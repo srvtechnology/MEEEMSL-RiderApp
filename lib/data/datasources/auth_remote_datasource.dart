@@ -6,6 +6,7 @@ import '../models/rider_model.dart';
 import '../models/registration_result_model.dart';
 import '../models/login_response_model.dart';
 import '../models/phone_otp_result_model.dart';
+import '../models/reset_password_result_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<bool> login(String phone);
@@ -45,7 +46,7 @@ abstract class AuthRemoteDataSource {
   Future<ResendOtpResultModel> resendRegistrationOtp({
     required String email,
   });
-  Future<bool> forgotPassword(String identity);
+  Future<SendResetOtpResultModel> forgotPassword(String identity);
   Future<bool> resetPassword(String identity, String otp, String newPassword);
   Future<String> refreshToken(String refreshToken);
   Future<void> logout();
@@ -330,18 +331,23 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   }
 
   @override
-  Future<bool> forgotPassword(String identity) async {
+  Future<SendResetOtpResultModel> forgotPassword(String identity) async {
     try {
       final response = await _dioClient.dio.post(
         ApiEndpoints.forgotPassword,
         data: {'identity': identity},
       );
-      return response.statusCode == 200;
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
+        return SendResetOtpResultModel.fromJson(data);
+      }
+      throw const ServerException(message: 'Failed to send reset code');
     } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to process password reset request',
-        statusCode: e.response?.statusCode,
-      );
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to send reset code';
+      if (e.response?.statusCode == 429) {
+        throw RateLimitException(message: msg, cooldownSeconds: 45);
+      }
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -358,10 +364,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       return response.statusCode == 200;
     } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to reset password',
-        statusCode: e.response?.statusCode,
-      );
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to reset password';
+      if (e.response?.statusCode == 429) {
+        throw RateLimitException(message: msg, cooldownSeconds: 300);
+      }
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 

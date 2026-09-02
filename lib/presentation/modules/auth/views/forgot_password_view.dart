@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
@@ -32,8 +34,8 @@ class ForgotPasswordView extends GetView<AuthController> {
                 const SizedBox(height: 6),
                 Text(
                   isCodeSent
-                      ? 'Enter the 4-digit code sent to your email/phone and choose a new password.'
-                      : AppStrings.resetPasswordSubtitle,
+                      ? 'Enter the 6-digit reset code sent to ${controller.resetMaskedDestination.value.isNotEmpty ? controller.resetMaskedDestination.value : controller.resetIdentityController.text} and choose a new password.'
+                      : 'Enter your registered email address or phone number to receive a 6-digit password reset code.',
                   style: AppTextStyles.bodyMedium(),
                 ),
                 const SizedBox(height: 32),
@@ -43,7 +45,7 @@ class ForgotPasswordView extends GetView<AuthController> {
                   CustomTextField(
                     controller: controller.resetIdentityController,
                     label: 'Email or Phone Number',
-                    hintText: 'alex.rider@meeem.com or +15552345678',
+                    hintText: 'e.g. rider.ibrahim@example.com or +23276123456',
                     prefixIcon: Icons.account_circle_outlined,
                   ),
                   const SizedBox(height: 28),
@@ -57,9 +59,13 @@ class ForgotPasswordView extends GetView<AuthController> {
                   CustomTextField(
                     controller: controller.resetOtpController,
                     label: 'Reset Verification Code',
-                    hintText: 'e.g. 4920',
+                    hintText: '• • • • • •',
                     keyboardType: TextInputType.number,
-                    prefixIcon: Icons.pin_outlined,
+                    prefixIcon: Icons.lock_reset,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(6),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   CustomTextField(
@@ -75,9 +81,28 @@ class ForgotPasswordView extends GetView<AuthController> {
                     label: AppStrings.confirmPassword,
                     hintText: 'Re-enter your new password',
                     obscureText: true,
-                    prefixIcon: Icons.lock_reset,
+                    prefixIcon: Icons.check_circle_outline,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
+
+                  // Timer & Resend button
+                  Center(
+                    child: Obx(() {
+                      if (controller.canResendOtp.value) {
+                        return TextButton.icon(
+                          onPressed: () => controller.sendResetCode(),
+                          icon: const Icon(Icons.refresh_rounded, size: 18),
+                          label: const Text('Resend Reset Code'),
+                        );
+                      }
+                      return Text(
+                        'Resend code in ${controller.resendTimerSeconds.value}s',
+                        style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryLight),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 24),
+
                   CustomButton(
                     text: 'Update Password',
                     isLoading: controller.isLoading.value,

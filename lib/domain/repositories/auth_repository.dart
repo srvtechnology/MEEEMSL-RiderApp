@@ -5,6 +5,8 @@ import '../entities/registration_result_entity.dart';
 import '../entities/login_response_entity.dart';
 import '../entities/phone_otp_result_entity.dart';
 
+import '../entities/reset_password_result_entity.dart';
+
 abstract class AuthRepository {
   Future<Either<Failure, bool>> login(String phone);
   Future<Either<Failure, RiderEntity>> loginWithPassword(String email, String password);
@@ -43,7 +45,7 @@ abstract class AuthRepository {
   Future<Either<Failure, ResendOtpResultEntity>> resendRegistrationOtp({
     required String email,
   });
-  Future<Either<Failure, bool>> forgotPassword(String identity);
+  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity);
   Future<Either<Failure, bool>> resetPassword(String identity, String otp, String newPassword);
   Future<Either<Failure, RiderEntity?>> getSavedRider();
   Future<Either<Failure, void>> logout();

@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:meeem_rider/domain/entities/rider_entity.dart';
 import 'package:meeem_rider/domain/entities/operating_zone_entity.dart';
 import 'package:meeem_rider/domain/entities/payout_info_entity.dart';
+import 'package:meeem_rider/domain/entities/reset_password_result_entity.dart';
 import 'package:meeem_rider/domain/entities/vehicle_entity.dart';
 import 'package:meeem_rider/domain/repositories/auth_repository.dart';
 import 'package:meeem_rider/domain/repositories/profile_repository.dart';
@@ -53,13 +54,18 @@ void main() {
 
     test('ResetPasswordUseCase sendResetCode & confirmReset', () async {
       final useCase = ResetPasswordUseCase(mockAuthRepository);
+      const tResetEntity = SendResetOtpResultEntity(
+        identity: 'alex@example.com',
+        identityType: 'EMAIL',
+        maskedDestination: 'a***x@example.com',
+      );
       when(() => mockAuthRepository.forgotPassword('alex@example.com'))
-          .thenAnswer((_) async => const Right(true));
+          .thenAnswer((_) async => const Right(tResetEntity));
       when(() => mockAuthRepository.resetPassword('alex@example.com', '4920', 'newpass123'))
           .thenAnswer((_) async => const Right(true));
 
       final sendResult = await useCase.sendResetCode('alex@example.com');
-      expect(sendResult, const Right(true));
+      expect(sendResult, const Right(tResetEntity));
 
       final confirmResult = await useCase.confirmReset('alex@example.com', '4920', 'newpass123');
       expect(confirmResult, const Right(true));

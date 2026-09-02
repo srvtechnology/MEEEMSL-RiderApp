@@ -5,6 +5,7 @@ import '../../domain/entities/rider_entity.dart';
 import '../../domain/entities/registration_result_entity.dart';
 import '../../domain/entities/login_response_entity.dart';
 import '../../domain/entities/phone_otp_result_entity.dart';
+import '../../domain/entities/reset_password_result_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_local_datasource.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -170,10 +171,12 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> forgotPassword(String identity) async {
+  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity) async {
     try {
       final result = await remoteDataSource.forgotPassword(identity);
       return Right(result);
+    } on RateLimitException catch (e) {
+      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -186,6 +189,8 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final result = await remoteDataSource.resetPassword(identity, otp, newPassword);
       return Right(result);
+    } on RateLimitException catch (e) {
+      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {

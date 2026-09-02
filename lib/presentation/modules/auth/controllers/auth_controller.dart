@@ -91,6 +91,7 @@ class AuthController extends GetxController {
   final newPasswordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
   final isResetCodeSent = false.obs;
+  final resetMaskedDestination = ''.obs;
 
   // 5-Step Onboarding Wizard State
   final onboardingStep = 0.obs;
@@ -477,10 +478,25 @@ class AuthController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
-      (success) {
+      (failure) {
+        if (failure is RateLimitFailure) {
+          startResendTimer(seconds: failure.cooldownSeconds);
+          Get.snackbar('Cooldown Active', failure.message, snackPosition: SnackPosition.BOTTOM);
+        } else {
+          Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+        }
+      },
+      (res) {
+        resetMaskedDestination.value = res.maskedDestination;
         isResetCodeSent.value = true;
-        Get.snackbar('Code Sent', 'Verification code sent to $identity', snackPosition: SnackPosition.TOP);
+        startResendTimer(seconds: res.resendCooldown);
+        Get.snackbar(
+          'Code Sent',
+          'Password reset code sent to ${res.maskedDestination}',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+          duration: const Duration(seconds: 4),
+        );
       },
     );
   }
@@ -492,15 +508,15 @@ class AuthController extends GetxController {
     final confirmPass = confirmPasswordController.text.trim();
 
     if (otp.length < 4) {
-      Get.snackbar('Error', 'Please enter a valid reset code');
+      Get.snackbar('Validation', 'Please enter the verification code sent to you', snackPosition: SnackPosition.BOTTOM);
       return;
     }
     if (newPass.length < 6) {
-      Get.snackbar('Error', 'Password must be at least 6 characters');
+      Get.snackbar('Validation', 'Password must be at least 6 characters', snackPosition: SnackPosition.BOTTOM);
       return;
     }
     if (newPass != confirmPass) {
-      Get.snackbar('Error', 'Passwords do not match');
+      Get.snackbar('Validation', 'Passwords do not match', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
@@ -509,11 +525,20 @@ class AuthController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Reset Failed', failure.message),
+      (failure) => Get.snackbar('Reset Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
       (success) {
-        Get.snackbar('Success', 'Password has been updated! Please sign in with your new password.',
-            snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
-        Get.offNamed(AppRoutes.login);
+        Get.snackbar(
+          'Password Reset Successful',
+          'Password has been successfully reset. Please log in with your new credentials.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+          duration: const Duration(seconds: 4),
+        );
+        isResetCodeSent.value = false;
+        resetOtpController.clear();
+        newPasswordController.clear();
+        confirmPasswordController.clear();
+        Get.offAllNamed(AppRoutes.login);
       },
     );
   }
