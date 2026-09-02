@@ -112,18 +112,40 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   @override
   Future<List<OperatingZoneModel>> getOperatingZones() async {
     try {
-      final response = await _dioClient.dio.get(ApiEndpoints.operatingZones);
-      final list = response.data['data'] as List<dynamic>;
+      final response = await _dioClient.dio.get(ApiEndpoints.zones);
+      final rawData = response.data['data'];
+      final List<dynamic> list;
+      if (rawData is Map<String, dynamic> && rawData['zones'] is List<dynamic>) {
+        list = rawData['zones'] as List<dynamic>;
+      } else if (rawData is List<dynamic>) {
+        list = rawData;
+      } else {
+        list = [];
+      }
       return list.map((e) => OperatingZoneModel.fromJson(e as Map<String, dynamic>)).toList();
     } catch (_) {
       // Mock fallback zones
       return const [
-        OperatingZoneModel(id: 'zone_1', name: 'Downtown District', district: 'Central Zone', isSelected: true, surgeMultiplier: 1.2, activeRiders: 45),
-        OperatingZoneModel(id: 'zone_2', name: 'North Heights & Uptown', district: 'North Zone', isSelected: true, surgeMultiplier: 1.0, activeRiders: 28),
-        OperatingZoneModel(id: 'zone_3', name: 'South Bay & Marina', district: 'South Zone', isSelected: false, surgeMultiplier: 1.15, activeRiders: 32),
-        OperatingZoneModel(id: 'zone_4', name: 'Financial Hub & Market St', district: 'East Zone', isSelected: true, surgeMultiplier: 1.3, activeRiders: 56),
-        OperatingZoneModel(id: 'zone_5', name: 'Airport Logistics Zone', district: 'Special Hub', isSelected: false, surgeMultiplier: 1.1, activeRiders: 19),
-        OperatingZoneModel(id: 'zone_6', name: 'West Campus & University', district: 'West Zone', isSelected: false, surgeMultiplier: 1.05, activeRiders: 24),
+        OperatingZoneModel(
+          id: 'cm7zone0001',
+          name: 'WESTERN RURAL ZONE',
+          description: 'Outer Western Area covering Waterloo, Campbell Town, and coastal villages',
+          isSelected: true,
+          locations: [
+            DeliveryLocationModel(id: 'cm7loc0001', zoneId: 'cm7zone0001', name: 'WATERLOO', code: 'WLOO'),
+            DeliveryLocationModel(id: 'cm7loc0002', zoneId: 'cm7zone0001', name: 'CAMPBELL TOWN', code: 'CTWN'),
+          ],
+        ),
+        OperatingZoneModel(
+          id: 'cm7zone0002',
+          name: 'PENINSULA ROAD ZONE',
+          description: 'Scenic beach and coastal corridor stretching from Lakka to Sussex and York',
+          isSelected: true,
+          locations: [
+            DeliveryLocationModel(id: 'cm7loc0006', zoneId: 'cm7zone0002', name: 'NO 2 RIVER', code: 'NO2R'),
+            DeliveryLocationModel(id: 'cm7loc0007', zoneId: 'cm7zone0002', name: 'BAW BAW', code: 'BBAW'),
+          ],
+        ),
       ];
     }
   }

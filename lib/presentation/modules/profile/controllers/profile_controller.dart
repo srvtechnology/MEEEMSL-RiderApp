@@ -160,7 +160,24 @@ class ProfileController extends GetxController {
     final index = operatingZones.indexWhere((z) => z.id == zoneId);
     if (index >= 0) {
       final current = operatingZones[index];
-      operatingZones[index] = current.copyWith(isSelected: !current.isSelected);
+      final newSelected = !current.isSelected;
+      final updatedLocations = current.locations.map((loc) => loc.copyWith(isSelected: newSelected)).toList();
+      operatingZones[index] = current.copyWith(isSelected: newSelected, locations: updatedLocations);
+    }
+  }
+
+  void toggleLocationSelection(String zoneId, String locationId) {
+    final zoneIndex = operatingZones.indexWhere((z) => z.id == zoneId);
+    if (zoneIndex >= 0) {
+      final zone = operatingZones[zoneIndex];
+      final locIndex = zone.locations.indexWhere((l) => l.id == locationId);
+      if (locIndex >= 0) {
+        final loc = zone.locations[locIndex];
+        final updatedLocs = List<DeliveryLocationEntity>.from(zone.locations);
+        updatedLocs[locIndex] = loc.copyWith(isSelected: !loc.isSelected);
+        final hasAnySelected = updatedLocs.any((l) => l.isSelected);
+        operatingZones[zoneIndex] = zone.copyWith(isSelected: hasAnySelected, locations: updatedLocs);
+      }
     }
   }
 
