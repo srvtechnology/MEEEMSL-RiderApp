@@ -16,6 +16,7 @@ import '../../../../domain/usecases/auth/self_register_usecase.dart';
 import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
+import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
 import '../controllers/auth_controller.dart';
 
 class AuthBinding extends Bindings {
@@ -39,6 +40,7 @@ class AuthBinding extends Bindings {
     Get.lazyPut(() => VerifyPhoneOtpUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => VerifyOtpUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => RegisterRiderUseCase(Get.find<AuthRepository>()));
+    Get.lazyPut(() => SubmitOnboardingUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => SelfRegisterUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => VerifyRegistrationOtpUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => ResendRegistrationOtpUseCase(Get.find<AuthRepository>()));
@@ -53,6 +55,7 @@ class AuthBinding extends Bindings {
           verifyPhoneOtpUseCase: Get.find<VerifyPhoneOtpUseCase>(),
           verifyOtpUseCase: Get.find<VerifyOtpUseCase>(),
           registerRiderUseCase: Get.find<RegisterRiderUseCase>(),
+          submitOnboardingUseCase: Get.find<SubmitOnboardingUseCase>(),
           selfRegisterUseCase: Get.find<SelfRegisterUseCase>(),
           verifyRegistrationOtpUseCase: Get.find<VerifyRegistrationOtpUseCase>(),
           resendRegistrationOtpUseCase: Get.find<ResendRegistrationOtpUseCase>(),

@@ -233,6 +233,47 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, RiderEntity>> submitOnboarding({
+    required List<String> vehicleTypes,
+    required String vehicleName,
+    required String vehicleNumber,
+    required String drivingLicenseNo,
+    required List<String> selectedZones,
+    required List<String> selectedLocations,
+    required Map<String, dynamic> address,
+    required Map<String, dynamic> emergencyContact,
+    required Map<String, dynamic> payoutInfo,
+    String? profileImagePath,
+    String? drivingLicenseFrontPath,
+    String? drivingLicenseBackPath,
+    String? nationalIdPath,
+  }) async {
+    try {
+      final rider = await remoteDataSource.submitOnboarding(
+        vehicleTypes: vehicleTypes,
+        vehicleName: vehicleName,
+        vehicleNumber: vehicleNumber,
+        drivingLicenseNo: drivingLicenseNo,
+        selectedZones: selectedZones,
+        selectedLocations: selectedLocations,
+        address: address,
+        emergencyContact: emergencyContact,
+        payoutInfo: payoutInfo,
+        profileImagePath: profileImagePath,
+        drivingLicenseFrontPath: drivingLicenseFrontPath,
+        drivingLicenseBackPath: drivingLicenseBackPath,
+        nationalIdPath: nationalIdPath,
+      );
+      await localDataSource.saveRider(rider);
+      return Right(rider);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, RegistrationResultEntity>> selfRegister({
     required String name,
     required String email,

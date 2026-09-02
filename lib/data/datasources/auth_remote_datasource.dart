@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/error/exceptions.dart';
@@ -32,6 +33,21 @@ abstract class AuthRemoteDataSource {
     required String userAgent,
   });
   Future<RiderModel> register(Map<String, dynamic> riderData);
+  Future<RiderModel> submitOnboarding({
+    required List<String> vehicleTypes,
+    required String vehicleName,
+    required String vehicleNumber,
+    required String drivingLicenseNo,
+    required List<String> selectedZones,
+    required List<String> selectedLocations,
+    required Map<String, dynamic> address,
+    required Map<String, dynamic> emergencyContact,
+    required Map<String, dynamic> payoutInfo,
+    String? profileImagePath,
+    String? drivingLicenseFrontPath,
+    String? drivingLicenseBackPath,
+    String? nationalIdPath,
+  });
   Future<RegistrationResultModel> selfRegister({
     required String name,
     required String email,
@@ -250,6 +266,76 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         message: e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Registration failed',
         statusCode: e.response?.statusCode,
       );
+    }
+  }
+
+  @override
+  Future<RiderModel> submitOnboarding({
+    required List<String> vehicleTypes,
+    required String vehicleName,
+    required String vehicleNumber,
+    required String drivingLicenseNo,
+    required List<String> selectedZones,
+    required List<String> selectedLocations,
+    required Map<String, dynamic> address,
+    required Map<String, dynamic> emergencyContact,
+    required Map<String, dynamic> payoutInfo,
+    String? profileImagePath,
+    String? drivingLicenseFrontPath,
+    String? drivingLicenseBackPath,
+    String? nationalIdPath,
+  }) async {
+    try {
+      final formDataMap = <String, dynamic>{
+        'vehicleTypes': jsonEncode(vehicleTypes),
+        'selectedZones': jsonEncode(selectedZones),
+        'selectedLocations': jsonEncode(selectedLocations),
+        'vehicleName': vehicleName,
+        'vehicleNumber': vehicleNumber,
+        'drivingLicenseNo': drivingLicenseNo,
+        'address': jsonEncode(address),
+        'emergencyContact': jsonEncode(emergencyContact),
+        'payoutInfo': jsonEncode(payoutInfo),
+      };
+
+      if (profileImagePath != null && profileImagePath.isNotEmpty && !profileImagePath.startsWith('http')) {
+        try {
+          formDataMap['profileImage'] = await MultipartFile.fromFile(profileImagePath, filename: 'profile.jpg');
+        } catch (_) {}
+      }
+      if (drivingLicenseFrontPath != null && drivingLicenseFrontPath.isNotEmpty && !drivingLicenseFrontPath.startsWith('http')) {
+        try {
+          formDataMap['drivingLicenseFront'] = await MultipartFile.fromFile(drivingLicenseFrontPath, filename: 'license_front.jpg');
+        } catch (_) {}
+      }
+      if (drivingLicenseBackPath != null && drivingLicenseBackPath.isNotEmpty && !drivingLicenseBackPath.startsWith('http')) {
+        try {
+          formDataMap['drivingLicenseBack'] = await MultipartFile.fromFile(drivingLicenseBackPath, filename: 'license_back.jpg');
+        } catch (_) {}
+      }
+      if (nationalIdPath != null && nationalIdPath.isNotEmpty && !nationalIdPath.startsWith('http')) {
+        try {
+          formDataMap['nationalId'] = await MultipartFile.fromFile(nationalIdPath, filename: 'national_id.jpg');
+        } catch (_) {}
+      }
+
+      final formData = FormData.fromMap(formDataMap);
+
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.onboarding,
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
+        final riderData = data['rider'] as Map<String, dynamic>? ?? data;
+        return RiderModel.fromJson(riderData);
+      }
+      throw const ServerException(message: 'Onboarding submission failed');
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Onboarding submission failed';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 

@@ -31,6 +31,21 @@ abstract class AuthRepository {
     required String userAgent,
   });
   Future<Either<Failure, RiderEntity>> register(Map<String, dynamic> riderData);
+  Future<Either<Failure, RiderEntity>> submitOnboarding({
+    required List<String> vehicleTypes,
+    required String vehicleName,
+    required String vehicleNumber,
+    required String drivingLicenseNo,
+    required List<String> selectedZones,
+    required List<String> selectedLocations,
+    required Map<String, dynamic> address,
+    required Map<String, dynamic> emergencyContact,
+    required Map<String, dynamic> payoutInfo,
+    String? profileImagePath,
+    String? drivingLicenseFrontPath,
+    String? drivingLicenseBackPath,
+    String? nationalIdPath,
+  });
   Future<Either<Failure, RegistrationResultEntity>> selfRegister({
     required String name,
     required String email,

@@ -19,6 +19,7 @@ import '../../../../domain/usecases/auth/self_register_usecase.dart';
 import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
+import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
 import '../../../../core/services/device_info_service.dart';
 import '../../../../core/error/failures.dart';
 import '../widgets/suspended_account_dialog.dart';
@@ -37,6 +38,7 @@ class AuthController extends GetxController {
   final VerifyPhoneOtpUseCase verifyPhoneOtpUseCase;
   final VerifyOtpUseCase verifyOtpUseCase;
   final RegisterRiderUseCase registerRiderUseCase;
+  final SubmitOnboardingUseCase submitOnboardingUseCase;
   final SelfRegisterUseCase selfRegisterUseCase;
   final VerifyRegistrationOtpUseCase verifyRegistrationOtpUseCase;
   final ResendRegistrationOtpUseCase resendRegistrationOtpUseCase;
@@ -51,6 +53,7 @@ class AuthController extends GetxController {
     required this.verifyPhoneOtpUseCase,
     required this.verifyOtpUseCase,
     required this.registerRiderUseCase,
+    required this.submitOnboardingUseCase,
     required this.selfRegisterUseCase,
     required this.verifyRegistrationOtpUseCase,
     required this.resendRegistrationOtpUseCase,
@@ -616,40 +619,64 @@ class AuthController extends GetxController {
   Future<void> submitFullOnboarding() async {
     isLoading.value = true;
 
-    final registrationData = {
-      'name': fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : 'Alex Johnson',
-      'email': emailController.text.trim().isNotEmpty ? emailController.text.trim() : 'alex.rider@meeem.com',
-      'phone': onboardingPhoneController.text.trim().isNotEmpty ? onboardingPhoneController.text.trim() : '+1 555 234 5678',
-      'avatar': profilePhotoPath.value,
-      'vehicle': {
-        'type': vehicleType.value,
-        'model': vehicleModelController.text.trim(),
-        'licensePlate': licensePlateController.text.trim(),
-        'color': vehicleColorController.text.trim(),
-        'year': vehicleYearController.text.trim(),
-      },
-      'operatingZones': selectedZones.toList(),
-      'payoutInfo': {
-        'methodType': payoutMethodType.value == PayoutMethodType.bank ? 'bank' : 'mobile_money',
-        'bankName': bankNameController.text.trim(),
-        'accountNumber': accountNumberController.text.trim(),
-        'accountHolderName': accountHolderController.text.trim(),
-        'routingNumber': routingNumberController.text.trim(),
-        'mobileMoneyProvider': mobileMoneyProviderController.text.trim(),
-        'mobileMoneyNumber': mobileMoneyNumberController.text.trim(),
-        'beneficiaryName': beneficiaryNameController.text.trim(),
-      },
+    String mappedVehicleType = '2_WHEELER';
+    if (vehicleType.value.contains('3-Wheeler')) {
+      mappedVehicleType = '3_WHEELER';
+    } else if (vehicleType.value.contains('4-Wheeler')) {
+      mappedVehicleType = '4_WHEELER';
+    }
+
+    final payoutData = payoutMethodType.value == PayoutMethodType.bank
+        ? {
+            'methodType': 'bank',
+            'bankName': bankNameController.text.trim().isNotEmpty ? bankNameController.text.trim() : 'Sierra Leone Commercial Bank',
+            'accountNumber': accountNumberController.text.trim().isNotEmpty ? accountNumberController.text.trim() : '0010029384920',
+            'accountHolder': accountHolderController.text.trim().isNotEmpty ? accountHolderController.text.trim() : 'Ibrahim Koroma',
+            'routingNumber': routingNumberController.text.trim(),
+          }
+        : {
+            'methodType': 'mobile_money',
+            'provider': mobileMoneyProviderController.text.trim().isNotEmpty ? mobileMoneyProviderController.text.trim() : 'Orange Money',
+            'phone': mobileMoneyNumberController.text.trim().isNotEmpty ? mobileMoneyNumberController.text.trim() : '+23276123456',
+            'accountHolder': beneficiaryNameController.text.trim().isNotEmpty ? beneficiaryNameController.text.trim() : 'Ibrahim Koroma',
+          };
+
+    final addressData = {
+      'street': '14 Lumley Beach Rd',
+      'city': 'Freetown',
+      'state': 'Western Area',
+      'postalCode': '00232',
     };
 
-    final result = await registerRiderUseCase(registrationData);
+    final emergencyContactData = {
+      'name': 'Fatima Koroma',
+      'relationship': 'Spouse',
+      'phone': onboardingPhoneController.text.trim().isNotEmpty ? onboardingPhoneController.text.trim() : '+23278999888',
+    };
+
+    final result = await submitOnboardingUseCase(
+      vehicleTypes: [mappedVehicleType],
+      vehicleName: vehicleModelController.text.trim().isNotEmpty ? vehicleModelController.text.trim() : 'Bajaj Boxer 150',
+      vehicleNumber: licensePlateController.text.trim().isNotEmpty ? licensePlateController.text.trim() : 'SL-AA-9201',
+      drivingLicenseNo: licenseExpiryController.text.trim().isNotEmpty ? 'DL-SL-${licenseExpiryController.text.trim()}' : 'DL-SL-2024-88492',
+      selectedZones: selectedZones.toList(),
+      selectedLocations: const ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+      address: addressData,
+      emergencyContact: emergencyContactData,
+      payoutInfo: payoutData,
+      profileImagePath: profilePhotoPath.value,
+      drivingLicenseFrontPath: driverLicensePath.value,
+      drivingLicenseBackPath: driverLicensePath.value,
+      nationalIdPath: nationalIdFrontPath.value,
+    );
     isLoading.value = false;
 
     result.fold(
       (failure) => Get.snackbar('Application Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
       (rider) {
         Get.snackbar(
-          '🎉 Application Submitted!',
-          'Your profile, vehicle & documents are submitted for review.',
+          '🎉 Onboarding Submitted!',
+          'Onboarding profile submitted successfully. Your account is pending admin approval.',
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
           duration: const Duration(seconds: 4),
