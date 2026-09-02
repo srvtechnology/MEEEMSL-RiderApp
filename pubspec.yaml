@@ -1,0 +1,86 @@
+name: meeem_rider
+description: "A production-ready Delivery Rider (Driver) App built with Flutter, GetX, and Clean Architecture."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+  # State Management, Dependency Injection & Routing
+  get: ^4.6.6
+
+  # Networking & HTTP
+  dio: ^5.7.0
+
+  # Functional Programming & Result Types
+  dartz: ^0.10.1
+
+  # Value Equality
+  equatable: ^2.0.5
+
+  # Local Key-Value Storage
+  get_storage: ^2.1.1
+
+  # Date & Currency Formatting
+  intl: ^0.19.0
+
+  # Typography & Google Fonts
+  google_fonts: ^6.2.1
+
+  # Image Handling & Caching
+  cached_network_image: ^3.4.1
+  image_picker: ^1.1.2
+
+  # Location & Geocoding
+  geolocator: ^13.0.2
+
+  # URL Launcher (Calls, SMS, Maps)
+  url_launcher: ^6.3.1
+
+  # Vector Assets
+  flutter_svg: ^2.0.10+1
+
+  # UUID Generator
+  uuid: ^4.5.1
+
+  # Video Player (Splash Screen)
+  video_player: ^2.9.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  mocktail: ^1.0.4
+  flutter_launcher_icons: ^0.14.4
+  flutter_native_splash: ^2.4.4
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  remove_alpha_ios: true
+  image_path: "assets/logo/logo-icon.png"
+  adaptive_icon_background: "assets/logo/logo-icon-bg.png"
+  adaptive_icon_foreground: "assets/logo/logo-icon-fg.png"
+  min_sdk_android: 21
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/logo/logo-icon.png"
+  color_dark: "#0834C2"
+  image_dark: "assets/logo/logo-icon.png"
+  android: true
+  ios: true
+  web: false
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo/
+
+
