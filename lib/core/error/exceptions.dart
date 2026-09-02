@@ -31,3 +31,28 @@ class AuthException implements Exception {
   @override
   String toString() => 'AuthException: $message';
 }
+
+class SuspendedException implements Exception {
+  final String message;
+  final String authStatus;
+  const SuspendedException({
+    this.message = 'Your rider account has been suspended. Please contact support.',
+    this.authStatus = 'SUSPENDED',
+  });
+
+  @override
+  String toString() => 'SuspendedException: $message';
+}
+
+class RateLimitException implements Exception {
+  final String message;
+  final int cooldownSeconds;
+  const RateLimitException({
+    required this.message,
+    this.cooldownSeconds = 60,
+  });
+
+  @override
+  String toString() => 'RateLimitException: $message (cooldown: ${cooldownSeconds}s)';
+}
+

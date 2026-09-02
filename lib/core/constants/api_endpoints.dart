@@ -1,19 +1,54 @@
-/// ApiEndpoints holds all REST and WebSocket endpoint paths.
+/// ApiEndpoints holds all REST and WebSocket endpoint paths
+/// conforming to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1).
 class ApiEndpoints {
   ApiEndpoints._();
 
-  static const String baseUrl = 'https://api.meeem.com/rider/v1';
+  static const String baseUrl = 'https://api.meeem.com/mobileapi/rider';
   static const String socketUrl = 'wss://socket.meeem.com/rider';
 
-  // Auth
-  static const String login = '/auth/login';
-  static const String loginWithPassword = '/auth/login-password';
-  static const String verifyOtp = '/auth/verify-otp';
+  // 2. Rider Registration & OTP Verification
   static const String register = '/auth/register';
-  static const String forgotPassword = '/auth/forgot-password';
-  static const String resetPassword = '/auth/reset-password';
-  static const String refreshToken = '/auth/refresh-token';
+  static const String verifyRegistrationOtp = '/auth/verify-otp';
+  static const String resendRegistrationOtp = '/auth/resend-otp';
+
+  // 3. Rider Login & Session Lifecycle
+  static const String login = '/auth/login';
+  static const String phoneOtpSend = '/auth/phone-otp/send-otp';
+  static const String phoneOtpVerify = '/auth/phone-otp/verify-otp';
+  static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout';
+
+  // 4. Forgot & Reset Password
+  static const String forgotPasswordSendOtp = '/auth/forgot-password/send-otp';
+  static const String forgotPasswordReset = '/auth/forgot-password/reset';
+
+  // Compatibility aliases
+  static const String loginWithPassword = login;
+  static const String verifyOtp = verifyRegistrationOtp;
+  static const String forgotPassword = forgotPasswordSendOtp;
+  static const String resetPassword = forgotPasswordReset;
+
+  // 5. First-Time Onboarding Flow
+  static const String onboarding = '/onboarding';
+
+  // 6. Rider Profile Management
+  static const String riderProfile = '/profile';
+  static const String updateProfile = '/profile'; // PATCH
+
+  // 7. Rider Settings & Preferences
+  static const String settings = '/settings'; // GET and POST
+
+  // 8. Delivery Zones & Hierarchical Locations
+  static const String zones = '/zones';
+
+  // 9. Multi-Device Push Token Management
+  static const String deviceToken = '/device-token'; // POST and DELETE
+
+  // Legacy/Additional Profile & Documents endpoints
+  static const String uploadDocument = '/profile/documents/upload';
+  static const String getDocuments = '/profile/documents';
+  static const String operatingZones = '/profile/operating-zones';
+  static const String updateVehicle = '/profile/vehicle/update';
 
   // Dashboard & Status
   static const String dashboardSummary = '/dashboard/summary';
@@ -35,14 +70,6 @@ class ApiEndpoints {
   static const String requestPayout = '/earnings/payout/request';
   static const String payoutHistory = '/earnings/payout/history';
   static const String payoutInfo = '/earnings/payout/info';
-
-  // Profile & Documents & Zones
-  static const String riderProfile = '/profile';
-  static const String updateProfile = '/profile/update';
-  static const String uploadDocument = '/profile/documents/upload';
-  static const String getDocuments = '/profile/documents';
-  static const String operatingZones = '/profile/operating-zones';
-  static const String updateVehicle = '/profile/vehicle/update';
 
   // Notifications
   static const String notifications = '/notifications';

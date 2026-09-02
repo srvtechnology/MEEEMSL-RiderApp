@@ -2,195 +2,463 @@ import 'package:dio/dio.dart';
 import '../constants/api_endpoints.dart';
 
 /// MockInterceptor intercepts Dio HTTP calls in demo/mock mode
-/// to return realistic mock JSON responses.
+/// to return realistic mock JSON responses conforming to
+/// MEEEM Delivery Network — Rider Mobile App API Doc (Part 1).
 class MockInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    // Add artificial network latency for realistic feel (300ms)
-    await Future.delayed(const Duration(milliseconds: 300));
+    // Add artificial network latency for realistic feel (250ms)
+    await Future.delayed(const Duration(milliseconds: 250));
 
     final path = options.path;
 
-    if (path.contains(ApiEndpoints.loginWithPassword)) {
+    // 2.1 Rider Self-Registration
+    if (path.endsWith(ApiEndpoints.register)) {
+      final name = options.data?['name'] ?? 'Ibrahim Koroma';
+      final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
       return handler.resolve(Response(
         requestOptions: options,
-        statusCode: 200,
+        statusCode: 201,
         data: {
           'success': true,
-          'token': 'mock_jwt_token_meeem_rider_secure_2026',
-          'refreshToken': 'mock_jwt_refresh_token_2026',
-          'rider': {
-            'id': 'rider_9082',
-            'name': 'Alex Johnson',
-            'phone': '+1 555 234 5678',
-            'email': options.data?['email'] ?? 'alex.rider@meeem.com',
-            'avatar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-            'rating': 4.92,
-            'totalTrips': 1420,
-            'isOnline': true,
-            'walletBalance': 184.50,
-            'approvalStatus': 'approved',
-            'vehicle': {
-              'type': '2-Wheeler',
-              'model': 'Honda CB500X',
-              'licensePlate': 'RD-8842-NY',
-              'color': 'Sapphire Blue',
-              'year': '2023',
+          'message': 'Registration successful. Please verify your email with the 6-digit OTP sent.',
+          'data': {
+            'userId': 'cm7user_${DateTime.now().millisecondsSinceEpoch}',
+            'email': email,
+            'name': name,
+            'role': 'RIDER',
+            'requiresVerification': true,
+            'verificationDetails': {
+              'method': 'OTP',
+              'expiresIn': 600,
+              'resendCooldown': 60,
             },
-            'payoutInfo': {
-              'methodType': 'bank',
-              'bankName': 'Chase Bank USA',
-              'accountNumber': '9920184920',
-              'accountHolderName': 'Alex Johnson',
-              'routingNumber': '021000021',
-            },
-            'operatingZones': ['zone_1', 'zone_2', 'zone_4'],
+            'verifyUrl': '/mobileapi/rider/auth/verify-otp',
           }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.forgotPassword)) {
+    // 2.2 Verify Registration OTP
+    if (path.endsWith(ApiEndpoints.verifyRegistrationOtp)) {
+      final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
       return handler.resolve(Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'message': 'Password reset verification code sent',
+          'message': 'Email verified successfully! You can now log in to complete your rider onboarding.',
+          'data': {
+            'email': email,
+            'isEmailVerified': true,
+            'loginAvailable': true,
+            'onboardingCompleted': false,
+          }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.resetPassword)) {
+    // 2.3 Resend Registration OTP
+    if (path.endsWith(ApiEndpoints.resendRegistrationOtp)) {
+      final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
       return handler.resolve(Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'message': 'Password has been reset successfully',
+          'message': 'New verification code has been sent.',
+          'data': {
+            'email': email,
+            'expiresIn': 600,
+            'resendCooldown': 60,
+          }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.operatingZones)) {
-      if (options.method == 'POST') {
-        return handler.resolve(Response(
-          requestOptions: options,
-          statusCode: 200,
-          data: {'success': true, 'message': 'Operating zones updated successfully'},
-        ));
-      }
+    // 3.2 A) Phone OTP Send
+    if (path.endsWith(ApiEndpoints.phoneOtpSend)) {
+      final phone = options.data?['phone'] ?? '+23276123456';
       return handler.resolve(Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'data': [
-            {'id': 'zone_1', 'name': 'Downtown District', 'district': 'Central Zone', 'isSelected': true, 'surgeMultiplier': 1.2, 'activeRiders': 45},
-            {'id': 'zone_2', 'name': 'North Heights & Uptown', 'district': 'North Zone', 'isSelected': true, 'surgeMultiplier': 1.0, 'activeRiders': 28},
-            {'id': 'zone_3', 'name': 'South Bay & Marina', 'district': 'South Zone', 'isSelected': false, 'surgeMultiplier': 1.15, 'activeRiders': 32},
-            {'id': 'zone_4', 'name': 'Financial Hub & Market St', 'district': 'East Zone', 'isSelected': true, 'surgeMultiplier': 1.3, 'activeRiders': 56},
-            {'id': 'zone_5', 'name': 'Airport Logistics Hub', 'district': 'Special Hub', 'isSelected': false, 'surgeMultiplier': 1.1, 'activeRiders': 19},
-            {'id': 'zone_6', 'name': 'West Campus & University', 'district': 'West Zone', 'isSelected': false, 'surgeMultiplier': 1.05, 'activeRiders': 24},
-          ]
+          'message': 'Login OTP sent to your phone.',
+          'data': {
+            'phone': phone,
+            'expiresIn': 600,
+            'resendCooldown': 60,
+          }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.payoutInfo)) {
-      if (options.method == 'POST') {
-        return handler.resolve(Response(
-          requestOptions: options,
-          statusCode: 200,
-          data: {'success': true, 'data': options.data},
-        ));
-      }
+    // 3.1 Email & Password Login OR 3.2 B) Phone OTP Verify
+    if (path.endsWith(ApiEndpoints.login) || path.endsWith(ApiEndpoints.phoneOtpVerify)) {
+      final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
+      final phone = options.data?['phone'] ?? '76123456';
+
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Login successful',
+          'data': {
+            'user': {
+              'id': 'cm7abc123000',
+              'email': email,
+              'name': 'Ibrahim Koroma',
+              'role': 'RIDER',
+              'phone': phone,
+              'phoneCountryCode': '+232',
+              'image': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              'isEmailVerified': true,
+              'createdAt': '2026-08-26T10:00:00.000Z',
+            },
+            'rider': {
+              'id': 'cm7rider0001',
+              'isApproved': true,
+              'isSuspended': false,
+              'status': 'APPROVED',
+              'onboardingCompleted': true,
+              'isFirstLogin': false,
+              'vehicleType': '2_WHEELER',
+              'vehicleTypes': ['2_WHEELER'],
+              'vehicleName': 'Honda CB Shine 125',
+              'vehicleNumber': 'SL-AA-9988',
+              'drivingLicenseNo': 'DL-10928374',
+              'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              'selectedZones': ['ZONE 1', 'ZONE 2'],
+              'selectedLocations': ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+            },
+            'tokens': {
+              'accessToken': 'mock_jwt_access_token_meeem_rider_2026',
+              'refreshToken': 'mock_jwt_refresh_token_meeem_rider_2026',
+              'expiresIn': 172800,
+            },
+            'sessionInfo': {
+              'expiresIn': 172800,
+              'tokenType': 'Bearer',
+            }
+          }
+        },
+      ));
+    }
+
+    // 3.3 Refresh JWT Tokens
+    if (path.endsWith(ApiEndpoints.refreshToken)) {
       return handler.resolve(Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
           'data': {
-            'methodType': 'bank',
-            'bankName': 'Chase Bank USA',
-            'accountNumber': '9920184920',
-            'accountHolderName': 'Alex Johnson',
-            'routingNumber': '021000021',
+            'accessToken': 'mock_refreshed_access_token_${DateTime.now().millisecondsSinceEpoch}',
+            'expiresIn': 172800,
+            'tokenType': 'Bearer',
           }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.updateLocation)) {
-      return handler.resolve(Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {'success': true, 'message': 'Location updated'},
-      ));
-    }
-
-    if (path.contains(ApiEndpoints.updateVehicle)) {
-      return handler.resolve(Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {'success': true, 'data': options.data},
-      ));
-    }
-
-    if (path.contains(ApiEndpoints.login)) {
+    // 4.1 Forgot Password Send OTP
+    if (path.endsWith(ApiEndpoints.forgotPasswordSendOtp)) {
+      final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
       return handler.resolve(Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'message': 'OTP sent successfully',
+          'message': 'If an active rider account exists, a reset OTP has been sent.',
           'data': {
-            'phone': options.data?['phone'] ?? '+1234567890',
-            'isRegistered': true,
+            'email': email,
+            'expiresIn': 600,
+            'resendCooldown': 60,
           }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.verifyOtp)) {
+    // 4.2 Reset Password
+    if (path.endsWith(ApiEndpoints.forgotPasswordReset)) {
       return handler.resolve(Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'token': 'mock_jwt_token_meeem_rider_secure_2026',
-          'refreshToken': 'mock_jwt_refresh_token_2026',
-          'rider': {
-            'id': 'rider_9082',
-            'name': 'Alex Johnson',
-            'phone': options.data?['phone'] ?? '+1 555 234 5678',
-            'email': 'alex.rider@meeem.com',
-            'avatar': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-            'rating': 4.92,
-            'totalTrips': 1420,
-            'isOnline': true,
-            'walletBalance': 184.50,
-            'approvalStatus': 'approved',
-            'vehicle': {
-              'type': '2-Wheeler',
-              'model': 'Honda CB500X',
-              'licensePlate': 'RD-8842-NY',
-              'color': 'Sapphire Blue',
-              'year': '2023',
-            },
-            'payoutInfo': {
-              'methodType': 'bank',
-              'bankName': 'Chase Bank USA',
-              'accountNumber': '9920184920',
-              'accountHolderName': 'Alex Johnson',
-              'routingNumber': '021000021',
-            },
-            'operatingZones': ['zone_1', 'zone_2', 'zone_4'],
+          'message': 'Password reset successful. You can now log in with your new password.',
+          'data': {
+            'loginAvailable': true,
           }
         },
       ));
     }
 
+    // 5.1 First-Time Onboarding
+    if (path.endsWith(ApiEndpoints.onboarding)) {
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Rider onboarding completed successfully!',
+          'data': {
+            'onboardingCompleted': true,
+            'rider': {
+              'id': 'cm7rider0001',
+              'isApproved': true,
+              'status': 'APPROVED',
+              'onboardingCompleted': true,
+              'isFirstLogin': false,
+              'vehicleType': '2_WHEELER',
+              'vehicleTypes': ['2_WHEELER'],
+              'vehicleName': 'Honda CB Shine 125',
+              'vehicleNumber': 'SL-AA-9988',
+              'drivingLicenseNo': 'DL-10928374',
+              'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              'drivingLicenseDoc': 'https://s3.amazonaws.com/meeem/docs/dl.png',
+              'nationalIdDoc': 'https://s3.amazonaws.com/meeem/docs/id.png',
+              'vehicleInsuranceDoc': 'https://s3.amazonaws.com/meeem/docs/ins.png',
+              'selectedZones': ['ZONE 1', 'ZONE 2'],
+              'selectedLocations': ['NO 2 RIVER', 'BAW BAW'],
+            }
+          }
+        },
+      ));
+    }
+
+    // 6.1 & 6.2 Profile GET and PATCH
+    if (path.endsWith(ApiEndpoints.riderProfile)) {
+      if (options.method == 'PATCH') {
+        final patchData = options.data is Map ? options.data as Map : {};
+        return handler.resolve(Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'message': 'Profile updated successfully.',
+            'data': {
+              'rider': {
+                'id': 'cm7rider0001',
+                'isApproved': true,
+                'isSuspended': false,
+                'status': 'APPROVED',
+                'vehicleType': patchData['vehicleType'] ?? '2_WHEELER',
+                'vehicleTypes': [patchData['vehicleType'] ?? '2_WHEELER'],
+                'vehicleName': patchData['vehicleName'] ?? 'Honda CB Shine 125 Super',
+                'vehicleNumber': patchData['vehicleNumber'] ?? 'SL-AA-9988-NEW',
+                'drivingLicenseNo': 'DL-10928374',
+              }
+            }
+          },
+        ));
+      }
+
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': {
+            'user': {
+              'id': 'cm7abc123000',
+              'email': 'rider.ibrahim@example.com',
+              'name': 'Ibrahim Koroma',
+              'phone': '76123456',
+              'phoneCountryCode': '+232',
+              'image': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              'isEmailVerified': true,
+            },
+            'rider': {
+              'id': 'cm7rider0001',
+              'isApproved': true,
+              'isSuspended': false,
+              'status': 'APPROVED',
+              'vehicleType': '2_WHEELER',
+              'vehicleTypes': ['2_WHEELER'],
+              'vehicleName': 'Honda CB Shine 125',
+              'vehicleNumber': 'SL-AA-9988',
+              'drivingLicenseNo': 'DL-10928374',
+              'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              'selectedZones': ['ZONE 1', 'ZONE 2'],
+              'selectedLocations': ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+            }
+          }
+        },
+      ));
+    }
+
+    // 7.1 & 7.2 Settings GET and POST
+    if (path.endsWith(ApiEndpoints.settings)) {
+      if (options.method == 'POST') {
+        return handler.resolve(Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'message': 'Settings updated successfully!',
+            'data': {
+              'rider': {
+                'id': 'cm7rider0001',
+                'selectedZones': options.data?['selectedZones'] ?? ['ZONE 1'],
+                'selectedLocations': options.data?['selectedLocations'] ?? ['NO 2 RIVER'],
+              }
+            }
+          },
+        ));
+      }
+
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': {
+            'user': {
+              'id': 'cm7abc123000',
+              'email': 'rider.ibrahim@example.com',
+              'name': 'Ibrahim Koroma',
+              'phone': '76123456',
+              'phoneCountryCode': '+232',
+            },
+            'rider': {
+              'id': 'cm7rider0001',
+              'isApproved': true,
+              'isSuspended': false,
+              'status': 'APPROVED',
+              'selectedZones': ['ZONE 1', 'ZONE 2'],
+              'selectedLocations': ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+            },
+            'registeredDevices': [
+              {
+                'token': 'mock_fcm_token_1',
+                'deviceId': 'android-uuid-1',
+                'platform': 'android',
+                'deviceModel': 'Samsung Galaxy S22',
+                'lastActiveAt': '2026-08-26T12:00:00.000Z',
+              },
+              {
+                'token': 'mock_fcm_token_2',
+                'deviceId': 'iphone-uuid-2',
+                'platform': 'ios',
+                'deviceModel': 'iPhone 15 Pro',
+                'lastActiveAt': '2026-08-27T10:30:00.000Z',
+              }
+            ]
+          }
+        },
+      ));
+    }
+
+    // 8.1 Delivery Zones & Hierarchical Locations
+    if (path.endsWith(ApiEndpoints.zones)) {
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': {
+            'totalZones': 4,
+            'totalLocations': 15,
+            'zones': [
+              {
+                'id': 'ZONE 1',
+                'name': 'ZONE 1 (Western Rural)',
+                'regions': [
+                  {'name': 'NO 2 RIVER'},
+                  {'name': 'BAW BAW'},
+                  {'name': 'BIG WATER'},
+                  {'name': 'JOHN OBEY'},
+                  {'name': 'MAMA BEACH'},
+                  {'name': 'TOKEH'},
+                  {'name': 'YORK'},
+                ]
+              },
+              {
+                'id': 'ZONE 2',
+                'name': 'ZONE 2 (Peninsula Area)',
+                'regions': [
+                  {'name': 'HAMILTON'},
+                  {'name': 'LAKKA'},
+                  {'name': 'SUSSEX'},
+                  {'name': 'KIMBO VILLAGE'},
+                ]
+              },
+              {
+                'id': 'ZONE 3',
+                'name': 'ZONE 3 (Central Business)',
+                'regions': [
+                  {'name': 'COTTON TREE'},
+                  {'name': 'SIAKA STEVENS ST'},
+                  {'name': 'CONNAUGHT'},
+                ]
+              },
+              {
+                'id': 'ZONE 4',
+                'name': 'ZONE 4 (East End)',
+                'regions': [
+                  {'name': 'CLINE TOWN'},
+                  {'name': 'KISSY'},
+                  {'name': 'WELLINGTON'},
+                ]
+              }
+            ]
+          }
+        },
+      ));
+    }
+
+    // 9.1 & 9.2 Push Token Management
+    if (path.endsWith(ApiEndpoints.deviceToken)) {
+      if (options.method == 'DELETE') {
+        return handler.resolve(Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'message': 'Device token unregistered successfully.',
+            'data': {
+              'remainingDevicesCount': 0,
+            }
+          },
+        ));
+      }
+
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Device token registered successfully for push notifications.',
+          'data': {
+            'registeredTokensCount': 1,
+            'devices': [
+              {
+                'token': options.data?['token'] ?? 'mock_fcm_token_device',
+                'deviceId': options.data?['deviceId'] ?? 'mock_device_uuid',
+                'platform': options.data?['platform'] ?? 'android',
+                'deviceModel': options.data?['deviceModel'] ?? 'Generic Phone',
+                'lastActiveAt': DateTime.now().toIso8601String(),
+                'createdAt': DateTime.now().toIso8601String(),
+              }
+            ]
+          }
+        },
+      ));
+    }
+
+    // Logout
+    if (path.endsWith(ApiEndpoints.logout)) {
+      return handler.resolve(Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'success': true, 'message': 'Logged out successfully'},
+      ));
+    }
+
+    // Orders & Dashboard simulation fallback
     if (path.contains(ApiEndpoints.dashboardSummary)) {
       return handler.resolve(Response(
         requestOptions: options,
@@ -233,29 +501,28 @@ class MockInterceptor extends Interceptor {
             {
               'id': 'ord_102948',
               'orderNumber': '#MM-8839',
-              'status': 'in_transit', // accepted, arrived_at_pickup, picked_up, in_transit, arrived_at_dropoff, delivered
+              'status': 'in_transit',
               'customerName': 'Sarah Jenkins',
-              'customerPhone': '+1 555 987 6543',
+              'customerPhone': '+232 76 998877',
               'customerAvatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-              'pickupName': 'Artisan Burger Co.',
-              'pickupAddress': '742 Evergreen Terrace, Downtown',
-              'pickupPhone': '+1 555 111 2233',
-              'dropoffAddress': '124 Conch Street, Apt 4B, Uptown',
-              'pickupLat': 40.7128,
-              'pickupLng': -74.0060,
-              'dropoffLat': 40.7306,
-              'dropoffLng': -73.9352,
+              'pickupName': 'Mama Beach Grill',
+              'pickupAddress': 'Mama Beach, Zone 1',
+              'pickupPhone': '+232 76 112233',
+              'dropoffAddress': 'No 2 River Beach House #4',
+              'pickupLat': 8.484,
+              'pickupLng': -13.234,
+              'dropoffLat': 8.460,
+              'dropoffLng': -13.250,
               'items': [
-                {'name': 'Double Truffle Burger', 'quantity': 2, 'notes': 'No onions'},
-                {'name': 'Loaded Truffle Fries', 'quantity': 1, 'notes': 'Extra crispy'},
-                {'name': 'Salted Caramel Shake', 'quantity': 2, 'notes': ''},
+                {'name': 'Grilled Barracuda & Plantain', 'quantity': 2, 'notes': 'Extra spicy sauce'},
+                {'name': 'Ginger Beer (Cold)', 'quantity': 2, 'notes': ''},
               ],
               'subtotal': 48.50,
               'riderEarnings': 14.80,
               'distanceKm': 3.4,
               'estimatedDurationMin': 16,
               'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
-              'notes': 'Please ring the doorbell and leave at door 4B.',
+              'notes': 'Please call when arriving at the gate.',
               'deliveryOtp': '4829',
             }
           ]
@@ -273,28 +540,27 @@ class MockInterceptor extends Interceptor {
             'id': 'ord_${DateTime.now().millisecondsSinceEpoch}',
             'orderNumber': '#MM-${(DateTime.now().millisecondsSinceEpoch % 9000) + 1000}',
             'status': 'pending',
-            'customerName': 'Michael Chang',
-            'customerPhone': '+1 555 333 4455',
+            'customerName': 'Michael Koroma',
+            'customerPhone': '+232 76 443322',
             'customerAvatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-            'pickupName': 'Tokyo Sushi Lounge',
-            'pickupAddress': '120 West 42nd St, Midtown',
-            'pickupPhone': '+1 555 444 8899',
-            'dropoffAddress': '450 Lexington Ave, Fl 18',
-            'pickupLat': 40.7589,
-            'pickupLng': -73.9851,
-            'dropoffLat': 40.7527,
-            'dropoffLng': -73.9772,
+            'pickupName': 'Lakka Ocean Bites',
+            'pickupAddress': 'Lakka Beach Road',
+            'pickupPhone': '+232 76 887766',
+            'dropoffAddress': 'Hamilton Junction',
+            'pickupLat': 8.470,
+            'pickupLng': -13.240,
+            'dropoffLat': 8.455,
+            'dropoffLng': -13.255,
             'items': [
-              {'name': 'Salmon Nigiri Combo (12 pcs)', 'quantity': 1, 'notes': 'Extra wasabi'},
-              {'name': 'Dragon Roll', 'quantity': 2, 'notes': ''},
-              {'name': 'Miso Soup', 'quantity': 2, 'notes': ''},
+              {'name': 'Cassava Leaf Stew with Rice', 'quantity': 1, 'notes': ''},
+              {'name': 'Star Beer', 'quantity': 1, 'notes': 'Chilled'},
             ],
-            'subtotal': 62.00,
-            'riderEarnings': 18.25,
+            'subtotal': 35.00,
+            'riderEarnings': 12.50,
             'distanceKm': 2.8,
             'estimatedDurationMin': 14,
             'createdAt': DateTime.now().toIso8601String(),
-            'notes': 'Security desk will call customer for lobby pickup.',
+            'notes': 'Call on arrival.',
             'deliveryOtp': '6192',
           }
         },
@@ -308,144 +574,25 @@ class MockInterceptor extends Interceptor {
         data: {
           'success': true,
           'data': {
-            'todayEarnings': 148.50,
-            'weeklyEarnings': 892.20,
-            'monthlyEarnings': 3420.00,
-            'availablePayout': 642.50,
-            'completedTrips': 42,
-            'basePay': 598.00,
-            'tips': 184.20,
-            'surgeBonuses': 110.00,
-            'dailyData': [
-              {'day': 'Mon', 'amount': 135.0},
-              {'day': 'Tue', 'amount': 142.5},
-              {'day': 'Wed', 'amount': 120.0},
-              {'day': 'Thu', 'amount': 168.2},
-              {'day': 'Fri', 'amount': 178.0},
-              {'day': 'Sat', 'amount': 148.5},
-              {'day': 'Sun', 'amount': 0.0},
-            ],
-            'recentTransactions': [
-              {
-                'id': 'tx_991',
-                'orderNumber': '#MM-8839',
-                'amount': 14.80,
-                'tip': 4.00,
-                'date': DateTime.now().subtract(const Duration(hours: 1)).toIso8601String(),
-                'type': 'trip_earnings',
-                'status': 'completed',
-              },
-              {
-                'id': 'tx_990',
-                'orderNumber': '#MM-8835',
-                'amount': 18.50,
-                'tip': 5.00,
-                'date': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
-                'type': 'trip_earnings',
-                'status': 'completed',
-              },
-              {
-                'id': 'tx_989',
-                'orderNumber': 'Payout #PO-221',
-                'amount': -250.00,
-                'tip': 0.0,
-                'date': DateTime.now().subtract(const Duration(days: 2)).toIso8601String(),
-                'type': 'withdrawal',
-                'status': 'completed',
-              }
+            'totalBalance': 284.50,
+            'availableForPayout': 240.00,
+            'pendingPayout': 44.50,
+            'todayTips': 18.00,
+            'weeklyBreakdown': [
+              {'day': 'Mon', 'amount': 45.0, 'deliveries': 3},
+              {'day': 'Tue', 'amount': 62.5, 'deliveries': 4},
+              {'day': 'Wed', 'amount': 38.0, 'deliveries': 2},
+              {'day': 'Thu', 'amount': 84.0, 'deliveries': 5},
+              {'day': 'Fri', 'amount': 95.0, 'deliveries': 6},
+              {'day': 'Sat', 'amount': 120.0, 'deliveries': 8},
+              {'day': 'Sun', 'amount': 80.0, 'deliveries': 5},
             ]
           }
         },
       ));
     }
 
-    if (path.contains(ApiEndpoints.orderHistory)) {
-      return handler.resolve(Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'success': true,
-          'data': [
-            {
-              'id': 'ord_102940',
-              'orderNumber': '#MM-8835',
-              'status': 'delivered',
-              'customerName': 'David Miller',
-              'customerPhone': '+1 555 444 1122',
-              'pickupName': 'Bella Italia Pizzeria',
-              'pickupAddress': '45 Grand Ave, Soho',
-              'dropoffAddress': '88 Mercer St, Apt 2',
-              'riderEarnings': 18.50,
-              'distanceKm': 2.1,
-              'estimatedDurationMin': 12,
-              'createdAt': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
-              'items': [{'name': 'Margherita Pizza', 'quantity': 1, 'notes': ''}],
-            },
-            {
-              'id': 'ord_102939',
-              'orderNumber': '#MM-8832',
-              'status': 'delivered',
-              'customerName': 'Emma Watson',
-              'customerPhone': '+1 555 777 8899',
-              'pickupName': 'Green Bowl Salad Bar',
-              'pickupAddress': '12 Broadway St',
-              'dropoffAddress': '220 Canal Street',
-              'riderEarnings': 12.25,
-              'distanceKm': 1.5,
-              'estimatedDurationMin': 9,
-              'createdAt': DateTime.now().subtract(const Duration(hours: 5)).toIso8601String(),
-              'items': [{'name': 'Avocado Quinoa Bowl', 'quantity': 1, 'notes': ''}],
-            },
-          ]
-        },
-      ));
-    }
-
-    if (path.contains(ApiEndpoints.getDocuments)) {
-      return handler.resolve(Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'success': true,
-          'data': [
-            {
-              'type': 'driver_license',
-              'title': "Driver's License",
-              'documentNumber': 'DL-NY-9920194',
-              'expiryDate': '2028-11-30',
-              'status': 'verified',
-            },
-            {
-              'type': 'vehicle_insurance',
-              'title': 'Vehicle Insurance Certificate',
-              'documentNumber': 'POL-90234-GE',
-              'expiryDate': '2027-04-15',
-              'status': 'verified',
-            },
-            {
-              'type': 'vehicle_registration',
-              'title': 'Vehicle Registration',
-              'documentNumber': 'REG-449102-NY',
-              'expiryDate': '2027-08-20',
-              'status': 'verified',
-            },
-            {
-              'type': 'background_check',
-              'title': 'Background Verification Check',
-              'documentNumber': 'BGC-2025-OK',
-              'expiryDate': '2027-01-01',
-              'status': 'verified',
-            }
-          ]
-        },
-      ));
-    }
-
-    // Default fallback
-    return handler.resolve(Response(
-      requestOptions: options,
-      statusCode: 200,
-      data: {'success': true, 'message': 'Success'},
-    ));
+    // Default passthrough fallback
+    return handler.next(options);
   }
 }

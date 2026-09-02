@@ -25,7 +25,7 @@ class DioClient {
     if (AppConstants.useMockApi) {
       dio.interceptors.add(MockInterceptor());
     } else {
-      dio.interceptors.add(ApiInterceptor());
+      dio.interceptors.add(ApiInterceptor(dio));
     }
 
     dio.interceptors.add(LogInterceptor(
