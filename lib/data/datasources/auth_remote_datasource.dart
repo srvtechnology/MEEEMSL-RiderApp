@@ -66,6 +66,16 @@ abstract class AuthRemoteDataSource {
   Future<bool> resetPassword(String identity, String otp, String newPassword);
   Future<String> refreshToken(String refreshToken);
   Future<void> logout();
+  Future<bool> registerDeviceToken({
+    required String token,
+    required String deviceId,
+    required String platform,
+    String? deviceModel,
+    String? appVersion,
+  });
+  Future<bool> unregisterDeviceToken({
+    required String deviceId,
+  });
 }
 
 class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
@@ -479,5 +489,49 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       await _dioClient.dio.post(ApiEndpoints.logout);
     } catch (_) {}
+  }
+
+  @override
+  Future<bool> registerDeviceToken({
+    required String token,
+    required String deviceId,
+    required String platform,
+    String? deviceModel,
+    String? appVersion,
+  }) async {
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.deviceToken,
+        data: {
+          'token': token,
+          'deviceId': deviceId,
+          'platform': platform,
+          if (deviceModel != null) 'deviceModel': deviceModel,
+          if (appVersion != null) 'appVersion': appVersion,
+        },
+      );
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to register device token';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
+  }
+
+  @override
+  Future<bool> unregisterDeviceToken({
+    required String deviceId,
+  }) async {
+    try {
+      final response = await _dioClient.dio.delete(
+        ApiEndpoints.deviceToken,
+        data: {
+          'deviceId': deviceId,
+        },
+      );
+      return response.statusCode == 200;
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to unregister device token';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
   }
 }

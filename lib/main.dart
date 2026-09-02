@@ -11,6 +11,11 @@ import 'core/services/device_info_service.dart';
 import 'core/services/location_service.dart';
 import 'core/services/notification_service.dart';
 import 'data/datasources/auth_local_datasource.dart';
+import 'data/datasources/auth_remote_datasource.dart';
+import 'data/repositories/auth_repository_impl.dart';
+import 'domain/repositories/auth_repository.dart';
+import 'domain/usecases/auth/register_device_token_usecase.dart';
+import 'domain/usecases/auth/unregister_device_token_usecase.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -40,6 +45,16 @@ void main() async {
   Get.put<ApiClient>(ApiClient(), permanent: true);
   Get.put<DioClient>(DioClient(), permanent: true);
   Get.put<AuthLocalDataSource>(AuthLocalDataSourceImpl(storage), permanent: true);
+  Get.put<AuthRemoteDataSource>(AuthRemoteDataSourceImpl(Get.find<DioClient>()), permanent: true);
+  Get.put<AuthRepository>(
+    AuthRepositoryImpl(
+      remoteDataSource: Get.find<AuthRemoteDataSource>(),
+      localDataSource: Get.find<AuthLocalDataSource>(),
+    ),
+    permanent: true,
+  );
+  Get.put<RegisterDeviceTokenUseCase>(RegisterDeviceTokenUseCase(Get.find<AuthRepository>()), permanent: true);
+  Get.put<UnregisterDeviceTokenUseCase>(UnregisterDeviceTokenUseCase(Get.find<AuthRepository>()), permanent: true);
   Get.put<LocationService>(LocationService(), permanent: true);
   Get.put<NotificationService>(NotificationService(), permanent: true);
 

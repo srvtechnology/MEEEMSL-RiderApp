@@ -65,5 +65,15 @@ abstract class AuthRepository {
   Future<Either<Failure, RiderEntity?>> getSavedRider();
   Future<Either<Failure, void>> logout();
   Future<Either<Failure, String>> refreshToken();
+  Future<Either<Failure, bool>> registerDeviceToken({
+    required String token,
+    required String deviceId,
+    required String platform,
+    String? deviceModel,
+    String? appVersion,
+  });
+  Future<Either<Failure, bool>> unregisterDeviceToken({
+    required String deviceId,
+  });
 }
 

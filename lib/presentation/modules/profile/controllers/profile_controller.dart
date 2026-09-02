@@ -22,6 +22,7 @@ import '../../../../domain/usecases/profile/update_vehicle_usecase.dart';
 import '../../../../domain/usecases/profile/get_settings_usecase.dart';
 import '../../../../domain/usecases/profile/update_settings_usecase.dart';
 import '../../../../domain/entities/rider_settings_entity.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../routes/app_routes.dart';
 
 class ProfileController extends GetxController {
@@ -344,10 +345,16 @@ class ProfileController extends GetxController {
       textCancel: 'Cancel',
       confirmTextColor: Colors.white,
       buttonColor: AppColors.error,
-      onConfirm: () {
+      onConfirm: () async {
+        // Section 9.2: Unregister Device Token
+        if (Get.isRegistered<NotificationService>()) {
+          await Get.find<NotificationService>().unregisterCurrentDeviceToken();
+        }
         final storage = GetStorage();
         storage.remove(AppConstants.tokenKey);
+        storage.remove(AppConstants.refreshTokenKey);
         storage.remove(AppConstants.riderProfileKey);
+        storage.remove(AppConstants.userProfileKey);
         Get.back();
         Get.offAllNamed(AppRoutes.login);
       },

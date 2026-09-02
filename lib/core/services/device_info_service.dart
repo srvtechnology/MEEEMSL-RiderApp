@@ -102,4 +102,14 @@ class DeviceInfoService {
 
     return _cachedUserAgent!;
   }
+
+  /// Application version (e.g., "1.0.0").
+  Future<String> getAppVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      return packageInfo.version;
+    } catch (_) {
+      return '1.0.0';
+    }
+  }
 }

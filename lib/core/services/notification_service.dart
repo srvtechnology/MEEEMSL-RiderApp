@@ -1,13 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
+import '../../domain/usecases/auth/register_device_token_usecase.dart';
+import '../../domain/usecases/auth/unregister_device_token_usecase.dart';
+import 'device_info_service.dart';
 
-/// NotificationService handles Push Notifications (FCM simulation),
-/// Dispatch Assignment Sound Alerts, and Heads-up In-app Popups.
+/// NotificationService handles FCM Push Notifications, Multi-device Token Registration,
+/// Dispatch Assignment Sound Alerts, and In-app Notification Heads-up Popups.
 class NotificationService extends GetxService {
   final isSoundEnabled = true.obs;
   final isVibrationEnabled = true.obs;
+  final currentFcmToken = ''.obs;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initFirebaseMessaging();
+  }
+
+  Future<void> _initFirebaseMessaging() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      // Request Push Permissions
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // Get FCM token
+      final token = await messaging.getToken();
+      if (token != null && token.isNotEmpty) {
+        currentFcmToken.value = token;
+        final storage = GetStorage();
+        await storage.write(AppConstants.devicePushTokenKey, token);
+        registerCurrentDeviceToken();
+      }
+
+      // Listen for token refresh
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
+        currentFcmToken.value = newToken;
+        final storage = GetStorage();
+        storage.write(AppConstants.devicePushTokenKey, newToken);
+        registerCurrentDeviceToken();
+      });
+
+      // Handle foreground push messages
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        final title = message.notification?.title ?? 'New Dispatch Alert';
+        final body = message.notification?.body ?? 'You have a new delivery order update!';
+        showInfoNotification(title: title, message: body);
+      });
+    } catch (_) {
+      // Fallback if running on simulator or without Google Play Services
+      const fallbackToken = 'fcm_mock_device_token_2026';
+      currentFcmToken.value = fallbackToken;
+      final storage = GetStorage();
+      storage.write(AppConstants.devicePushTokenKey, fallbackToken);
+    }
+  }
+
+  /// 9.1 Register or Update Device Token with Backend
+  Future<bool> registerCurrentDeviceToken() async {
+    try {
+      if (!Get.isRegistered<RegisterDeviceTokenUseCase>() || !Get.isRegistered<DeviceInfoService>()) {
+        return false;
+      }
+      final registerTokenUseCase = Get.find<RegisterDeviceTokenUseCase>();
+      final deviceInfoService = Get.find<DeviceInfoService>();
+
+      final deviceId = await deviceInfoService.getDeviceId();
+      final platform = deviceInfoService.getPlatform();
+      final deviceModel = await deviceInfoService.getDeviceModel();
+      final appVersion = await deviceInfoService.getAppVersion();
+      final token = currentFcmToken.value.isNotEmpty
+          ? currentFcmToken.value
+          : (GetStorage().read<String>(AppConstants.devicePushTokenKey) ?? 'fcm_mock_device_token_2026');
+
+      final result = await registerTokenUseCase(
+        token: token,
+        deviceId: deviceId,
+        platform: platform,
+        deviceModel: deviceModel,
+        appVersion: appVersion,
+      );
+      return result.isRight();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 9.2 Unregister Device Token on Logout
+  Future<bool> unregisterCurrentDeviceToken() async {
+    try {
+      if (!Get.isRegistered<UnregisterDeviceTokenUseCase>() || !Get.isRegistered<DeviceInfoService>()) {
+        return false;
+      }
+      final unregisterTokenUseCase = Get.find<UnregisterDeviceTokenUseCase>();
+      final deviceInfoService = Get.find<DeviceInfoService>();
+
+      final deviceId = await deviceInfoService.getDeviceId();
+      final result = await unregisterTokenUseCase(deviceId: deviceId);
+      return result.isRight();
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Plays dispatch assignment alert audio/vibration cue.
   void playOrderAlertFeedback() {

@@ -17,6 +17,8 @@ import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
 import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
+import '../../../../domain/usecases/auth/register_device_token_usecase.dart';
+import '../../../../domain/usecases/auth/unregister_device_token_usecase.dart';
 import '../controllers/auth_controller.dart';
 
 class AuthBinding extends Bindings {
@@ -45,6 +47,8 @@ class AuthBinding extends Bindings {
     Get.lazyPut(() => VerifyRegistrationOtpUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => ResendRegistrationOtpUseCase(Get.find<AuthRepository>()));
     Get.lazyPut(() => ResetPasswordUseCase(Get.find<AuthRepository>()));
+    Get.lazyPut(() => RegisterDeviceTokenUseCase(Get.find<AuthRepository>()));
+    Get.lazyPut(() => UnregisterDeviceTokenUseCase(Get.find<AuthRepository>()));
 
     // Controller
     Get.lazyPut<AuthController>(() => AuthController(

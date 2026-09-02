@@ -375,4 +375,45 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(AuthFailure(message: e.toString()));
     }
   }
+
+  @override
+  Future<Either<Failure, bool>> registerDeviceToken({
+    required String token,
+    required String deviceId,
+    required String platform,
+    String? deviceModel,
+    String? appVersion,
+  }) async {
+    try {
+      final result = await remoteDataSource.registerDeviceToken(
+        token: token,
+        deviceId: deviceId,
+        platform: platform,
+        deviceModel: deviceModel,
+        appVersion: appVersion,
+      );
+      if (token.isNotEmpty) {
+        await localDataSource.saveDeviceToken(token);
+      }
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, bool>> unregisterDeviceToken({
+    required String deviceId,
+  }) async {
+    try {
+      final result = await remoteDataSource.unregisterDeviceToken(deviceId: deviceId);
+      return Right(result);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
 }
