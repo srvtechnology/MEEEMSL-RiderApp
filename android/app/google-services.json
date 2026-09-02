@@ -1,0 +1,98 @@
+{
+  "project_info": {
+    "project_number": "119257014191",
+    "project_id": "meeem-test",
+    "storage_bucket": "meeem-test.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119257014191:android:a7560243911f6b540a595a",
+        "android_client_info": {
+          "package_name": "com.meeem.rider.meeem_rider"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "119257014191-u3unobotkc9tlk1753sk6mfdk2ffr4pe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJGGhRF3B-rArv61RgciCsYigG6fzDt3A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "119257014191-u3unobotkc9tlk1753sk6mfdk2ffr4pe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "119257014191-1k83mgljpl8h1igt5bj3b6amgfd98frd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.meeemsl.meeem"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:119257014191:android:d48437fb07e5e4630a595a",
+        "android_client_info": {
+          "package_name": "com.meeemsl.meeem"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "119257014191-6id1fn24nni60l2lor5plp267dpar4jh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.meeemsl.meeem",
+            "certificate_hash": "0f6fb33acd5deba2f1b045a4389f88f597f8570d"
+          }
+        },
+        {
+          "client_id": "119257014191-se7t9nhu92sam014ptc8fid8b20ql7kc.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.meeemsl.meeem",
+            "certificate_hash": "44a593ee1fe1f5a619ce849861cb25040fb7a8b3"
+          }
+        },
+        {
+          "client_id": "119257014191-u3unobotkc9tlk1753sk6mfdk2ffr4pe.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCJGGhRF3B-rArv61RgciCsYigG6fzDt3A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "119257014191-u3unobotkc9tlk1753sk6mfdk2ffr4pe.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "119257014191-1k83mgljpl8h1igt5bj3b6amgfd98frd.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.meeemsl.meeem"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

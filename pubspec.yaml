@@ -49,6 +49,14 @@ dependencies:
   # UUID Generator
   uuid: ^4.5.1
 
+  # Firebase & Push Notifications
+  firebase_core: ^4.14.0
+  firebase_messaging: ^16.6.0
+
+  # Device & Package Information
+  device_info_plus: ^13.2.0
+  package_info_plus: ^10.2.1
+
   # Video Player (Splash Screen)
   video_player: ^2.9.2
 
