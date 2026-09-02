@@ -12,7 +12,23 @@ class RiderEntity extends Equatable {
   final int totalTrips;
   final bool isOnline;
   final double walletBalance;
-  final String approvalStatus; // pending, approved, under_review, rejected
+  final String approvalStatus; // pending, approved, under_review, rejected, SUSPENDED
+
+  // API Doc Part 1 specification fields
+  final bool isApproved;
+  final bool isSuspended;
+  final String status;
+  final bool onboardingCompleted;
+  final bool isFirstLogin;
+  final List<String> vehicleTypes;
+  final String? vehicleType;
+  final String? vehicleName;
+  final String? vehicleNumber;
+  final String? drivingLicenseNo;
+  final String? profileImage;
+  final List<String> selectedZones;
+  final List<String> selectedLocations;
+
   final VehicleEntity? vehicle;
   final PayoutInfoEntity? payoutInfo;
   final List<String> operatingZones;
@@ -28,6 +44,19 @@ class RiderEntity extends Equatable {
     required this.isOnline,
     required this.walletBalance,
     required this.approvalStatus,
+    this.isApproved = true,
+    this.isSuspended = false,
+    this.status = 'APPROVED',
+    this.onboardingCompleted = true,
+    this.isFirstLogin = false,
+    this.vehicleTypes = const ['2_WHEELER'],
+    this.vehicleType = '2_WHEELER',
+    this.vehicleName,
+    this.vehicleNumber,
+    this.drivingLicenseNo,
+    this.profileImage,
+    this.selectedZones = const [],
+    this.selectedLocations = const [],
     this.vehicle,
     this.payoutInfo,
     this.operatingZones = const [],
@@ -44,6 +73,19 @@ class RiderEntity extends Equatable {
     bool? isOnline,
     double? walletBalance,
     String? approvalStatus,
+    bool? isApproved,
+    bool? isSuspended,
+    String? status,
+    bool? onboardingCompleted,
+    bool? isFirstLogin,
+    List<String>? vehicleTypes,
+    String? vehicleType,
+    String? vehicleName,
+    String? vehicleNumber,
+    String? drivingLicenseNo,
+    String? profileImage,
+    List<String>? selectedZones,
+    List<String>? selectedLocations,
     VehicleEntity? vehicle,
     PayoutInfoEntity? payoutInfo,
     List<String>? operatingZones,
@@ -59,6 +101,19 @@ class RiderEntity extends Equatable {
       isOnline: isOnline ?? this.isOnline,
       walletBalance: walletBalance ?? this.walletBalance,
       approvalStatus: approvalStatus ?? this.approvalStatus,
+      isApproved: isApproved ?? this.isApproved,
+      isSuspended: isSuspended ?? this.isSuspended,
+      status: status ?? this.status,
+      onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
+      isFirstLogin: isFirstLogin ?? this.isFirstLogin,
+      vehicleTypes: vehicleTypes ?? this.vehicleTypes,
+      vehicleType: vehicleType ?? this.vehicleType,
+      vehicleName: vehicleName ?? this.vehicleName,
+      vehicleNumber: vehicleNumber ?? this.vehicleNumber,
+      drivingLicenseNo: drivingLicenseNo ?? this.drivingLicenseNo,
+      profileImage: profileImage ?? this.profileImage,
+      selectedZones: selectedZones ?? this.selectedZones,
+      selectedLocations: selectedLocations ?? this.selectedLocations,
       vehicle: vehicle ?? this.vehicle,
       payoutInfo: payoutInfo ?? this.payoutInfo,
       operatingZones: operatingZones ?? this.operatingZones,
@@ -77,6 +132,19 @@ class RiderEntity extends Equatable {
         isOnline,
         walletBalance,
         approvalStatus,
+        isApproved,
+        isSuspended,
+        status,
+        onboardingCompleted,
+        isFirstLogin,
+        vehicleTypes,
+        vehicleType,
+        vehicleName,
+        vehicleNumber,
+        drivingLicenseNo,
+        profileImage,
+        selectedZones,
+        selectedLocations,
         vehicle,
         payoutInfo,
         operatingZones,

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:get_storage/get_storage.dart';
 import '../../core/constants/app_constants.dart';
 import '../models/rider_model.dart';
+import '../models/user_model.dart';
 
 abstract class AuthLocalDataSource {
   Future<void> saveToken(String token);
@@ -10,6 +11,10 @@ abstract class AuthLocalDataSource {
   String? getRefreshToken();
   Future<void> saveRider(RiderModel rider);
   RiderModel? getSavedRider();
+  Future<void> saveUser(UserModel user);
+  UserModel? getSavedUser();
+  Future<void> saveDeviceToken(String token);
+  String? getDeviceToken();
   Future<void> clearAuth();
   bool getIsOnline();
   Future<void> setIsOnline(bool isOnline);
@@ -62,10 +67,37 @@ class AuthLocalDataSourceImpl implements AuthLocalDataSource {
   }
 
   @override
+  Future<void> saveUser(UserModel user) async {
+    await _storage.write(AppConstants.userProfileKey, jsonEncode(user.toJson()));
+  }
+
+  @override
+  UserModel? getSavedUser() {
+    final raw = _storage.read<String>(AppConstants.userProfileKey);
+    if (raw == null) return null;
+    try {
+      return UserModel.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> saveDeviceToken(String token) async {
+    await _storage.write(AppConstants.devicePushTokenKey, token);
+  }
+
+  @override
+  String? getDeviceToken() {
+    return _storage.read<String>(AppConstants.devicePushTokenKey);
+  }
+
+  @override
   Future<void> clearAuth() async {
     await _storage.remove(AppConstants.tokenKey);
     await _storage.remove(AppConstants.refreshTokenKey);
     await _storage.remove(AppConstants.riderProfileKey);
+    await _storage.remove(AppConstants.userProfileKey);
   }
 
   @override

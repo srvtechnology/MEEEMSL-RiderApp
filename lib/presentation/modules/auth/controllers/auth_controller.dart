@@ -1,18 +1,27 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../domain/entities/payout_info_entity.dart';
+import '../../../../domain/entities/user_entity.dart';
+import '../../../../domain/entities/rider_entity.dart';
 import '../../../../domain/usecases/auth/login_usecase.dart';
 import '../../../../domain/usecases/auth/login_with_password_usecase.dart';
+import '../../../../domain/usecases/auth/login_with_email_password_usecase.dart';
+import '../../../../domain/usecases/auth/send_phone_otp_usecase.dart';
+import '../../../../domain/usecases/auth/verify_phone_otp_usecase.dart';
 import '../../../../domain/usecases/auth/verify_otp_usecase.dart';
 import '../../../../domain/usecases/auth/register_rider_usecase.dart';
 import '../../../../domain/usecases/auth/self_register_usecase.dart';
 import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
+import '../../../../core/services/device_info_service.dart';
+import '../../../../core/error/failures.dart';
+import '../widgets/suspended_account_dialog.dart';
 import '../../../routes/app_routes.dart';
 
 enum OtpFlowType {
@@ -23,29 +32,37 @@ enum OtpFlowType {
 class AuthController extends GetxController {
   final LoginUseCase loginUseCase;
   final LoginWithPasswordUseCase loginWithPasswordUseCase;
+  final LoginWithEmailPasswordUseCase loginWithEmailPasswordUseCase;
+  final SendPhoneOtpUseCase sendPhoneOtpUseCase;
+  final VerifyPhoneOtpUseCase verifyPhoneOtpUseCase;
   final VerifyOtpUseCase verifyOtpUseCase;
   final RegisterRiderUseCase registerRiderUseCase;
   final SelfRegisterUseCase selfRegisterUseCase;
   final VerifyRegistrationOtpUseCase verifyRegistrationOtpUseCase;
   final ResendRegistrationOtpUseCase resendRegistrationOtpUseCase;
   final ResetPasswordUseCase resetPasswordUseCase;
+  final DeviceInfoService deviceInfoService;
 
   AuthController({
     required this.loginUseCase,
     required this.loginWithPasswordUseCase,
+    required this.loginWithEmailPasswordUseCase,
+    required this.sendPhoneOtpUseCase,
+    required this.verifyPhoneOtpUseCase,
     required this.verifyOtpUseCase,
     required this.registerRiderUseCase,
     required this.selfRegisterUseCase,
     required this.verifyRegistrationOtpUseCase,
     required this.resendRegistrationOtpUseCase,
     required this.resetPasswordUseCase,
+    required this.deviceInfoService,
   });
 
   // State Observables
   final isLoading = false.obs;
   final isEmailLoginMode = true.obs;
   final isPasswordVisible = false.obs;
-  final selectedCountryCode = '+1'.obs;
+  final selectedCountryCode = AppConstants.defaultCountryCode.obs;
   final phoneNumber = ''.obs;
   final otpCode = ''.obs;
   final resendTimerSeconds = AppConstants.otpResendSeconds.obs;
@@ -268,7 +285,45 @@ class AuthController extends GetxController {
     }
   }
 
-  // Login with Email & Password
+  void _handleLoginSuccess(UserEntity user, RiderEntity rider) {
+    if (!user.isEmailVerified) {
+      registrationEmail.value = user.email;
+      otpFlowType.value = OtpFlowType.registration;
+      startResendTimer();
+      Get.snackbar(
+        'Verification Required',
+        'Please verify your email address to proceed.',
+        snackPosition: SnackPosition.TOP,
+      );
+      Get.toNamed(AppRoutes.otp);
+      return;
+    }
+
+    if (rider.isSuspended || rider.status == 'SUSPENDED') {
+      SuspendedAccountDialog.show();
+      return;
+    }
+
+    if (!rider.onboardingCompleted || rider.isFirstLogin) {
+      Get.snackbar(
+        'Welcome!',
+        'Please complete your initial rider onboarding details.',
+        snackPosition: SnackPosition.TOP,
+      );
+      Get.offAllNamed(AppRoutes.onboarding);
+      return;
+    }
+
+    Get.snackbar(
+      'Welcome Back!',
+      'Signed in as ${user.name.isNotEmpty ? user.name : rider.name}',
+      snackPosition: SnackPosition.BOTTOM,
+      backgroundColor: const Color(0xFFE8F8EE),
+    );
+    Get.offAllNamed(AppRoutes.main);
+  }
+
+  // 3.1 Rider Login with Email & Password (with Auto Device Token Registration)
   Future<void> loginWithEmailPassword() async {
     final email = loginEmailController.text.trim();
     final password = loginPasswordController.text.trim();
@@ -284,19 +339,35 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await loginWithPasswordUseCase(email, password);
+    final deviceId = await deviceInfoService.getDeviceId();
+    final platform = deviceInfoService.getPlatform();
+    final userAgent = await deviceInfoService.getUserAgent();
+    final storage = GetStorage();
+    final deviceToken = storage.read<String>(AppConstants.devicePushTokenKey) ?? 'fcm_mock_device_token';
+
+    final result = await loginWithEmailPasswordUseCase(
+      email: email,
+      password: password,
+      deviceId: deviceId,
+      platform: platform,
+      deviceToken: deviceToken,
+      userAgent: userAgent,
+    );
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Sign In Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
-      (rider) {
-        Get.snackbar('Welcome Back!', 'Signed in as ${rider.name}', snackPosition: SnackPosition.BOTTOM);
-        Get.offAllNamed(AppRoutes.main);
+      (failure) {
+        if (failure is SuspendedFailure) {
+          SuspendedAccountDialog.show(message: failure.message);
+        } else {
+          Get.snackbar('Sign In Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
+        }
       },
+      (res) => _handleLoginSuccess(res.user, res.rider),
     );
   }
 
-  // Send Phone OTP
+  // 3.2 (A) Send Phone OTP via SMS
   Future<void> sendOtp() async {
     final phone = phoneTextController.text.trim();
     final error = Validators.validatePhone(phone);
@@ -311,19 +382,28 @@ class AuthController extends GetxController {
     otpFlowType.value = OtpFlowType.phoneLogin;
     otpTextController.clear();
 
-    final result = await loginUseCase(fullPhone);
+    final result = await sendPhoneOtpUseCase(fullPhone);
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
-      (success) {
-        startResendTimer();
+      (failure) {
+        if (failure is SuspendedFailure) {
+          SuspendedAccountDialog.show(message: failure.message);
+        } else if (failure is RateLimitFailure) {
+          startResendTimer(seconds: failure.cooldownSeconds);
+          Get.snackbar('Cooldown Active', failure.message, snackPosition: SnackPosition.BOTTOM);
+        } else {
+          Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+        }
+      },
+      (res) {
+        startResendTimer(seconds: res.resendCooldown);
         Get.toNamed(AppRoutes.otp);
       },
     );
   }
 
-  // Verify OTP (Dispatches according to otpFlowType)
+  // 3.2 (B) Verify Phone OTP & Obtain Session Tokens (or Email Registration OTP)
   Future<void> verifyOtp() async {
     final otp = otpTextController.text.trim();
     final error = Validators.validateOtp(otp);
@@ -355,15 +435,31 @@ class AuthController extends GetxController {
         },
       );
     } else {
-      final result = await verifyOtpUseCase(phoneNumber.value, otp);
+      final deviceId = await deviceInfoService.getDeviceId();
+      final platform = deviceInfoService.getPlatform();
+      final userAgent = await deviceInfoService.getUserAgent();
+      final storage = GetStorage();
+      final deviceToken = storage.read<String>(AppConstants.devicePushTokenKey) ?? 'fcm_mock_device_token';
+
+      final result = await verifyPhoneOtpUseCase(
+        phone: phoneNumber.value,
+        otp: otp,
+        deviceId: deviceId,
+        platform: platform,
+        deviceToken: deviceToken,
+        userAgent: userAgent,
+      );
       isLoading.value = false;
 
       result.fold(
-        (failure) => Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
-        (rider) {
-          Get.snackbar('Welcome!', 'Logged in as ${rider.name}', snackPosition: SnackPosition.BOTTOM);
-          Get.offAllNamed(AppRoutes.main);
+        (failure) {
+          if (failure is SuspendedFailure) {
+            SuspendedAccountDialog.show(message: failure.message);
+          } else {
+            Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
+          }
         },
+        (res) => _handleLoginSuccess(res.user, res.rider),
       );
     }
   }

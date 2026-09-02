@@ -14,23 +14,62 @@ class RiderModel extends RiderEntity {
     required super.isOnline,
     required super.walletBalance,
     required super.approvalStatus,
+    super.isApproved,
+    super.isSuspended,
+    super.status,
+    super.onboardingCompleted,
+    super.isFirstLogin,
+    super.vehicleTypes,
+    super.vehicleType,
+    super.vehicleName,
+    super.vehicleNumber,
+    super.drivingLicenseNo,
+    super.profileImage,
+    super.selectedZones,
+    super.selectedLocations,
     super.vehicle,
     super.payoutInfo,
     super.operatingZones,
   });
 
   factory RiderModel.fromJson(Map<String, dynamic> json) {
+    final statusStr = json['status'] as String? ?? json['approvalStatus'] as String? ?? 'APPROVED';
+    final isSuspendedVal = json['isSuspended'] as bool? ?? (statusStr == 'SUSPENDED');
+    final isApprovedVal = json['isApproved'] as bool? ?? (statusStr == 'APPROVED' && !isSuspendedVal);
+
     return RiderModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String? ?? '',
-      avatar: json['avatar'] as String? ?? '',
+      avatar: json['avatar'] as String? ?? json['profileImage'] as String? ?? '',
       rating: (json['rating'] as num?)?.toDouble() ?? 5.0,
       totalTrips: (json['totalTrips'] as num?)?.toInt() ?? 0,
       isOnline: json['isOnline'] as bool? ?? false,
       walletBalance: (json['walletBalance'] as num?)?.toDouble() ?? 0.0,
-      approvalStatus: json['approvalStatus'] as String? ?? 'approved',
+      approvalStatus: statusStr,
+      isApproved: isApprovedVal,
+      isSuspended: isSuspendedVal,
+      status: statusStr,
+      onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
+      isFirstLogin: json['isFirstLogin'] as bool? ?? false,
+      vehicleTypes: (json['vehicleTypes'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const ['2_WHEELER'],
+      vehicleType: json['vehicleType'] as String? ?? '2_WHEELER',
+      vehicleName: json['vehicleName'] as String?,
+      vehicleNumber: json['vehicleNumber'] as String?,
+      drivingLicenseNo: json['drivingLicenseNo'] as String?,
+      profileImage: json['profileImage'] as String? ?? json['avatar'] as String?,
+      selectedZones: (json['selectedZones'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      selectedLocations: (json['selectedLocations'] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
       vehicle: json['vehicle'] != null
           ? VehicleModel.fromJson(json['vehicle'] as Map<String, dynamic>)
           : null,
@@ -56,6 +95,19 @@ class RiderModel extends RiderEntity {
       'isOnline': isOnline,
       'walletBalance': walletBalance,
       'approvalStatus': approvalStatus,
+      'isApproved': isApproved,
+      'isSuspended': isSuspended,
+      'status': status,
+      'onboardingCompleted': onboardingCompleted,
+      'isFirstLogin': isFirstLogin,
+      'vehicleTypes': vehicleTypes,
+      'vehicleType': vehicleType,
+      'vehicleName': vehicleName,
+      'vehicleNumber': vehicleNumber,
+      'drivingLicenseNo': drivingLicenseNo,
+      'profileImage': profileImage,
+      'selectedZones': selectedZones,
+      'selectedLocations': selectedLocations,
       'vehicle': vehicle != null ? VehicleModel.fromEntity(vehicle!).toJson() : null,
       'payoutInfo': payoutInfo != null
           ? PayoutInfoModel.fromEntity(payoutInfo!).toJson()
@@ -76,6 +128,19 @@ class RiderModel extends RiderEntity {
       isOnline: entity.isOnline,
       walletBalance: entity.walletBalance,
       approvalStatus: entity.approvalStatus,
+      isApproved: entity.isApproved,
+      isSuspended: entity.isSuspended,
+      status: entity.status,
+      onboardingCompleted: entity.onboardingCompleted,
+      isFirstLogin: entity.isFirstLogin,
+      vehicleTypes: entity.vehicleTypes,
+      vehicleType: entity.vehicleType,
+      vehicleName: entity.vehicleName,
+      vehicleNumber: entity.vehicleNumber,
+      drivingLicenseNo: entity.drivingLicenseNo,
+      profileImage: entity.profileImage,
+      selectedZones: entity.selectedZones,
+      selectedLocations: entity.selectedLocations,
       vehicle: entity.vehicle,
       payoutInfo: entity.payoutInfo,
       operatingZones: entity.operatingZones,

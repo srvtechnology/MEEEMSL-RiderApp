@@ -1,10 +1,14 @@
+import '../network/api_client.dart';
+
 /// ApiEndpoints holds all REST and WebSocket endpoint paths
 /// conforming to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1).
 class ApiEndpoints {
   ApiEndpoints._();
 
-  static const String baseUrl = 'https://api.meeem.com/mobileapi/rider';
-  static const String socketUrl = 'wss://socket.meeem.com/rider';
+  static String get baseUrl => ApiClient.riderApiBaseUrl;
+  static String get socketUrl => ApiClient.currentEnvironment == AppEnvironment.staging
+      ? 'wss://development.meeemsl.com/rider'
+      : 'wss://www.meeemsl.com/rider';
 
   // 2. Rider Registration & OTP Verification
   static const String register = '/auth/register';

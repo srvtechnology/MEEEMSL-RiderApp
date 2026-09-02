@@ -146,13 +146,13 @@ class LoginView extends GetView<AuthController> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      "Want to become a rider? ",
+                      "New delivery partner? ",
                       style: AppTextStyles.bodyMedium(),
                     ),
                     GestureDetector(
-                      onTap: () => Get.toNamed(AppRoutes.onboarding),
+                      onTap: () => Get.toNamed(AppRoutes.register),
                       child: Text(
-                        "Start Onboarding",
+                        "Register Now",
                         style: AppTextStyles.labelLarge(color: AppColors.primary),
                       ),
                     ),
@@ -183,7 +183,7 @@ class LoginView extends GetView<AuthController> {
         CustomTextField(
           controller: controller.loginEmailController,
           label: AppStrings.email,
-          hintText: 'alex.rider@meeem.com',
+          hintText: 'e.g. rider.ibrahim@example.com',
           keyboardType: TextInputType.emailAddress,
           prefixIcon: Icons.email_outlined,
         ),
@@ -254,11 +254,11 @@ class LoginView extends GetView<AuthController> {
                       underline: const SizedBox(),
                       icon: const Icon(Icons.arrow_drop_down, size: 20),
                       items: const [
+                        DropdownMenuItem(value: '+232', child: Text('🇸🇱 +232')),
+                        DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
                         DropdownMenuItem(value: '+1', child: Text('🇺🇸 +1')),
                         DropdownMenuItem(value: '+44', child: Text('🇬🇧 +44')),
                         DropdownMenuItem(value: '+971', child: Text('🇦🇪 +971')),
-                        DropdownMenuItem(value: '+966', child: Text('🇸🇦 +966')),
-                        DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
                       ],
                       onChanged: (val) {
                         if (val != null) controller.selectedCountryCode.value = val;
@@ -270,7 +270,7 @@ class LoginView extends GetView<AuthController> {
             Expanded(
               child: CustomTextField(
                 controller: controller.phoneTextController,
-                hintText: '555 019 2834',
+                hintText: '76123456',
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone_outlined,
                 inputFormatters: [
