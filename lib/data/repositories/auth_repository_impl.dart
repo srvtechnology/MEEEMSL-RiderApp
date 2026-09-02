@@ -2,6 +2,7 @@ import 'package:dartz/dartz.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/error/failures.dart';
 import '../../domain/entities/rider_entity.dart';
+import '../../domain/entities/registration_result_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_local_datasource.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -100,6 +101,70 @@ class AuthRepositoryImpl implements AuthRepository {
       final rider = await remoteDataSource.register(riderData);
       await localDataSource.saveRider(rider);
       return Right(rider);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, RegistrationResultEntity>> selfRegister({
+    required String name,
+    required String email,
+    required String password,
+    required String phone,
+    required String phoneCountryCode,
+  }) async {
+    try {
+      final result = await remoteDataSource.selfRegister(
+        name: name,
+        email: email,
+        password: password,
+        phone: phone,
+        phoneCountryCode: phoneCountryCode,
+      );
+      return Right(result);
+    } on RateLimitException catch (e) {
+      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+    } on SuspendedException catch (e) {
+      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, VerifyRegistrationResultEntity>> verifyRegistrationOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final result = await remoteDataSource.verifyRegistrationOtp(
+        email: email,
+        otp: otp,
+      );
+      return Right(result);
+    } on RateLimitException catch (e) {
+      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, ResendOtpResultEntity>> resendRegistrationOtp({
+    required String email,
+  }) async {
+    try {
+      final result = await remoteDataSource.resendRegistrationOtp(email: email);
+      return Right(result);
+    } on RateLimitException catch (e) {
+      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {

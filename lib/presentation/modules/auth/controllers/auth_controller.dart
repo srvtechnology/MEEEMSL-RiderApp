@@ -9,14 +9,25 @@ import '../../../../domain/usecases/auth/login_usecase.dart';
 import '../../../../domain/usecases/auth/login_with_password_usecase.dart';
 import '../../../../domain/usecases/auth/verify_otp_usecase.dart';
 import '../../../../domain/usecases/auth/register_rider_usecase.dart';
+import '../../../../domain/usecases/auth/self_register_usecase.dart';
+import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
+import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
 import '../../../routes/app_routes.dart';
+
+enum OtpFlowType {
+  registration,
+  phoneLogin,
+}
 
 class AuthController extends GetxController {
   final LoginUseCase loginUseCase;
   final LoginWithPasswordUseCase loginWithPasswordUseCase;
   final VerifyOtpUseCase verifyOtpUseCase;
   final RegisterRiderUseCase registerRiderUseCase;
+  final SelfRegisterUseCase selfRegisterUseCase;
+  final VerifyRegistrationOtpUseCase verifyRegistrationOtpUseCase;
+  final ResendRegistrationOtpUseCase resendRegistrationOtpUseCase;
   final ResetPasswordUseCase resetPasswordUseCase;
 
   AuthController({
@@ -24,6 +35,9 @@ class AuthController extends GetxController {
     required this.loginWithPasswordUseCase,
     required this.verifyOtpUseCase,
     required this.registerRiderUseCase,
+    required this.selfRegisterUseCase,
+    required this.verifyRegistrationOtpUseCase,
+    required this.resendRegistrationOtpUseCase,
     required this.resetPasswordUseCase,
   });
 
@@ -37,6 +51,16 @@ class AuthController extends GetxController {
   final resendTimerSeconds = AppConstants.otpResendSeconds.obs;
   final canResendOtp = false.obs;
   Timer? _timer;
+
+  // Registration Controllers & State
+  final registerNameController = TextEditingController();
+  final registerEmailController = TextEditingController();
+  final registerPasswordController = TextEditingController();
+  final registerPhoneController = TextEditingController();
+  final registerCountryCode = AppConstants.defaultCountryCode.obs;
+  final registerIsPasswordVisible = false.obs;
+  final otpFlowType = OtpFlowType.registration.obs;
+  final registrationEmail = ''.obs;
 
   // Login Controllers
   final loginEmailController = TextEditingController();
@@ -120,6 +144,10 @@ class AuthController extends GetxController {
     mobileMoneyProviderController.dispose();
     mobileMoneyNumberController.dispose();
     beneficiaryNameController.dispose();
+    registerNameController.dispose();
+    registerEmailController.dispose();
+    registerPasswordController.dispose();
+    registerPhoneController.dispose();
     super.onClose();
   }
 
@@ -127,9 +155,13 @@ class AuthController extends GetxController {
     isPasswordVisible.value = !isPasswordVisible.value;
   }
 
-  void startResendTimer() {
+  void toggleRegisterPasswordVisibility() {
+    registerIsPasswordVisible.value = !registerIsPasswordVisible.value;
+  }
+
+  void startResendTimer({int? seconds}) {
     _timer?.cancel();
-    resendTimerSeconds.value = AppConstants.otpResendSeconds;
+    resendTimerSeconds.value = seconds ?? AppConstants.otpResendSeconds;
     canResendOtp.value = false;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (resendTimerSeconds.value > 0) {
@@ -139,6 +171,101 @@ class AuthController extends GetxController {
         timer.cancel();
       }
     });
+  }
+
+  // 2.1 Rider Self-Registration
+  Future<void> selfRegisterRider() async {
+    final name = registerNameController.text.trim();
+    final email = registerEmailController.text.trim();
+    final password = registerPasswordController.text.trim();
+    final phone = registerPhoneController.text.trim();
+    final countryCode = registerCountryCode.value;
+
+    if (name.isEmpty) {
+      Get.snackbar('Validation', 'Please enter your full name', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    final emailError = Validators.validateEmail(email);
+    if (emailError != null) {
+      Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    if (password.length < 6) {
+      Get.snackbar('Validation', 'Password must be at least 6 characters', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    if (phone.isEmpty) {
+      Get.snackbar('Validation', 'Please enter your phone number', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    isLoading.value = true;
+    final result = await selfRegisterUseCase(
+      name: name,
+      email: email,
+      password: password,
+      phone: phone,
+      phoneCountryCode: countryCode,
+    );
+    isLoading.value = false;
+
+    result.fold(
+      (failure) => Get.snackbar('Registration Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (data) {
+        registrationEmail.value = email;
+        otpFlowType.value = OtpFlowType.registration;
+        otpTextController.clear();
+        startResendTimer(seconds: data.resendCooldown);
+        Get.snackbar(
+          'Registration Successful',
+          'A 6-digit verification code has been sent to $email',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+          duration: const Duration(seconds: 4),
+        );
+        Get.toNamed(AppRoutes.otp);
+      },
+    );
+  }
+
+  // Resend current OTP (Registration Email OTP vs Phone SMS OTP)
+  Future<void> resendCurrentOtp() async {
+    if (!canResendOtp.value) return;
+
+    isLoading.value = true;
+    if (otpFlowType.value == OtpFlowType.registration) {
+      final result = await resendRegistrationOtpUseCase(email: registrationEmail.value);
+      isLoading.value = false;
+
+      result.fold(
+        (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
+        (data) {
+          startResendTimer(seconds: data.resendCooldown);
+          Get.snackbar(
+            'New Code Sent',
+            'Verification code resent to ${registrationEmail.value}',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+          );
+        },
+      );
+    } else {
+      final result = await loginUseCase(phoneNumber.value);
+      isLoading.value = false;
+
+      result.fold(
+        (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
+        (success) {
+          startResendTimer();
+          Get.snackbar(
+            'New OTP Sent',
+            'Login OTP resent to ${phoneNumber.value}',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+          );
+        },
+      );
+    }
   }
 
   // Login with Email & Password
@@ -179,8 +306,10 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final fullPhone = '${selectedCountryCode.value} $phone';
+    final fullPhone = '${selectedCountryCode.value}$phone';
     phoneNumber.value = fullPhone;
+    otpFlowType.value = OtpFlowType.phoneLogin;
+    otpTextController.clear();
 
     final result = await loginUseCase(fullPhone);
     isLoading.value = false;
@@ -194,7 +323,7 @@ class AuthController extends GetxController {
     );
   }
 
-  // Verify Phone OTP
+  // Verify OTP (Dispatches according to otpFlowType)
   Future<void> verifyOtp() async {
     final otp = otpTextController.text.trim();
     final error = Validators.validateOtp(otp);
@@ -204,16 +333,39 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await verifyOtpUseCase(phoneNumber.value, otp);
-    isLoading.value = false;
 
-    result.fold(
-      (failure) => Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
-      (rider) {
-        Get.snackbar('Welcome!', 'Logged in as ${rider.name}', snackPosition: SnackPosition.BOTTOM);
-        Get.offAllNamed(AppRoutes.main);
-      },
-    );
+    if (otpFlowType.value == OtpFlowType.registration) {
+      final result = await verifyRegistrationOtpUseCase(
+        email: registrationEmail.value,
+        otp: otp,
+      );
+      isLoading.value = false;
+
+      result.fold(
+        (failure) => Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+        (res) {
+          Get.snackbar(
+            'Email Verified!',
+            'Email verified successfully! You can now log in to complete your rider onboarding.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+            duration: const Duration(seconds: 4),
+          );
+          Get.offAllNamed(AppRoutes.login);
+        },
+      );
+    } else {
+      final result = await verifyOtpUseCase(phoneNumber.value, otp);
+      isLoading.value = false;
+
+      result.fold(
+        (failure) => Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+        (rider) {
+          Get.snackbar('Welcome!', 'Logged in as ${rider.name}', snackPosition: SnackPosition.BOTTOM);
+          Get.offAllNamed(AppRoutes.main);
+        },
+      );
+    }
   }
 
   // Password Reset Flow

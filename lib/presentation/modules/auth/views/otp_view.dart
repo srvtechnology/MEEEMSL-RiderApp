@@ -15,7 +15,11 @@ class OtpView extends GetView<AuthController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.verifyOtp),
+        title: Obx(() => Text(
+              controller.otpFlowType.value == OtpFlowType.registration
+                  ? 'Email Verification'
+                  : AppStrings.verifyOtp,
+            )),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -24,15 +28,21 @@ class OtpView extends GetView<AuthController> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              Text(
-                'Enter Verification Code',
-                style: AppTextStyles.headlineLarge(),
-              ),
-              const SizedBox(height: 8),
               Obx(() => Text(
-                    '\${AppStrings.otpSubtitle} \${controller.phoneNumber.value}',
-                    style: AppTextStyles.bodyMedium(),
+                    controller.otpFlowType.value == OtpFlowType.registration
+                        ? 'Verify Your Email'
+                        : 'Enter Verification Code',
+                    style: AppTextStyles.headlineLarge(),
                   )),
+              const SizedBox(height: 8),
+              Obx(() {
+                final isReg = controller.otpFlowType.value == OtpFlowType.registration;
+                final target = isReg ? controller.registrationEmail.value : controller.phoneNumber.value;
+                return Text(
+                  'A 6-digit verification OTP was sent to $target',
+                  style: AppTextStyles.bodyMedium(),
+                );
+              }),
               const SizedBox(height: 36),
 
               // 6-Digit OTP Field
@@ -53,13 +63,13 @@ class OtpView extends GetView<AuthController> {
                 child: Obx(() {
                   if (controller.canResendOtp.value) {
                     return TextButton.icon(
-                      onPressed: () => controller.sendOtp(),
+                      onPressed: () => controller.resendCurrentOtp(),
                       icon: const Icon(Icons.refresh_rounded, size: 18),
                       label: const Text(AppStrings.resendOtp),
                     );
                   }
                   return Text(
-                    '\${AppStrings.resendIn} \${controller.resendTimerSeconds.value}s',
+                    'Resend code in ${controller.resendTimerSeconds.value}s',
                     style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryLight),
                   );
                 }),
@@ -68,7 +78,9 @@ class OtpView extends GetView<AuthController> {
 
               // Verify Button
               Obx(() => CustomButton(
-                    text: AppStrings.verifyOtp,
+                    text: controller.otpFlowType.value == OtpFlowType.registration
+                        ? 'Verify & Complete'
+                        : AppStrings.verifyOtp,
                     isLoading: controller.isLoading.value,
                     onPressed: () => controller.verifyOtp(),
                   )),
