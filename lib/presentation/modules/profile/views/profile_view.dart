@@ -4,6 +4,8 @@ import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_card.dart';
+import '../../../../core/widgets/custom_button.dart';
+import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../controllers/profile_controller.dart';
 import 'documents_view.dart';
@@ -157,7 +159,21 @@ class ProfileView extends GetView<ProfileController> {
                       ),
                       const SizedBox(height: 2),
                       Text(rider?.email ?? 'alex.rider@meeem.com', style: AppTextStyles.bodySmall()),
-                      Text(rider?.phone ?? '+1 555 234 5678', style: AppTextStyles.bodySmall()),
+                      Row(
+                        children: [
+                          Expanded(child: Text(rider?.phone ?? '+232 76 123456', style: AppTextStyles.bodySmall())),
+                          TextButton.icon(
+                            onPressed: () => _showEditProfileBottomSheet(context, rider),
+                            icon: const Icon(Icons.edit, size: 14),
+                            label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -202,5 +218,70 @@ class ProfileView extends GetView<ProfileController> {
         ),
       );
     });
+  }
+
+  void _showEditProfileBottomSheet(BuildContext context, dynamic rider) {
+    final nameController = TextEditingController(text: rider?.name ?? '');
+    final phoneController = TextEditingController(text: rider?.phone ?? '');
+    final vehicleNameController = TextEditingController(text: rider?.vehicleName ?? '');
+    final vehicleNumberController = TextEditingController(text: rider?.vehicleNumber ?? '');
+
+    Get.bottomSheet(
+      Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Edit Rider Profile', style: AppTextStyles.headlineSmall()),
+              const SizedBox(height: 16),
+              CustomTextField(
+                controller: nameController,
+                label: 'Full Name',
+                prefixIcon: Icons.person_outline,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: phoneController,
+                label: 'Phone Number',
+                prefixIcon: Icons.phone_outlined,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: vehicleNameController,
+                label: 'Vehicle Model / Name',
+                prefixIcon: Icons.two_wheeler,
+              ),
+              const SizedBox(height: 12),
+              CustomTextField(
+                controller: vehicleNumberController,
+                label: 'Vehicle License Plate',
+                prefixIcon: Icons.badge_outlined,
+              ),
+              const SizedBox(height: 20),
+              Obx(() => CustomButton(
+                    text: 'Save Changes',
+                    isLoading: controller.isLoading.value,
+                    onPressed: () {
+                      Get.back();
+                      controller.updateRiderProfile(
+                        name: nameController.text.trim(),
+                        phone: phoneController.text.trim(),
+                        vehicleName: vehicleNameController.text.trim(),
+                        vehicleNumber: vehicleNumberController.text.trim(),
+                      );
+                    },
+                  )),
+            ],
+          ),
+        ),
+      ),
+      isScrollControlled: true,
+    );
   }
 }

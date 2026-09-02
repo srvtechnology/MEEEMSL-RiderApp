@@ -204,6 +204,42 @@ class ProfileController extends GetxController {
     );
   }
 
+  // 6.2 Update Rider Profile
+  Future<void> updateRiderProfile({
+    required String name,
+    required String phone,
+    String? vehicleType,
+    String? vehicleName,
+    String? vehicleNumber,
+  }) async {
+    if (riderProfile.value == null) return;
+    isLoading.value = true;
+
+    final updated = riderProfile.value!.copyWith(
+      name: name,
+      phone: phone,
+      vehicleType: vehicleType,
+      vehicleName: vehicleName,
+      vehicleNumber: vehicleNumber,
+    );
+
+    final result = await updateProfileUseCase(updated);
+    isLoading.value = false;
+
+    result.fold(
+      (failure) => Get.snackbar('Error', failure.message),
+      (res) {
+        riderProfile.value = res;
+        Get.snackbar(
+          'Profile Updated',
+          'Profile updated successfully.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+        );
+      },
+    );
+  }
+
   void logout() {
     Get.defaultDialog(
       title: 'Log Out',

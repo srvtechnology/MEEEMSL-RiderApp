@@ -31,37 +31,41 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   Future<RiderModel> getProfile() async {
     try {
       final response = await _dioClient.dio.get(ApiEndpoints.riderProfile);
-      return RiderModel.fromJson(response.data['data'] as Map<String, dynamic>);
-    } catch (_) {
-      // Mock fallback
-      return const RiderModel(
-        id: 'rider_9082',
-        name: 'Alex Johnson',
-        phone: '+1 555 234 5678',
-        email: 'alex.rider@meeem.com',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
-        rating: 4.92,
-        totalTrips: 1420,
-        isOnline: true,
-        walletBalance: 184.50,
-        approvalStatus: 'approved',
-      );
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        final riderData = data['rider'] as Map<String, dynamic>? ?? data;
+        return RiderModel.fromJson(riderData);
+      }
+      throw const ServerException(message: 'Invalid profile response');
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to load profile';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 
   @override
   Future<RiderModel> updateProfile(RiderModel rider) async {
     try {
-      final response = await _dioClient.dio.put(
+      final patchData = {
+        'name': rider.name,
+        'phone': rider.phone,
+        if (rider.vehicleType != null) 'vehicleType': rider.vehicleType,
+        if (rider.vehicleName != null) 'vehicleName': rider.vehicleName,
+        if (rider.vehicleNumber != null) 'vehicleNumber': rider.vehicleNumber,
+      };
+      final response = await _dioClient.dio.patch(
         ApiEndpoints.updateProfile,
-        data: rider.toJson(),
+        data: patchData,
       );
-      return RiderModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        final riderData = data['rider'] as Map<String, dynamic>? ?? data;
+        return RiderModel.fromJson(riderData);
+      }
+      return rider;
     } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to update profile',
-        statusCode: e.response?.statusCode,
-      );
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to update profile';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 
