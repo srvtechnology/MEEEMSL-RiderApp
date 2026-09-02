@@ -9,6 +9,7 @@ import '../models/document_model.dart';
 import '../models/operating_zone_model.dart';
 import '../models/payout_info_model.dart';
 import '../models/vehicle_model.dart';
+import '../models/rider_settings_model.dart';
 
 abstract class ProfileRemoteDataSource {
   Future<RiderModel> getProfile();
@@ -20,6 +21,14 @@ abstract class ProfileRemoteDataSource {
   Future<PayoutInfoModel?> getPayoutInfo();
   Future<PayoutInfoModel> updatePayoutInfo(PayoutInfoModel payoutInfo);
   Future<VehicleModel> updateVehicle(VehicleModel vehicle);
+  Future<RiderSettingsModel> getSettings();
+  Future<RiderSettingsModel> updateSettings({
+    NotificationsSettingsModel? notifications,
+    NavigationSettingsModel? navigation,
+    AppPreferencesSettingsModel? appPreferences,
+    String? currentPassword,
+    String? newPassword,
+  });
 }
 
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
@@ -174,6 +183,59 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       return VehicleModel.fromJson(response.data['data'] as Map<String, dynamic>);
     } catch (_) {
       return vehicle;
+    }
+  }
+
+  @override
+  Future<RiderSettingsModel> getSettings() async {
+    try {
+      final response = await _dioClient.dio.get(ApiEndpoints.settings);
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        final settingsData = data['settings'] as Map<String, dynamic>? ?? data;
+        return RiderSettingsModel.fromJson(settingsData);
+      }
+      return const RiderSettingsModel();
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to load settings';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
+  }
+
+  @override
+  Future<RiderSettingsModel> updateSettings({
+    NotificationsSettingsModel? notifications,
+    NavigationSettingsModel? navigation,
+    AppPreferencesSettingsModel? appPreferences,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    try {
+      final patchData = <String, dynamic>{
+        if (notifications != null) 'notifications': notifications.toJson(),
+        if (navigation != null) 'navigation': navigation.toJson(),
+        if (appPreferences != null) 'appPreferences': appPreferences.toJson(),
+        if (currentPassword != null && currentPassword.isNotEmpty && newPassword != null && newPassword.isNotEmpty)
+          'security': {
+            'currentPassword': currentPassword,
+            'newPassword': newPassword,
+          },
+      };
+
+      final response = await _dioClient.dio.patch(
+        ApiEndpoints.settings,
+        data: patchData,
+      );
+
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        final settingsData = data['settings'] as Map<String, dynamic>? ?? data;
+        return RiderSettingsModel.fromJson(settingsData);
+      }
+      return const RiderSettingsModel();
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to update settings';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 }

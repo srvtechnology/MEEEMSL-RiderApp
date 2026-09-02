@@ -6,12 +6,14 @@ import '../../domain/entities/document_entity.dart';
 import '../../domain/entities/operating_zone_entity.dart';
 import '../../domain/entities/payout_info_entity.dart';
 import '../../domain/entities/vehicle_entity.dart';
+import '../../domain/entities/rider_settings_entity.dart';
 import '../../domain/repositories/profile_repository.dart';
 import '../datasources/auth_local_datasource.dart';
 import '../datasources/profile_remote_datasource.dart';
 import '../models/rider_model.dart';
 import '../models/payout_info_model.dart';
 import '../models/vehicle_model.dart';
+import '../models/rider_settings_model.dart';
 
 class ProfileRepositoryImpl implements ProfileRepository {
   final ProfileRemoteDataSource remoteDataSource;
@@ -124,6 +126,42 @@ class ProfileRepositoryImpl implements ProfileRepository {
   Future<Either<Failure, VehicleEntity>> updateVehicle(VehicleEntity vehicle) async {
     try {
       final updated = await remoteDataSource.updateVehicle(VehicleModel.fromEntity(vehicle));
+      return Right(updated);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, RiderSettingsEntity>> getSettings() async {
+    try {
+      final settings = await remoteDataSource.getSettings();
+      return Right(settings);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, RiderSettingsEntity>> updateSettings({
+    NotificationsSettingsEntity? notifications,
+    NavigationSettingsEntity? navigation,
+    AppPreferencesSettingsEntity? appPreferences,
+    String? currentPassword,
+    String? newPassword,
+  }) async {
+    try {
+      final updated = await remoteDataSource.updateSettings(
+        notifications: notifications != null ? NotificationsSettingsModel.fromEntity(notifications) : null,
+        navigation: navigation != null ? NavigationSettingsModel.fromEntity(navigation) : null,
+        appPreferences: appPreferences != null ? AppPreferencesSettingsModel.fromEntity(appPreferences) : null,
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
       return Right(updated);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));

@@ -19,6 +19,9 @@ import '../../../../domain/usecases/profile/update_operating_zones_usecase.dart'
 import '../../../../domain/usecases/profile/get_payout_info_usecase.dart';
 import '../../../../domain/usecases/profile/update_payout_info_usecase.dart';
 import '../../../../domain/usecases/profile/update_vehicle_usecase.dart';
+import '../../../../domain/usecases/profile/get_settings_usecase.dart';
+import '../../../../domain/usecases/profile/update_settings_usecase.dart';
+import '../../../../domain/entities/rider_settings_entity.dart';
 import '../../../routes/app_routes.dart';
 
 class ProfileController extends GetxController {
@@ -31,6 +34,8 @@ class ProfileController extends GetxController {
   final GetPayoutInfoUseCase getPayoutInfoUseCase;
   final UpdatePayoutInfoUseCase updatePayoutInfoUseCase;
   final UpdateVehicleUseCase updateVehicleUseCase;
+  final GetSettingsUseCase getSettingsUseCase;
+  final UpdateSettingsUseCase updateSettingsUseCase;
 
   ProfileController({
     required this.getProfileUseCase,
@@ -42,6 +47,8 @@ class ProfileController extends GetxController {
     required this.getPayoutInfoUseCase,
     required this.updatePayoutInfoUseCase,
     required this.updateVehicleUseCase,
+    required this.getSettingsUseCase,
+    required this.updateSettingsUseCase,
   });
 
   final isLoading = false.obs;
@@ -50,6 +57,7 @@ class ProfileController extends GetxController {
   final documents = <DocumentEntity>[].obs;
   final operatingZones = <OperatingZoneEntity>[].obs;
   final payoutInfo = Rxn<PayoutInfoEntity>();
+  final riderSettings = const RiderSettingsEntity().obs;
 
   final _imagePicker = ImagePicker();
 
@@ -68,8 +76,17 @@ class ProfileController extends GetxController {
       _loadDocuments(),
       _loadOperatingZones(),
       _loadPayoutInfo(),
+      _loadSettings(),
     ]);
     isLoading.value = false;
+  }
+
+  Future<void> _loadSettings() async {
+    final result = await getSettingsUseCase();
+    result.fold(
+      (failure) => null,
+      (settings) => riderSettings.value = settings,
+    );
   }
 
   Future<void> _loadProfile() async {
@@ -233,6 +250,68 @@ class ProfileController extends GetxController {
         Get.snackbar(
           'Profile Updated',
           'Profile updated successfully.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+        );
+      },
+    );
+  }
+
+  // 7.2 Update Settings & Password
+  Future<void> updateRiderSettings({
+    NotificationsSettingsEntity? notifications,
+    NavigationSettingsEntity? navigation,
+    AppPreferencesSettingsEntity? appPreferences,
+  }) async {
+    isLoading.value = true;
+    final result = await updateSettingsUseCase(
+      notifications: notifications ?? riderSettings.value.notifications,
+      navigation: navigation ?? riderSettings.value.navigation,
+      appPreferences: appPreferences ?? riderSettings.value.appPreferences,
+    );
+    isLoading.value = false;
+
+    result.fold(
+      (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (updated) {
+        riderSettings.value = updated;
+        Get.snackbar(
+          'Settings Saved',
+          'Preferences updated successfully.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+        );
+      },
+    );
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    if (currentPassword.isEmpty || newPassword.isEmpty) {
+      Get.snackbar('Input Required', 'Please enter your current and new passwords.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      Get.snackbar('Validation', 'New password must be at least 6 characters.');
+      return;
+    }
+
+    isLoading.value = true;
+    final result = await updateSettingsUseCase(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    isLoading.value = false;
+
+    result.fold(
+      (failure) => Get.snackbar('Password Update Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (updated) {
+        Get.back();
+        Get.snackbar(
+          'Password Changed',
+          'Your account password has been successfully updated.',
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
         );

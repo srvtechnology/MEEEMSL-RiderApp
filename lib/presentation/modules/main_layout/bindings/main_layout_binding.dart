@@ -34,6 +34,8 @@ import '../../../../domain/usecases/profile/update_operating_zones_usecase.dart'
 import '../../../../domain/usecases/profile/get_payout_info_usecase.dart';
 import '../../../../domain/usecases/profile/update_payout_info_usecase.dart';
 import '../../../../domain/usecases/profile/update_vehicle_usecase.dart';
+import '../../../../domain/usecases/profile/get_settings_usecase.dart';
+import '../../../../domain/usecases/profile/update_settings_usecase.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../orders/controllers/orders_controller.dart';
 import '../../earnings/controllers/earnings_controller.dart';
@@ -95,6 +97,8 @@ class MainLayoutBinding extends Bindings {
     Get.lazyPut(() => GetPayoutInfoUseCase(Get.find<ProfileRepository>()));
     Get.lazyPut(() => UpdatePayoutInfoUseCase(Get.find<ProfileRepository>()));
     Get.lazyPut(() => UpdateVehicleUseCase(Get.find<ProfileRepository>()));
+    Get.lazyPut(() => GetSettingsUseCase(Get.find<ProfileRepository>()));
+    Get.lazyPut(() => UpdateSettingsUseCase(Get.find<ProfileRepository>()));
 
     // Module Controllers
     Get.lazyPut<DashboardController>(() => DashboardController(
@@ -128,6 +132,8 @@ class MainLayoutBinding extends Bindings {
           getPayoutInfoUseCase: Get.find<GetPayoutInfoUseCase>(),
           updatePayoutInfoUseCase: Get.find<UpdatePayoutInfoUseCase>(),
           updateVehicleUseCase: Get.find<UpdateVehicleUseCase>(),
+          getSettingsUseCase: Get.find<GetSettingsUseCase>(),
+          updateSettingsUseCase: Get.find<UpdateSettingsUseCase>(),
         ));
   }
 }

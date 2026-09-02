@@ -13,6 +13,8 @@ import '../../../../domain/usecases/profile/update_operating_zones_usecase.dart'
 import '../../../../domain/usecases/profile/get_payout_info_usecase.dart';
 import '../../../../domain/usecases/profile/update_payout_info_usecase.dart';
 import '../../../../domain/usecases/profile/update_vehicle_usecase.dart';
+import '../../../../domain/usecases/profile/get_settings_usecase.dart';
+import '../../../../domain/usecases/profile/update_settings_usecase.dart';
 import '../controllers/profile_controller.dart';
 
 class ProfileBinding extends Bindings {
@@ -39,6 +41,8 @@ class ProfileBinding extends Bindings {
     Get.lazyPut(() => GetPayoutInfoUseCase(Get.find<ProfileRepository>()));
     Get.lazyPut(() => UpdatePayoutInfoUseCase(Get.find<ProfileRepository>()));
     Get.lazyPut(() => UpdateVehicleUseCase(Get.find<ProfileRepository>()));
+    Get.lazyPut(() => GetSettingsUseCase(Get.find<ProfileRepository>()));
+    Get.lazyPut(() => UpdateSettingsUseCase(Get.find<ProfileRepository>()));
 
     // Controller
     Get.lazyPut<ProfileController>(() => ProfileController(
@@ -51,6 +55,8 @@ class ProfileBinding extends Bindings {
           getPayoutInfoUseCase: Get.find<GetPayoutInfoUseCase>(),
           updatePayoutInfoUseCase: Get.find<UpdatePayoutInfoUseCase>(),
           updateVehicleUseCase: Get.find<UpdateVehicleUseCase>(),
+          getSettingsUseCase: Get.find<GetSettingsUseCase>(),
+          updateSettingsUseCase: Get.find<UpdateSettingsUseCase>(),
         ));
   }
 }
