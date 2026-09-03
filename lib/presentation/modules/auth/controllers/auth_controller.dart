@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
@@ -20,6 +21,9 @@ import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
 import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
+import '../../../../domain/usecases/profile/get_operating_zones_usecase.dart';
+import '../../../../domain/entities/operating_zone_entity.dart';
+import '../../../../data/datasources/auth_local_datasource.dart';
 import '../../../../core/services/device_info_service.dart';
 import '../../../../core/error/failures.dart';
 import '../widgets/suspended_account_dialog.dart';
@@ -44,6 +48,7 @@ class AuthController extends GetxController {
   final ResendRegistrationOtpUseCase resendRegistrationOtpUseCase;
   final ResetPasswordUseCase resetPasswordUseCase;
   final DeviceInfoService deviceInfoService;
+  final GetOperatingZonesUseCase? getOperatingZonesUseCase;
 
   AuthController({
     required this.loginUseCase,
@@ -59,6 +64,7 @@ class AuthController extends GetxController {
     required this.resendRegistrationOtpUseCase,
     required this.resetPasswordUseCase,
     required this.deviceInfoService,
+    this.getOperatingZonesUseCase,
   });
 
   // State Observables
@@ -109,33 +115,44 @@ class AuthController extends GetxController {
   final emailController = TextEditingController();
   final onboardingPhoneController = TextEditingController();
 
-  // Step 2: Documents Expiry Dates
+  // Step 2: Documents & Driving License
+  final drivingLicenseNoController = TextEditingController(text: 'DL-10928374');
   final idExpiryController = TextEditingController(text: '2028-12-31');
   final licenseExpiryController = TextEditingController(text: '2028-10-15');
   final insuranceExpiryController = TextEditingController(text: '2027-05-20');
 
   // Step 3: Vehicle Details
-  final vehicleType = '2-Wheeler (Motorcycle / Scooter)'.obs;
-  final vehicleModelController = TextEditingController(text: 'Honda CB500X');
-  final licensePlateController = TextEditingController(text: 'RD-8842-NY');
+  // Allowed values per API doc: "2_WHEELER", "3_WHEELER", "4_WHEELER", "BICYCLE"
+  final vehicleType = '2_WHEELER'.obs;
+  final vehicleModelController = TextEditingController(text: 'Honda CB Shine 125');
+  final licensePlateController = TextEditingController(text: 'SL-AA-9988');
   final vehicleColorController = TextEditingController(text: 'Sapphire Blue');
   final vehicleYearController = TextEditingController(text: '2023');
 
-  // Step 4: Operating Zones
-  final selectedZones = <String>['zone_1', 'zone_2', 'zone_4'].obs;
+  // Step 4: Operating Zones & Hierarchical Locations
+  final operatingZonesList = <OperatingZoneEntity>[].obs;
+  final isLoadingZones = false.obs;
+  final selectedZones = <String>['ZONE 1'].obs;
+  final selectedLocations = <String>['NO 2 RIVER', 'BAW BAW'].obs;
 
   // Step 5: Payout Info
   final payoutMethodType = PayoutMethodType.bank.obs;
-  final bankNameController = TextEditingController(text: 'Chase Bank USA');
-  final accountNumberController = TextEditingController(text: '9920184920');
-  final accountHolderController = TextEditingController(text: 'Alex Johnson');
+  final bankNameController = TextEditingController(text: 'Sierra Leone Commercial Bank');
+  final accountNumberController = TextEditingController(text: '0010029384920');
+  final accountHolderController = TextEditingController(text: 'Ibrahim Koroma');
   final routingNumberController = TextEditingController(text: '021000021');
 
-  final mobileMoneyProviderController = TextEditingController(text: 'M-Pesa');
-  final mobileMoneyNumberController = TextEditingController(text: '+1 555 234 5678');
-  final beneficiaryNameController = TextEditingController(text: 'Alex Johnson');
+  final mobileMoneyProviderController = TextEditingController(text: 'Orange Money');
+  final mobileMoneyNumberController = TextEditingController(text: '+23276123456');
+  final beneficiaryNameController = TextEditingController(text: 'Ibrahim Koroma');
 
   final _imagePicker = ImagePicker();
+
+  @override
+  void onInit() {
+    super.onInit();
+    initOnboardingData();
+  }
 
   @override
   void onClose() {
@@ -290,11 +307,23 @@ class AuthController extends GetxController {
       return;
     }
 
-    if (!rider.onboardingCompleted || rider.isFirstLogin) {
+    // Redirect to onboarding if onboarding is not completed, is first login, or essential details missing
+    final bool requiresOnboarding = !rider.onboardingCompleted ||
+        rider.isFirstLogin ||
+        rider.vehicleNumber == null ||
+        rider.vehicleNumber!.isEmpty ||
+        rider.drivingLicenseNo == null ||
+        rider.drivingLicenseNo!.isEmpty ||
+        rider.selectedZones.isEmpty;
+
+    if (requiresOnboarding) {
+      initOnboardingData(user: user, rider: rider);
+      onboardingStep.value = 0;
       Get.snackbar(
-        'Welcome!',
+        'Welcome, ${user.name.isNotEmpty ? user.name : "Rider"}!',
         'Please complete your initial rider onboarding details.',
         snackPosition: SnackPosition.TOP,
+        duration: const Duration(seconds: 4),
       );
       Get.offAllNamed(AppRoutes.onboarding);
       return;
@@ -569,20 +598,248 @@ class AuthController extends GetxController {
     Get.snackbar('Document Uploaded', 'Attached successfully', snackPosition: SnackPosition.BOTTOM);
   }
 
+  void initOnboardingData({UserEntity? user, RiderEntity? rider}) {
+    try {
+      final localSource = Get.isRegistered<AuthLocalDataSource>() ? Get.find<AuthLocalDataSource>() : null;
+      final savedUser = user ?? localSource?.getSavedUser();
+      if (savedUser != null) {
+        if (savedUser.name.isNotEmpty) {
+          fullNameController.text = savedUser.name;
+        }
+        if (savedUser.email.isNotEmpty) {
+          emailController.text = savedUser.email;
+        }
+        if (savedUser.phone.isNotEmpty) {
+          final code = savedUser.phoneCountryCode;
+          onboardingPhoneController.text = (code.isNotEmpty && !savedUser.phone.startsWith('+'))
+              ? '$code${savedUser.phone}'
+              : savedUser.phone;
+        }
+        if (savedUser.image != null && savedUser.image!.isNotEmpty) {
+          profilePhotoPath.value = savedUser.image!;
+        }
+      }
+
+      final savedRider = rider ?? localSource?.getSavedRider();
+      if (savedRider != null) {
+        if (fullNameController.text.isEmpty && savedRider.name.isNotEmpty) {
+          fullNameController.text = savedRider.name;
+        }
+        if (onboardingPhoneController.text.isEmpty && savedRider.phone.isNotEmpty) {
+          onboardingPhoneController.text = savedRider.phone;
+        }
+        if (emailController.text.isEmpty && savedRider.email.isNotEmpty) {
+          emailController.text = savedRider.email;
+        }
+        if (profilePhotoPath.value.isEmpty) {
+          if (savedRider.profileImage != null && savedRider.profileImage!.isNotEmpty) {
+            profilePhotoPath.value = savedRider.profileImage!;
+          } else if (savedRider.avatar.isNotEmpty) {
+            profilePhotoPath.value = savedRider.avatar;
+          }
+        }
+        if (savedRider.vehicleType != null && savedRider.vehicleType!.isNotEmpty) {
+          vehicleType.value = savedRider.vehicleType!;
+        }
+        if (savedRider.vehicleName != null && savedRider.vehicleName!.isNotEmpty) {
+          vehicleModelController.text = savedRider.vehicleName!;
+        }
+        if (savedRider.vehicleNumber != null && savedRider.vehicleNumber!.isNotEmpty) {
+          licensePlateController.text = savedRider.vehicleNumber!;
+        }
+        if (savedRider.drivingLicenseNo != null && savedRider.drivingLicenseNo!.isNotEmpty) {
+          drivingLicenseNoController.text = savedRider.drivingLicenseNo!;
+        }
+        if (savedRider.selectedZones.isNotEmpty) {
+          selectedZones.assignAll(savedRider.selectedZones);
+        }
+        if (savedRider.selectedLocations.isNotEmpty) {
+          selectedLocations.assignAll(savedRider.selectedLocations);
+        }
+      }
+
+      // Direct fallback to GetStorage if localSource was not ready or fields still empty
+      if (fullNameController.text.isEmpty || emailController.text.isEmpty || onboardingPhoneController.text.isEmpty) {
+        try {
+          final storage = GetStorage();
+          final rawUser = storage.read<String>(AppConstants.userProfileKey);
+          if (rawUser != null) {
+            final userMap = jsonDecode(rawUser) as Map<String, dynamic>;
+            if (fullNameController.text.isEmpty && userMap['name'] != null) {
+              fullNameController.text = userMap['name'] as String;
+            }
+            if (emailController.text.isEmpty && userMap['email'] != null) {
+              emailController.text = userMap['email'] as String;
+            }
+            if (onboardingPhoneController.text.isEmpty && userMap['phone'] != null) {
+              final p = userMap['phone'] as String;
+              final c = (userMap['phoneCountryCode'] as String?) ?? '+232';
+              onboardingPhoneController.text = (c.isNotEmpty && !p.startsWith('+')) ? '$c$p' : p;
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+    loadOperatingZones();
+  }
+
+  Future<void> loadOperatingZones() async {
+    isLoadingZones.value = true;
+    try {
+      final useCase = getOperatingZonesUseCase ??
+          (Get.isRegistered<GetOperatingZonesUseCase>() ? Get.find<GetOperatingZonesUseCase>() : null);
+      if (useCase != null) {
+        final result = await useCase();
+        result.fold(
+          (failure) => _loadDefaultOperatingZones(),
+          (zones) {
+            if (zones.isNotEmpty) {
+              operatingZonesList.assignAll(zones);
+              if (selectedZones.isEmpty) {
+                final firstZone = zones.first;
+                selectedZones.add(firstZone.id);
+                selectedLocations.addAll(firstZone.locations.map((loc) => loc.name));
+              }
+            } else {
+              _loadDefaultOperatingZones();
+            }
+          },
+        );
+      } else {
+        _loadDefaultOperatingZones();
+      }
+    } catch (_) {
+      _loadDefaultOperatingZones();
+    } finally {
+      isLoadingZones.value = false;
+    }
+  }
+
+  void _loadDefaultOperatingZones() {
+    final defaultZones = [
+      const OperatingZoneEntity(
+        id: 'ZONE 1',
+        name: 'ZONE 1 (Western Rural)',
+        district: 'Western Rural',
+        locations: [
+          DeliveryLocationEntity(id: 'NO 2 RIVER', zoneId: 'ZONE 1', name: 'NO 2 RIVER'),
+          DeliveryLocationEntity(id: 'BAW BAW', zoneId: 'ZONE 1', name: 'BAW BAW'),
+          DeliveryLocationEntity(id: 'BIG WATER', zoneId: 'ZONE 1', name: 'BIG WATER'),
+          DeliveryLocationEntity(id: 'JOHN OBEY', zoneId: 'ZONE 1', name: 'JOHN OBEY'),
+          DeliveryLocationEntity(id: 'MAMA BEACH', zoneId: 'ZONE 1', name: 'MAMA BEACH'),
+          DeliveryLocationEntity(id: 'TOKEH', zoneId: 'ZONE 1', name: 'TOKEH'),
+          DeliveryLocationEntity(id: 'YORK', zoneId: 'ZONE 1', name: 'YORK'),
+        ],
+      ),
+      const OperatingZoneEntity(
+        id: 'ZONE 2',
+        name: 'ZONE 2 (Peninsula Area)',
+        district: 'Peninsula Area',
+        locations: [
+          DeliveryLocationEntity(id: 'HAMILTON', zoneId: 'ZONE 2', name: 'HAMILTON'),
+          DeliveryLocationEntity(id: 'LAKKA', zoneId: 'ZONE 2', name: 'LAKKA'),
+          DeliveryLocationEntity(id: 'SUSSEX', zoneId: 'ZONE 2', name: 'SUSSEX'),
+          DeliveryLocationEntity(id: 'KIMBO VILLAGE', zoneId: 'ZONE 2', name: 'KIMBO VILLAGE'),
+        ],
+      ),
+      const OperatingZoneEntity(
+        id: 'ZONE 3',
+        name: 'ZONE 3 (Central Business)',
+        district: 'Central Business',
+        locations: [
+          DeliveryLocationEntity(id: 'COTTON TREE', zoneId: 'ZONE 3', name: 'COTTON TREE'),
+          DeliveryLocationEntity(id: 'SIAKA STEVENS ST', zoneId: 'ZONE 3', name: 'SIAKA STEVENS ST'),
+          DeliveryLocationEntity(id: 'CONNAUGHT', zoneId: 'ZONE 3', name: 'CONNAUGHT'),
+        ],
+      ),
+      const OperatingZoneEntity(
+        id: 'ZONE 4',
+        name: 'ZONE 4 (East End)',
+        district: 'East End',
+        locations: [
+          DeliveryLocationEntity(id: 'CLINE TOWN', zoneId: 'ZONE 4', name: 'CLINE TOWN'),
+          DeliveryLocationEntity(id: 'KISSY', zoneId: 'ZONE 4', name: 'KISSY'),
+          DeliveryLocationEntity(id: 'WELLINGTON', zoneId: 'ZONE 4', name: 'WELLINGTON'),
+        ],
+      ),
+    ];
+    operatingZonesList.assignAll(defaultZones);
+    if (selectedZones.isEmpty) {
+      selectedZones.add('ZONE 1');
+      selectedLocations.addAll(['NO 2 RIVER', 'BAW BAW']);
+    }
+  }
+
   void toggleZone(String zoneId) {
     if (selectedZones.contains(zoneId)) {
       if (selectedZones.length > 1) {
         selectedZones.remove(zoneId);
+        final zone = operatingZonesList.firstWhereOrNull((z) => z.id == zoneId);
+        if (zone != null) {
+          final locNames = zone.locations.map((l) => l.name).toSet();
+          selectedLocations.removeWhere((l) => locNames.contains(l));
+        }
       } else {
         Get.snackbar('Operating Zones', 'Please select at least 1 operating zone');
       }
     } else {
       selectedZones.add(zoneId);
+      final zone = operatingZonesList.firstWhereOrNull((z) => z.id == zoneId);
+      if (zone != null) {
+        for (final loc in zone.locations) {
+          if (!selectedLocations.contains(loc.name)) {
+            selectedLocations.add(loc.name);
+          }
+        }
+      }
+    }
+  }
+
+  void toggleLocation(String locationName) {
+    if (selectedLocations.contains(locationName)) {
+      if (selectedLocations.length > 1) {
+        selectedLocations.remove(locationName);
+      } else {
+        Get.snackbar('Operating Locations', 'Please select at least 1 location');
+      }
+    } else {
+      selectedLocations.add(locationName);
     }
   }
 
   // 5-Step Onboarding Wizard Navigation
   void nextOnboardingStep() {
+    final current = onboardingStep.value;
+    if (current == 0) {
+      final name = fullNameController.text.trim();
+      final phone = onboardingPhoneController.text.trim();
+      if (name.isEmpty) {
+        Get.snackbar('Personal Information', 'Please enter your legal full name', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+      if (phone.isEmpty) {
+        Get.snackbar('Personal Information', 'Please enter your phone number', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+    } else if (current == 1) {
+      final dlNo = drivingLicenseNoController.text.trim();
+      if (dlNo.isEmpty) {
+        Get.snackbar('Documents Required', "Please enter your Driver's License ID Number", snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+    } else if (current == 2) {
+      final plate = licensePlateController.text.trim();
+      if (plate.isEmpty) {
+        Get.snackbar('Vehicle Information', 'Please enter your vehicle license plate / registration number', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+    } else if (current == 3) {
+      if (selectedZones.isEmpty) {
+        Get.snackbar('Zones Required', 'Please select at least one operating delivery zone', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+    }
+
     if (onboardingStep.value < 4) {
       onboardingStep.value++;
     } else {
@@ -601,11 +858,45 @@ class AuthController extends GetxController {
   Future<void> submitFullOnboarding() async {
     isLoading.value = true;
 
-    String mappedVehicleType = '2_WHEELER';
-    if (vehicleType.value.contains('3-Wheeler')) {
+    // Vehicle Type per API doc: "2_WHEELER", "3_WHEELER", "4_WHEELER", "BICYCLE"
+    String mappedVehicleType = vehicleType.value;
+    if (mappedVehicleType.contains('3-Wheeler') || mappedVehicleType == '3_WHEELER') {
       mappedVehicleType = '3_WHEELER';
-    } else if (vehicleType.value.contains('4-Wheeler')) {
+    } else if (mappedVehicleType.contains('4-Wheeler') || mappedVehicleType == '4_WHEELER') {
       mappedVehicleType = '4_WHEELER';
+    } else if (mappedVehicleType.contains('Bicycle') || mappedVehicleType == 'BICYCLE') {
+      mappedVehicleType = 'BICYCLE';
+    } else {
+      mappedVehicleType = '2_WHEELER';
+    }
+
+    final dlNo = drivingLicenseNoController.text.trim().isNotEmpty
+        ? drivingLicenseNoController.text.trim()
+        : 'DL-10928374';
+
+    // Extract country code and phone
+    String rawPhone = onboardingPhoneController.text.trim();
+    String phoneCountryCode = '+232';
+    String phoneNumber = rawPhone;
+    if (rawPhone.startsWith('+232')) {
+      phoneCountryCode = '+232';
+      phoneNumber = rawPhone.substring(4);
+    } else if (rawPhone.startsWith('+')) {
+      final match = RegExp(r'^(\+\d{1,4})(.*)$').firstMatch(rawPhone);
+      if (match != null) {
+        phoneCountryCode = match.group(1)!;
+        phoneNumber = match.group(2)!;
+      }
+    }
+
+    final locationsToSubmit = <String>[...selectedLocations];
+    if (locationsToSubmit.isEmpty) {
+      for (final zId in selectedZones) {
+        final matchedZone = operatingZonesList.firstWhereOrNull((z) => z.id == zId);
+        if (matchedZone != null) {
+          locationsToSubmit.addAll(matchedZone.locations.map((l) => l.name));
+        }
+      }
     }
 
     final payoutData = payoutMethodType.value == PayoutMethodType.bank
@@ -613,14 +904,14 @@ class AuthController extends GetxController {
             'methodType': 'bank',
             'bankName': bankNameController.text.trim().isNotEmpty ? bankNameController.text.trim() : 'Sierra Leone Commercial Bank',
             'accountNumber': accountNumberController.text.trim().isNotEmpty ? accountNumberController.text.trim() : '0010029384920',
-            'accountHolder': accountHolderController.text.trim().isNotEmpty ? accountHolderController.text.trim() : 'Ibrahim Koroma',
+            'accountHolder': accountHolderController.text.trim().isNotEmpty ? accountHolderController.text.trim() : (fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : 'Ibrahim Koroma'),
             'routingNumber': routingNumberController.text.trim(),
           }
         : {
             'methodType': 'mobile_money',
             'provider': mobileMoneyProviderController.text.trim().isNotEmpty ? mobileMoneyProviderController.text.trim() : 'Orange Money',
-            'phone': mobileMoneyNumberController.text.trim().isNotEmpty ? mobileMoneyNumberController.text.trim() : '+23276123456',
-            'accountHolder': beneficiaryNameController.text.trim().isNotEmpty ? beneficiaryNameController.text.trim() : 'Ibrahim Koroma',
+            'phone': mobileMoneyNumberController.text.trim().isNotEmpty ? mobileMoneyNumberController.text.trim() : rawPhone,
+            'accountHolder': beneficiaryNameController.text.trim().isNotEmpty ? beneficiaryNameController.text.trim() : (fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : 'Ibrahim Koroma'),
           };
 
     final addressData = {
@@ -632,33 +923,37 @@ class AuthController extends GetxController {
 
     final emergencyContactData = {
       'name': 'Fatima Koroma',
-      'relationship': 'Spouse',
-      'phone': onboardingPhoneController.text.trim().isNotEmpty ? onboardingPhoneController.text.trim() : '+23278999888',
+      'relationship': 'Family Contact',
+      'phone': rawPhone.isNotEmpty ? rawPhone : '+23278999888',
     };
 
     final result = await submitOnboardingUseCase(
+      name: fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : null,
+      phone: phoneNumber.isNotEmpty ? phoneNumber : null,
+      phoneCountryCode: phoneCountryCode,
+      vehicleType: mappedVehicleType,
       vehicleTypes: [mappedVehicleType],
-      vehicleName: vehicleModelController.text.trim().isNotEmpty ? vehicleModelController.text.trim() : 'Bajaj Boxer 150',
-      vehicleNumber: licensePlateController.text.trim().isNotEmpty ? licensePlateController.text.trim() : 'SL-AA-9201',
-      drivingLicenseNo: licenseExpiryController.text.trim().isNotEmpty ? 'DL-SL-${licenseExpiryController.text.trim()}' : 'DL-SL-2024-88492',
+      vehicleName: vehicleModelController.text.trim().isNotEmpty ? vehicleModelController.text.trim() : 'Honda CB Shine 125',
+      vehicleNumber: licensePlateController.text.trim().isNotEmpty ? licensePlateController.text.trim() : 'SL-AA-9988',
+      drivingLicenseNo: dlNo,
       selectedZones: selectedZones.toList(),
-      selectedLocations: const ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+      selectedLocations: locationsToSubmit.isNotEmpty ? locationsToSubmit : ['NO 2 RIVER', 'BAW BAW'],
       address: addressData,
       emergencyContact: emergencyContactData,
       payoutInfo: payoutData,
-      profileImagePath: profilePhotoPath.value,
-      drivingLicenseFrontPath: driverLicensePath.value,
-      drivingLicenseBackPath: driverLicensePath.value,
-      nationalIdPath: nationalIdFrontPath.value,
+      profileImagePath: profilePhotoPath.value.isNotEmpty ? profilePhotoPath.value : null,
+      drivingLicenseDocPath: driverLicensePath.value.isNotEmpty ? driverLicensePath.value : null,
+      nationalIdDocPath: nationalIdFrontPath.value.isNotEmpty ? nationalIdFrontPath.value : null,
+      vehicleInsuranceDocPath: vehicleInsurancePath.value.isNotEmpty ? vehicleInsurancePath.value : null,
     );
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Application Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (failure) => Get.snackbar('Onboarding Submission Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
       (rider) {
         Get.snackbar(
-          '🎉 Onboarding Submitted!',
-          'Onboarding profile submitted successfully. Your account is pending admin approval.',
+          '🎉 Onboarding Completed!',
+          'Rider onboarding submitted successfully! Your account status is ${rider.status}.',
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
           duration: const Duration(seconds: 4),

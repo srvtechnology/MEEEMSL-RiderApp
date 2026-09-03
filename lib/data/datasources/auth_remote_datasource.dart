@@ -34,16 +34,24 @@ abstract class AuthRemoteDataSource {
   });
   Future<RiderModel> register(Map<String, dynamic> riderData);
   Future<RiderModel> submitOnboarding({
-    required List<String> vehicleTypes,
-    required String vehicleName,
-    required String vehicleNumber,
-    required String drivingLicenseNo,
+    String? name,
+    String? phone,
+    String? phoneCountryCode,
+    String? newPassword,
+    String? vehicleType,
+    List<String>? vehicleTypes,
+    String? vehicleName,
+    String? vehicleNumber,
+    String? drivingLicenseNo,
     required List<String> selectedZones,
     required List<String> selectedLocations,
-    required Map<String, dynamic> address,
-    required Map<String, dynamic> emergencyContact,
-    required Map<String, dynamic> payoutInfo,
+    Map<String, dynamic>? address,
+    Map<String, dynamic>? emergencyContact,
+    Map<String, dynamic>? payoutInfo,
     String? profileImagePath,
+    String? drivingLicenseDocPath,
+    String? nationalIdDocPath,
+    String? vehicleInsuranceDocPath,
     String? drivingLicenseFrontPath,
     String? drivingLicenseBackPath,
     String? nationalIdPath,
@@ -281,51 +289,117 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<RiderModel> submitOnboarding({
-    required List<String> vehicleTypes,
-    required String vehicleName,
-    required String vehicleNumber,
-    required String drivingLicenseNo,
+    String? name,
+    String? phone,
+    String? phoneCountryCode,
+    String? newPassword,
+    String? vehicleType,
+    List<String>? vehicleTypes,
+    String? vehicleName,
+    String? vehicleNumber,
+    String? drivingLicenseNo,
     required List<String> selectedZones,
     required List<String> selectedLocations,
-    required Map<String, dynamic> address,
-    required Map<String, dynamic> emergencyContact,
-    required Map<String, dynamic> payoutInfo,
+    Map<String, dynamic>? address,
+    Map<String, dynamic>? emergencyContact,
+    Map<String, dynamic>? payoutInfo,
     String? profileImagePath,
+    String? drivingLicenseDocPath,
+    String? nationalIdDocPath,
+    String? vehicleInsuranceDocPath,
     String? drivingLicenseFrontPath,
     String? drivingLicenseBackPath,
     String? nationalIdPath,
   }) async {
     try {
+      final effectiveVehicleType = vehicleType ??
+          (vehicleTypes != null && vehicleTypes.isNotEmpty
+              ? vehicleTypes.first
+              : '2_WHEELER');
+      final effectiveVehicleTypes = vehicleTypes ?? [effectiveVehicleType];
+
       final formDataMap = <String, dynamic>{
-        'vehicleTypes': jsonEncode(vehicleTypes),
+        'vehicleType': effectiveVehicleType,
+        'vehicleTypes': jsonEncode(effectiveVehicleTypes),
         'selectedZones': jsonEncode(selectedZones),
         'selectedLocations': jsonEncode(selectedLocations),
-        'vehicleName': vehicleName,
-        'vehicleNumber': vehicleNumber,
-        'drivingLicenseNo': drivingLicenseNo,
-        'address': jsonEncode(address),
-        'emergencyContact': jsonEncode(emergencyContact),
-        'payoutInfo': jsonEncode(payoutInfo),
       };
 
-      if (profileImagePath != null && profileImagePath.isNotEmpty && !profileImagePath.startsWith('http')) {
+      if (name != null && name.isNotEmpty) formDataMap['name'] = name;
+      if (phone != null && phone.isNotEmpty) formDataMap['phone'] = phone;
+      if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) {
+        formDataMap['phoneCountryCode'] = phoneCountryCode;
+      }
+      if (newPassword != null && newPassword.isNotEmpty) {
+        formDataMap['newPassword'] = newPassword;
+      }
+      if (vehicleName != null && vehicleName.isNotEmpty) {
+        formDataMap['vehicleName'] = vehicleName;
+      }
+      if (vehicleNumber != null && vehicleNumber.isNotEmpty) {
+        formDataMap['vehicleNumber'] = vehicleNumber;
+      }
+      if (drivingLicenseNo != null && drivingLicenseNo.isNotEmpty) {
+        formDataMap['drivingLicenseNo'] = drivingLicenseNo;
+      }
+
+      // Optional legacy/metadata payloads
+      if (address != null && address.isNotEmpty) {
+        formDataMap['address'] = jsonEncode(address);
+      }
+      if (emergencyContact != null && emergencyContact.isNotEmpty) {
+        formDataMap['emergencyContact'] = jsonEncode(emergencyContact);
+      }
+      if (payoutInfo != null && payoutInfo.isNotEmpty) {
+        formDataMap['payoutInfo'] = jsonEncode(payoutInfo);
+      }
+
+      // Binary Document files conforming to API Doc Part 1:
+      // profileImage, drivingLicenseDoc, nationalIdDoc, vehicleInsuranceDoc
+      if (profileImagePath != null &&
+          profileImagePath.isNotEmpty &&
+          !profileImagePath.startsWith('http')) {
         try {
-          formDataMap['profileImage'] = await MultipartFile.fromFile(profileImagePath, filename: 'profile.jpg');
+          formDataMap['profileImage'] = await MultipartFile.fromFile(
+            profileImagePath,
+            filename: profileImagePath.split('/').last,
+          );
         } catch (_) {}
       }
-      if (drivingLicenseFrontPath != null && drivingLicenseFrontPath.isNotEmpty && !drivingLicenseFrontPath.startsWith('http')) {
+
+      final effectiveLicenseDoc =
+          drivingLicenseDocPath ?? drivingLicenseFrontPath;
+      if (effectiveLicenseDoc != null &&
+          effectiveLicenseDoc.isNotEmpty &&
+          !effectiveLicenseDoc.startsWith('http')) {
         try {
-          formDataMap['drivingLicenseFront'] = await MultipartFile.fromFile(drivingLicenseFrontPath, filename: 'license_front.jpg');
+          formDataMap['drivingLicenseDoc'] = await MultipartFile.fromFile(
+            effectiveLicenseDoc,
+            filename: effectiveLicenseDoc.split('/').last,
+          );
         } catch (_) {}
       }
-      if (drivingLicenseBackPath != null && drivingLicenseBackPath.isNotEmpty && !drivingLicenseBackPath.startsWith('http')) {
+
+      final effectiveIdDoc = nationalIdDocPath ?? nationalIdPath;
+      if (effectiveIdDoc != null &&
+          effectiveIdDoc.isNotEmpty &&
+          !effectiveIdDoc.startsWith('http')) {
         try {
-          formDataMap['drivingLicenseBack'] = await MultipartFile.fromFile(drivingLicenseBackPath, filename: 'license_back.jpg');
+          formDataMap['nationalIdDoc'] = await MultipartFile.fromFile(
+            effectiveIdDoc,
+            filename: effectiveIdDoc.split('/').last,
+          );
         } catch (_) {}
       }
-      if (nationalIdPath != null && nationalIdPath.isNotEmpty && !nationalIdPath.startsWith('http')) {
+
+      if (vehicleInsuranceDocPath != null &&
+          vehicleInsuranceDocPath.isNotEmpty &&
+          !vehicleInsuranceDocPath.startsWith('http')) {
         try {
-          formDataMap['nationalId'] = await MultipartFile.fromFile(nationalIdPath, filename: 'national_id.jpg');
+          formDataMap['vehicleInsuranceDoc'] = await MultipartFile.fromFile(
+            vehicleInsuranceDocPath,
+            filename: vehicleInsuranceDocPath.split('/').last,
+          );
         } catch (_) {}
       }
 
@@ -338,14 +412,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
-        final riderData = data['rider'] as Map<String, dynamic>? ?? data;
+        final data = response.data['data'] as Map<String, dynamic>? ??
+            response.data as Map<String, dynamic>;
+        final riderData = Map<String, dynamic>.from(data['rider'] as Map<String, dynamic>? ?? data);
+        if (data.containsKey('onboardingCompleted') && !riderData.containsKey('onboardingCompleted')) {
+          riderData['onboardingCompleted'] = data['onboardingCompleted'];
+        }
         return RiderModel.fromJson(riderData);
       }
       throw const ServerException(message: 'Onboarding submission failed');
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Onboarding submission failed';
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      final msg = e.response?.data?['error'] ??
+          e.response?.data?['message'] ??
+          'Onboarding submission failed';
+      throw ServerException(
+          message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 

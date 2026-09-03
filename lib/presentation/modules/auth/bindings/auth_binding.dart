@@ -19,6 +19,10 @@ import '../../../../domain/usecases/auth/reset_password_usecase.dart';
 import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
 import '../../../../domain/usecases/auth/register_device_token_usecase.dart';
 import '../../../../domain/usecases/auth/unregister_device_token_usecase.dart';
+import '../../../../data/datasources/profile_remote_datasource.dart';
+import '../../../../data/repositories/profile_repository_impl.dart';
+import '../../../../domain/repositories/profile_repository.dart';
+import '../../../../domain/usecases/profile/get_operating_zones_usecase.dart';
 import '../controllers/auth_controller.dart';
 
 class AuthBinding extends Bindings {
@@ -27,6 +31,9 @@ class AuthBinding extends Bindings {
     // Datasources
     Get.lazyPut<AuthRemoteDataSource>(() => AuthRemoteDataSourceImpl(Get.find<DioClient>()), fenix: true);
     Get.lazyPut<AuthLocalDataSource>(() => AuthLocalDataSourceImpl(Get.find()), fenix: true);
+    if (!Get.isRegistered<ProfileRemoteDataSource>()) {
+      Get.lazyPut<ProfileRemoteDataSource>(() => ProfileRemoteDataSourceImpl(Get.find<DioClient>()), fenix: true);
+    }
 
     // Repository
     Get.lazyPut<AuthRepository>(
@@ -36,6 +43,15 @@ class AuthBinding extends Bindings {
       ),
       fenix: true,
     );
+    if (!Get.isRegistered<ProfileRepository>()) {
+      Get.lazyPut<ProfileRepository>(
+        () => ProfileRepositoryImpl(
+          remoteDataSource: Get.find<ProfileRemoteDataSource>(),
+          localDataSource: Get.find<AuthLocalDataSource>(),
+        ),
+        fenix: true,
+      );
+    }
 
     // UseCases
     Get.lazyPut(() => LoginUseCase(Get.find<AuthRepository>()), fenix: true);
@@ -52,6 +68,9 @@ class AuthBinding extends Bindings {
     Get.lazyPut(() => ResetPasswordUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => RegisterDeviceTokenUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => UnregisterDeviceTokenUseCase(Get.find<AuthRepository>()), fenix: true);
+    if (!Get.isRegistered<GetOperatingZonesUseCase>()) {
+      Get.lazyPut(() => GetOperatingZonesUseCase(Get.find<ProfileRepository>()), fenix: true);
+    }
 
     // Controller
     if (!Get.isRegistered<AuthController>()) {
@@ -70,6 +89,7 @@ class AuthBinding extends Bindings {
           resendRegistrationOtpUseCase: Get.find<ResendRegistrationOtpUseCase>(),
           resetPasswordUseCase: Get.find<ResetPasswordUseCase>(),
           deviceInfoService: Get.find<DeviceInfoService>(),
+          getOperatingZonesUseCase: Get.find<GetOperatingZonesUseCase>(),
         ),
         permanent: true,
       );

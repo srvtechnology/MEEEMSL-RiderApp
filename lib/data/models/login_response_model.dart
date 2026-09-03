@@ -13,8 +13,16 @@ class LoginResponseModel extends LoginResponseEntity {
 
   factory LoginResponseModel.fromJson(Map<String, dynamic> json) {
     final userJson = json['user'] as Map<String, dynamic>? ?? {};
-    final riderJson = json['rider'] as Map<String, dynamic>? ?? {};
+    final riderJson = Map<String, dynamic>.from(json['rider'] as Map<String, dynamic>? ?? {});
     final tokensJson = json['tokens'] as Map<String, dynamic>? ?? {};
+
+    // Propagate onboarding status from root if present
+    if (json.containsKey('onboardingCompleted') && !riderJson.containsKey('onboardingCompleted')) {
+      riderJson['onboardingCompleted'] = json['onboardingCompleted'];
+    }
+    if (json.containsKey('isFirstLogin') && !riderJson.containsKey('isFirstLogin')) {
+      riderJson['isFirstLogin'] = json['isFirstLogin'];
+    }
 
     return LoginResponseModel(
       user: UserModel.fromJson(userJson),

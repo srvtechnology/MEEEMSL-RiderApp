@@ -26,6 +26,9 @@ class RiderEntity extends Equatable {
   final String? vehicleNumber;
   final String? drivingLicenseNo;
   final String? profileImage;
+  final String? drivingLicenseDoc;
+  final String? nationalIdDoc;
+  final String? vehicleInsuranceDoc;
   final List<String> selectedZones;
   final List<String> selectedLocations;
 
@@ -47,7 +50,7 @@ class RiderEntity extends Equatable {
     this.isApproved = true,
     this.isSuspended = false,
     this.status = 'APPROVED',
-    this.onboardingCompleted = true,
+    this.onboardingCompleted = false,
     this.isFirstLogin = false,
     this.vehicleTypes = const ['2_WHEELER'],
     this.vehicleType = '2_WHEELER',
@@ -55,6 +58,9 @@ class RiderEntity extends Equatable {
     this.vehicleNumber,
     this.drivingLicenseNo,
     this.profileImage,
+    this.drivingLicenseDoc,
+    this.nationalIdDoc,
+    this.vehicleInsuranceDoc,
     this.selectedZones = const [],
     this.selectedLocations = const [],
     this.vehicle,
@@ -84,6 +90,9 @@ class RiderEntity extends Equatable {
     String? vehicleNumber,
     String? drivingLicenseNo,
     String? profileImage,
+    String? drivingLicenseDoc,
+    String? nationalIdDoc,
+    String? vehicleInsuranceDoc,
     List<String>? selectedZones,
     List<String>? selectedLocations,
     VehicleEntity? vehicle,
@@ -112,6 +121,9 @@ class RiderEntity extends Equatable {
       vehicleNumber: vehicleNumber ?? this.vehicleNumber,
       drivingLicenseNo: drivingLicenseNo ?? this.drivingLicenseNo,
       profileImage: profileImage ?? this.profileImage,
+      drivingLicenseDoc: drivingLicenseDoc ?? this.drivingLicenseDoc,
+      nationalIdDoc: nationalIdDoc ?? this.nationalIdDoc,
+      vehicleInsuranceDoc: vehicleInsuranceDoc ?? this.vehicleInsuranceDoc,
       selectedZones: selectedZones ?? this.selectedZones,
       selectedLocations: selectedLocations ?? this.selectedLocations,
       vehicle: vehicle ?? this.vehicle,
@@ -143,6 +155,9 @@ class RiderEntity extends Equatable {
         vehicleNumber,
         drivingLicenseNo,
         profileImage,
+        drivingLicenseDoc,
+        nationalIdDoc,
+        vehicleInsuranceDoc,
         selectedZones,
         selectedLocations,
         vehicle,

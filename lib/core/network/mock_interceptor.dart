@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../constants/api_endpoints.dart';
 
@@ -198,6 +199,39 @@ class MockInterceptor extends Interceptor {
 
     // 5.1 First-Time Onboarding
     if (path.endsWith(ApiEndpoints.onboarding)) {
+      Map<String, dynamic> incoming = {};
+      if (options.data is FormData) {
+        final fd = options.data as FormData;
+        for (final entry in fd.fields) {
+          try {
+            incoming[entry.key] = jsonDecode(entry.value);
+          } catch (_) {
+            incoming[entry.key] = entry.value;
+          }
+        }
+      } else if (options.data is Map<String, dynamic>) {
+        incoming = options.data as Map<String, dynamic>;
+      }
+
+      final vType = incoming['vehicleType']?.toString() ?? '2_WHEELER';
+      final vName = incoming['vehicleName']?.toString() ?? 'Honda CB Shine 125';
+      final vNumber = incoming['vehicleNumber']?.toString() ?? 'SL-AA-9988';
+      final dlNo = incoming['drivingLicenseNo']?.toString() ?? 'DL-10928374';
+
+      List<String> parseList(dynamic raw, List<String> fallback) {
+        if (raw is List) return raw.map((e) => e.toString()).toList();
+        if (raw is String) {
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is List) return decoded.map((e) => e.toString()).toList();
+          } catch (_) {}
+        }
+        return fallback;
+      }
+
+      final sZones = parseList(incoming['selectedZones'], ['ZONE 1', 'ZONE 2']);
+      final sLocs = parseList(incoming['selectedLocations'], ['NO 2 RIVER', 'BAW BAW']);
+
       return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
@@ -212,17 +246,17 @@ class MockInterceptor extends Interceptor {
               'status': 'APPROVED',
               'onboardingCompleted': true,
               'isFirstLogin': false,
-              'vehicleType': '2_WHEELER',
-              'vehicleTypes': ['2_WHEELER'],
-              'vehicleName': 'Honda CB Shine 125',
-              'vehicleNumber': 'SL-AA-9988',
-              'drivingLicenseNo': 'DL-10928374',
+              'vehicleType': vType,
+              'vehicleTypes': [vType],
+              'vehicleName': vName,
+              'vehicleNumber': vNumber,
+              'drivingLicenseNo': dlNo,
               'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
               'drivingLicenseDoc': 'https://s3.amazonaws.com/meeem/docs/dl.png',
               'nationalIdDoc': 'https://s3.amazonaws.com/meeem/docs/id.png',
               'vehicleInsuranceDoc': 'https://s3.amazonaws.com/meeem/docs/ins.png',
-              'selectedZones': ['ZONE 1', 'ZONE 2'],
-              'selectedLocations': ['NO 2 RIVER', 'BAW BAW'],
+              'selectedZones': sZones,
+              'selectedLocations': sLocs,
             }
           }
         },

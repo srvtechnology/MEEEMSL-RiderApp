@@ -25,6 +25,9 @@ class RiderModel extends RiderEntity {
     super.vehicleNumber,
     super.drivingLicenseNo,
     super.profileImage,
+    super.drivingLicenseDoc,
+    super.nationalIdDoc,
+    super.vehicleInsuranceDoc,
     super.selectedZones,
     super.selectedLocations,
     super.vehicle,
@@ -36,6 +39,32 @@ class RiderModel extends RiderEntity {
     final statusStr = json['status'] as String? ?? json['approvalStatus'] as String? ?? 'APPROVED';
     final isSuspendedVal = json['isSuspended'] as bool? ?? (statusStr == 'SUSPENDED');
     final isApprovedVal = json['isApproved'] as bool? ?? (statusStr == 'APPROVED' && !isSuspendedVal);
+
+    // Safely parse onboardingCompleted (supports bool, String, num, and defaults to false)
+    final rawOnboarding = json['onboardingCompleted'];
+    final bool onboardingCompletedVal;
+    if (rawOnboarding is bool) {
+      onboardingCompletedVal = rawOnboarding;
+    } else if (rawOnboarding is String) {
+      onboardingCompletedVal = rawOnboarding.toLowerCase() == 'true';
+    } else if (rawOnboarding is num) {
+      onboardingCompletedVal = rawOnboarding == 1;
+    } else {
+      onboardingCompletedVal = false;
+    }
+
+    // Safely parse isFirstLogin
+    final rawFirstLogin = json['isFirstLogin'];
+    final bool isFirstLoginVal;
+    if (rawFirstLogin is bool) {
+      isFirstLoginVal = rawFirstLogin;
+    } else if (rawFirstLogin is String) {
+      isFirstLoginVal = rawFirstLogin.toLowerCase() == 'true';
+    } else if (rawFirstLogin is num) {
+      isFirstLoginVal = rawFirstLogin == 1;
+    } else {
+      isFirstLoginVal = false;
+    }
 
     return RiderModel(
       id: json['id'] as String? ?? '',
@@ -51,8 +80,8 @@ class RiderModel extends RiderEntity {
       isApproved: isApprovedVal,
       isSuspended: isSuspendedVal,
       status: statusStr,
-      onboardingCompleted: json['onboardingCompleted'] as bool? ?? true,
-      isFirstLogin: json['isFirstLogin'] as bool? ?? false,
+      onboardingCompleted: onboardingCompletedVal,
+      isFirstLogin: isFirstLoginVal,
       vehicleTypes: (json['vehicleTypes'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -62,6 +91,9 @@ class RiderModel extends RiderEntity {
       vehicleNumber: json['vehicleNumber'] as String?,
       drivingLicenseNo: json['drivingLicenseNo'] as String?,
       profileImage: json['profileImage'] as String? ?? json['avatar'] as String?,
+      drivingLicenseDoc: json['drivingLicenseDoc'] as String?,
+      nationalIdDoc: json['nationalIdDoc'] as String?,
+      vehicleInsuranceDoc: json['vehicleInsuranceDoc'] as String?,
       selectedZones: (json['selectedZones'] as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -106,6 +138,9 @@ class RiderModel extends RiderEntity {
       'vehicleNumber': vehicleNumber,
       'drivingLicenseNo': drivingLicenseNo,
       'profileImage': profileImage,
+      'drivingLicenseDoc': drivingLicenseDoc,
+      'nationalIdDoc': nationalIdDoc,
+      'vehicleInsuranceDoc': vehicleInsuranceDoc,
       'selectedZones': selectedZones,
       'selectedLocations': selectedLocations,
       'vehicle': vehicle != null ? VehicleModel.fromEntity(vehicle!).toJson() : null,
@@ -139,6 +174,9 @@ class RiderModel extends RiderEntity {
       vehicleNumber: entity.vehicleNumber,
       drivingLicenseNo: entity.drivingLicenseNo,
       profileImage: entity.profileImage,
+      drivingLicenseDoc: entity.drivingLicenseDoc,
+      nationalIdDoc: entity.nationalIdDoc,
+      vehicleInsuranceDoc: entity.vehicleInsuranceDoc,
       selectedZones: entity.selectedZones,
       selectedLocations: entity.selectedLocations,
       vehicle: entity.vehicle,

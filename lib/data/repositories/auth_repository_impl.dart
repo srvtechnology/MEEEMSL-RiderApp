@@ -234,22 +234,35 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, RiderEntity>> submitOnboarding({
-    required List<String> vehicleTypes,
-    required String vehicleName,
-    required String vehicleNumber,
-    required String drivingLicenseNo,
+    String? name,
+    String? phone,
+    String? phoneCountryCode,
+    String? newPassword,
+    String? vehicleType,
+    List<String>? vehicleTypes,
+    String? vehicleName,
+    String? vehicleNumber,
+    String? drivingLicenseNo,
     required List<String> selectedZones,
     required List<String> selectedLocations,
-    required Map<String, dynamic> address,
-    required Map<String, dynamic> emergencyContact,
-    required Map<String, dynamic> payoutInfo,
+    Map<String, dynamic>? address,
+    Map<String, dynamic>? emergencyContact,
+    Map<String, dynamic>? payoutInfo,
     String? profileImagePath,
+    String? drivingLicenseDocPath,
+    String? nationalIdDocPath,
+    String? vehicleInsuranceDocPath,
     String? drivingLicenseFrontPath,
     String? drivingLicenseBackPath,
     String? nationalIdPath,
   }) async {
     try {
       final rider = await remoteDataSource.submitOnboarding(
+        name: name,
+        phone: phone,
+        phoneCountryCode: phoneCountryCode,
+        newPassword: newPassword,
+        vehicleType: vehicleType,
         vehicleTypes: vehicleTypes,
         vehicleName: vehicleName,
         vehicleNumber: vehicleNumber,
@@ -260,11 +273,24 @@ class AuthRepositoryImpl implements AuthRepository {
         emergencyContact: emergencyContact,
         payoutInfo: payoutInfo,
         profileImagePath: profileImagePath,
+        drivingLicenseDocPath: drivingLicenseDocPath,
+        nationalIdDocPath: nationalIdDocPath,
+        vehicleInsuranceDocPath: vehicleInsuranceDocPath,
         drivingLicenseFrontPath: drivingLicenseFrontPath,
         drivingLicenseBackPath: drivingLicenseBackPath,
         nationalIdPath: nationalIdPath,
       );
       await localDataSource.saveRider(rider);
+
+      final savedUser = localDataSource.getSavedUser();
+      if (savedUser != null) {
+        await localDataSource.saveUser(savedUser.copyWith(
+          name: rider.name.isNotEmpty ? rider.name : savedUser.name,
+          phone: rider.phone.isNotEmpty ? rider.phone : savedUser.phone,
+          image: rider.profileImage ?? rider.avatar,
+        ));
+      }
+
       return Right(rider);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));

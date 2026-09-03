@@ -10,6 +10,7 @@ import '../../../../core/widgets/custom_card.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../domain/entities/payout_info_entity.dart';
+import '../../../../domain/entities/operating_zone_entity.dart';
 import '../controllers/auth_controller.dart';
 
 class OnboardingView extends GetView<AuthController> {
@@ -17,9 +18,14 @@ class OnboardingView extends GetView<AuthController> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.initOnboardingData();
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.onboardingTitle),
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => controller.prevOnboardingStep(),
@@ -28,13 +34,13 @@ class OnboardingView extends GetView<AuthController> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Stepper Indicator
+            // Enhanced Top Stepper Indicator
             _buildStepperHeader(),
 
             // Step Content
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(20.0),
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
                 child: Obx(() {
                   switch (controller.onboardingStep.value) {
                     case 0:
@@ -64,70 +70,145 @@ class OnboardingView extends GetView<AuthController> {
 
   Widget _buildStepperHeader() {
     final stepTitles = ['Personal', 'Documents', 'Vehicle', 'Zones', 'Payout'];
+    final stepIcons = [
+      Icons.person_rounded,
+      Icons.badge_rounded,
+      Icons.two_wheeler_rounded,
+      Icons.map_rounded,
+      Icons.payments_rounded,
+    ];
 
     return Obx(() {
       final currentStep = controller.onboardingStep.value;
+      final progressPercent = ((currentStep + 1) / 5.0);
 
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.primaryContainer.withAlpha(50),
-          border: Border(bottom: BorderSide(color: AppColors.lightCardBorder)),
+          color: AppColors.primaryContainer.withAlpha(35),
+          border: Border(bottom: BorderSide(color: AppColors.lightCardBorder.withAlpha(80))),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Step counter & Progress Badge
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        'STEP ${currentStep + 1} OF 5',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      stepTitles[currentStep],
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '${(progressPercent * 100).toInt()}% Done',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+
+            // Animated Smooth Progress Bar
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(
+                value: progressPercent,
+                backgroundColor: AppColors.lightCardBorder.withAlpha(120),
+                valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
+                minHeight: 5,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Stepper Icon Nodes
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: List.generate(5, (index) {
                 final isCompleted = index < currentStep;
                 final isCurrent = index == currentStep;
 
-                return Expanded(
-                  child: Row(
+                Color nodeBg = AppColors.lightCardBorder.withAlpha(100);
+                Color iconColor = AppColors.textSecondaryLight;
+                if (isCompleted) {
+                  nodeBg = AppColors.success;
+                  iconColor = Colors.white;
+                } else if (isCurrent) {
+                  nodeBg = AppColors.primary;
+                  iconColor = Colors.white;
+                }
+
+                return GestureDetector(
+                  onTap: () {
+                    // Only allow jumping to already completed steps or current
+                    if (index < currentStep) {
+                      controller.onboardingStep.value = index;
+                    }
+                  },
+                  child: Column(
                     children: [
                       Container(
-                        width: 28,
-                        height: 28,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isCompleted
-                              ? AppColors.success
-                              : (isCurrent ? AppColors.primary : AppColors.lightCardBorder),
+                          color: nodeBg,
+                          boxShadow: isCurrent
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withAlpha(60),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  )
+                                ]
+                              : null,
                         ),
                         child: Center(
                           child: isCompleted
-                              ? const Icon(Icons.check, size: 16, color: Colors.white)
-                              : Text(
-                                  '${index + 1}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: isCurrent ? Colors.white : AppColors.textSecondaryLight,
-                                  ),
-                                ),
+                              ? const Icon(Icons.check, size: 18, color: Colors.white)
+                              : Icon(stepIcons[index], size: 16, color: iconColor),
                         ),
                       ),
-                      if (index < 4)
-                        Expanded(
-                          child: Container(
-                            height: 2,
-                            color: index < currentStep ? AppColors.success : AppColors.lightCardBorder,
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        stepTitles[index],
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                          color: isCurrent ? AppColors.primary : AppColors.textSecondaryLight,
                         ),
+                      ),
                     ],
                   ),
                 );
               }),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Step ${currentStep + 1} of 5: ${stepTitles[currentStep]}',
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
-                ),
-              ],
             ),
           ],
         ),
@@ -140,12 +221,52 @@ class OnboardingView extends GetView<AuthController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Step 1: Personal Information', style: AppTextStyles.headlineSmall()),
-        const SizedBox(height: 4),
-        Text('Upload your profile photo and enter your legal details.', style: AppTextStyles.bodyMedium()),
-        const SizedBox(height: 24),
+        // Verified Account Sync Callout
+        Container(
+          margin: const EdgeInsets.only(bottom: 18),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.successLight.withAlpha(70),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.success.withAlpha(80)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.sync_rounded, color: Colors.white, size: 16),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Account Details Synced',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.successDark),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Pre-filled with your registered login credentials. Review or edit if needed.',
+                      style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
 
-        // Profile Photo Upload Card
+        Text('Personal Information', style: AppTextStyles.headlineSmall()),
+        const SizedBox(height: 4),
+        Text('Verify your identity and upload a professional profile photo.', style: AppTextStyles.bodyMedium()),
+        const SizedBox(height: 20),
+
+        // Profile Photo Upload
         Center(
           child: Obx(() {
             final photoPath = controller.profilePhotoPath.value;
@@ -154,17 +275,24 @@ class OnboardingView extends GetView<AuthController> {
               children: [
                 Stack(
                   children: [
-                    CircleAvatar(
-                      radius: 48,
-                      backgroundColor: AppColors.primaryContainer,
-                      backgroundImage: photoPath.isNotEmpty
-                          ? (photoPath.startsWith('http')
-                              ? NetworkImage(photoPath) as ImageProvider
-                              : FileImage(File(photoPath)))
-                          : null,
-                      child: photoPath.isEmpty
-                          ? const Icon(Icons.person, size: 54, color: AppColors.primary)
-                          : null,
+                    Container(
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.primary, width: 2),
+                      ),
+                      child: CircleAvatar(
+                        radius: 46,
+                        backgroundColor: AppColors.primaryContainer,
+                        backgroundImage: photoPath.isNotEmpty
+                            ? (photoPath.startsWith('http')
+                                ? NetworkImage(photoPath) as ImageProvider
+                                : FileImage(File(photoPath)))
+                            : null,
+                        child: photoPath.isEmpty
+                            ? const Icon(Icons.person, size: 50, color: AppColors.primary)
+                            : null,
+                      ),
                     ),
                     Positioned(
                       bottom: 0,
@@ -173,20 +301,32 @@ class OnboardingView extends GetView<AuthController> {
                         onTap: () => _showPhotoSourcePicker(context),
                         child: Container(
                           padding: const EdgeInsets.all(8),
-                          decoration: const BoxDecoration(
-                            color: AppColors.secondary,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(30),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              )
+                            ],
                           ),
-                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 18),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
                         ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                TextButton(
+                TextButton.icon(
                   onPressed: () => _showPhotoSourcePicker(context),
-                  child: const Text(AppStrings.uploadProfilePhoto, style: TextStyle(fontWeight: FontWeight.w600)),
+                  icon: const Icon(Icons.upload, size: 16),
+                  label: Text(
+                    photoPath.isNotEmpty ? 'Change Photo' : AppStrings.uploadProfilePhoto,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
                 ),
               ],
             );
@@ -197,22 +337,26 @@ class OnboardingView extends GetView<AuthController> {
         CustomTextField(
           controller: controller.fullNameController,
           label: AppStrings.fullName,
-          hintText: 'Alex Johnson',
+          hintText: 'e.g. Samuel Taylor',
           prefixIcon: Icons.person_outline,
         ),
         const SizedBox(height: 16),
         CustomTextField(
           controller: controller.emailController,
           label: AppStrings.email,
-          hintText: 'alex.rider@meeem.com',
+          hintText: 'e.g. hadane3655@fanzher.com',
           keyboardType: TextInputType.emailAddress,
           prefixIcon: Icons.email_outlined,
+          suffixIcon: const Tooltip(
+            message: 'Verified account email',
+            child: Icon(Icons.verified_rounded, color: AppColors.success, size: 18),
+          ),
         ),
         const SizedBox(height: 16),
         CustomTextField(
           controller: controller.onboardingPhoneController,
           label: AppStrings.phoneNumber,
-          hintText: '+1 555 234 5678',
+          hintText: 'e.g. +23276145892',
           keyboardType: TextInputType.phone,
           prefixIcon: Icons.phone_outlined,
         ),
@@ -256,12 +400,50 @@ class OnboardingView extends GetView<AuthController> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Step 2: Verification Documents', style: AppTextStyles.headlineSmall()),
+        // Security Banner
+        Container(
+          margin: const EdgeInsets.only(bottom: 18),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.primaryContainer.withAlpha(45),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.primary.withAlpha(60)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withAlpha(20),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.shield_outlined, color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Your documents are encrypted and reviewed solely for Sierra Leone driver compliance and verification.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        Text('Verification Documents', style: AppTextStyles.headlineSmall()),
         const SizedBox(height: 4),
-        Text('Please upload clear photos of your official documents.', style: AppTextStyles.bodyMedium()),
+        Text('Enter your driver\'s license number and attach clear photos of required documents.', style: AppTextStyles.bodyMedium()),
         const SizedBox(height: 20),
 
-        // 1. National ID Front & Back
+        CustomTextField(
+          controller: controller.drivingLicenseNoController,
+          label: "Driver's License ID Number",
+          hintText: 'e.g. DL-10928374',
+          prefixIcon: Icons.badge_outlined,
+        ),
+        const SizedBox(height: 18),
+
+        // 1. National ID / Passport
         _buildDocumentUploadCard(
           title: 'National ID / Passport (Front)',
           docType: 'national_id_front',
@@ -279,7 +461,7 @@ class OnboardingView extends GetView<AuthController> {
 
         // 2. Driver's License
         _buildDocumentUploadCard(
-          title: "Driver's License (Active)",
+          title: "Driver's License Document",
           docType: 'driver_license',
           pathObservable: controller.driverLicensePath,
           icon: Icons.credit_card_outlined,
@@ -293,6 +475,29 @@ class OnboardingView extends GetView<AuthController> {
           pathObservable: controller.vehicleInsurancePath,
           icon: Icons.security_outlined,
         ),
+        const SizedBox(height: 16),
+
+        // Document Quality Tips
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.lightCardBorder.withAlpha(100)),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.info_outline, color: AppColors.secondary, size: 18),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Tips: Ensure all 4 corners of documents are visible, text is crisp, and there is no camera glare.',
+                  style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -304,21 +509,35 @@ class OnboardingView extends GetView<AuthController> {
     required IconData icon,
   }) {
     return Obx(() {
-      final isAttached = pathObservable.value.isNotEmpty;
+      final path = pathObservable.value;
+      final isAttached = path.isNotEmpty;
 
       return CustomCard(
+        backgroundColor: isAttached
+            ? AppColors.successLight.withAlpha(40)
+            : Theme.of(Get.context!).cardColor,
+        border: Border.all(
+          color: isAttached ? AppColors.success.withAlpha(100) : AppColors.lightCardBorder,
+          width: isAttached ? 1.5 : 1,
+        ),
         child: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(12),
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
                 color: isAttached ? AppColors.successLight : AppColors.primaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(
-                isAttached ? Icons.check_circle : icon,
-                color: isAttached ? AppColors.successDark : AppColors.primary,
-                size: 24,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: isAttached && !path.startsWith('http') && File(path).existsSync()
+                    ? Image.file(File(path), fit: BoxFit.cover)
+                    : Icon(
+                        isAttached ? Icons.check_circle_rounded : icon,
+                        color: isAttached ? AppColors.successDark : AppColors.primary,
+                        size: 22,
+                      ),
               ),
             ),
             const SizedBox(width: 14),
@@ -326,22 +545,52 @@ class OnboardingView extends GetView<AuthController> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  const SizedBox(height: 2),
-                  Text(
-                    isAttached ? 'Attached & Ready' : 'JPG, PNG, or PDF up to 10MB',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
-                    ),
+                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isAttached ? AppColors.success : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      Text(
+                        isAttached ? 'Ready to Submit' : 'JPG, PNG, PDF up to 10MB',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: isAttached ? FontWeight.w600 : FontWeight.normal,
+                          color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
             TextButton.icon(
               onPressed: () => controller.pickDocument(docType),
-              icon: Icon(isAttached ? Icons.edit : Icons.upload_file, size: 16),
-              label: Text(isAttached ? 'Change' : 'Upload'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                backgroundColor: isAttached ? AppColors.success.withAlpha(15) : AppColors.primaryContainer,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: Icon(
+                isAttached ? Icons.change_circle_outlined : Icons.upload_file_rounded,
+                size: 16,
+                color: isAttached ? AppColors.successDark : AppColors.primary,
+              ),
+              label: Text(
+                isAttached ? 'Replace' : 'Upload',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: isAttached ? AppColors.successDark : AppColors.primary,
+                ),
+              ),
             ),
           ],
         ),
@@ -349,17 +598,17 @@ class OnboardingView extends GetView<AuthController> {
     });
   }
 
-  // STEP 3: Vehicle Details (2-Wheeler, 3-Wheeler, 4-Wheeler)
+  // STEP 3: Vehicle Details (2-Wheeler, 3-Wheeler, 4-Wheeler, Bicycle)
   Widget _buildVehicleStep(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Step 3: Vehicle Information', style: AppTextStyles.headlineSmall()),
         const SizedBox(height: 4),
-        Text('Select your delivery vehicle type and enter details.', style: AppTextStyles.bodyMedium()),
+        Text('Select your primary delivery vehicle type and enter details.', style: AppTextStyles.bodyMedium()),
         const SizedBox(height: 20),
 
-        // Vehicle Type Selector (2-Wheeler, 3-Wheeler, 4-Wheeler)
+        // Vehicle Type Selector
         const Text(
           AppStrings.vehicleType,
           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
@@ -372,21 +621,28 @@ class OnboardingView extends GetView<AuthController> {
                   title: '2-Wheeler',
                   subtitle: 'Motorcycle, Scooter, E-Bike',
                   icon: Icons.two_wheeler,
-                  value: '2-Wheeler (Motorcycle / Scooter)',
+                  value: '2_WHEELER',
                 ),
                 const SizedBox(height: 8),
                 _buildVehicleTypeOption(
                   title: '3-Wheeler',
                   subtitle: 'Auto Rickshaw, TukTuk, Cargo Trike',
                   icon: Icons.electric_rickshaw_rounded,
-                  value: '3-Wheeler (Auto Rickshaw / TukTuk)',
+                  value: '3_WHEELER',
                 ),
                 const SizedBox(height: 8),
                 _buildVehicleTypeOption(
                   title: '4-Wheeler',
                   subtitle: 'Car, Sedan, Van, Delivery Truck',
                   icon: Icons.directions_car_rounded,
-                  value: '4-Wheeler (Car / Van / Delivery Truck)',
+                  value: '4_WHEELER',
+                ),
+                const SizedBox(height: 8),
+                _buildVehicleTypeOption(
+                  title: 'Bicycle',
+                  subtitle: 'Standard Bicycle, Cargo Bike',
+                  icon: Icons.pedal_bike_rounded,
+                  value: 'BICYCLE',
                 ),
               ],
             )),
@@ -395,14 +651,14 @@ class OnboardingView extends GetView<AuthController> {
         CustomTextField(
           controller: controller.licensePlateController,
           label: AppStrings.vehiclePlate,
-          hintText: 'e.g. RD-8842-NY',
+          hintText: 'e.g. SL-AA-9988',
           prefixIcon: Icons.badge_outlined,
         ),
         const SizedBox(height: 16),
         CustomTextField(
           controller: controller.vehicleModelController,
           label: AppStrings.vehicleModel,
-          hintText: 'e.g. Honda CB500X',
+          hintText: 'e.g. Honda CB Shine 125',
           prefixIcon: Icons.minor_crash_outlined,
         ),
         const SizedBox(height: 16),
@@ -438,7 +694,8 @@ class OnboardingView extends GetView<AuthController> {
     required IconData icon,
     required String value,
   }) {
-    final isSelected = controller.vehicleType.value == value;
+    final isSelected = controller.vehicleType.value == value ||
+        (controller.vehicleType.value.contains(title) && !value.contains('_'));
 
     return GestureDetector(
       onTap: () => controller.vehicleType.value = value,
@@ -482,92 +739,291 @@ class OnboardingView extends GetView<AuthController> {
     );
   }
 
-  // STEP 4: Preferred Operating Zones
+  // STEP 4: Preferred Operating Zones & Locations (From API)
   Widget _buildZonesStep(BuildContext context) {
-    final availableZones = [
-      {'id': 'zone_1', 'name': 'Downtown Commercial District', 'district': 'Central Zone', 'surge': '1.2x Surge'},
-      {'id': 'zone_2', 'name': 'North Heights & Uptown', 'district': 'North Zone', 'surge': '1.0x Normal'},
-      {'id': 'zone_3', 'name': 'South Bay Marina & Waterfront', 'district': 'South Zone', 'surge': '1.15x Surge'},
-      {'id': 'zone_4', 'name': 'Financial Hub & Market Street', 'district': 'East Zone', 'surge': '1.3x High Demand'},
-      {'id': 'zone_5', 'name': 'Airport Logistics & Cargo Zone', 'district': 'Special Hub', 'surge': '1.1x Surge'},
-      {'id': 'zone_6', 'name': 'West Campus & University Hub', 'district': 'West Zone', 'surge': '1.05x Normal'},
-    ];
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Step 4: Preferred Operating Zones', style: AppTextStyles.headlineSmall()),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('Step 4: Operating Zones', style: AppTextStyles.headlineSmall()),
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded, size: 22, color: AppColors.primary),
+              tooltip: 'Reload Delivery Zones',
+              onPressed: () => controller.loadOperatingZones(),
+            ),
+          ],
+        ),
         const SizedBox(height: 4),
         Text(AppStrings.selectZonesSubtitle, style: AppTextStyles.bodyMedium()),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
 
-        Obx(
-          () => Column(
+        // Live Coverage Badge
+        Obx(() {
+          final zoneCount = controller.selectedZones.length;
+          final locCount = controller.selectedLocations.length;
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer.withAlpha(45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withAlpha(50)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.pin_drop, color: AppColors.primary, size: 18),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$zoneCount Zones • $locCount Regions Selected',
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: AppColors.primary),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: zoneCount > 0 ? AppColors.successLight : AppColors.warningLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    zoneCount > 0 ? 'Active Coverage' : 'Required',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: zoneCount > 0 ? AppColors.successDark : AppColors.warningDark,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+
+        Obx(() {
+          if (controller.isLoadingZones.value) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          if (controller.operatingZonesList.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 30),
+                child: Column(
+                  children: [
+                    const Text('No operating zones loaded.'),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      onPressed: () => controller.loadOperatingZones(),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry Loading Zones'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return Column(
             children: [
-              for (int i = 0; i < availableZones.length; i++) ...[
-                if (i > 0) const SizedBox(height: 10),
-                _buildZoneItem(context, availableZones[i]),
+              for (final zone in controller.operatingZonesList) ...[
+                _buildOperatingZoneCard(context, zone),
+                const SizedBox(height: 12),
               ],
             ],
-          ),
-        ),
+          );
+        }),
       ],
     );
   }
 
-  Widget _buildZoneItem(BuildContext context, Map<String, String> zone) {
-    final isSelected = controller.selectedZones.contains(zone['id']);
+  Widget _buildOperatingZoneCard(BuildContext context, OperatingZoneEntity zone) {
+    return Obx(() {
+      final isZoneSelected = controller.selectedZones.contains(zone.id);
 
-    return GestureDetector(
-      onTap: () => controller.toggleZone(zone['id']!),
-      child: Container(
+      return Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryContainer : Theme.of(context).cardColor,
+          color: isZoneSelected ? AppColors.primaryContainer.withAlpha(40) : Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.lightCardBorder,
-            width: isSelected ? 1.8 : 1,
+            color: isZoneSelected ? AppColors.primary : AppColors.lightCardBorder,
+            width: isZoneSelected ? 1.8 : 1,
           ),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Checkbox(
-              value: isSelected,
-              activeColor: AppColors.primary,
-              onChanged: (_) => controller.toggleZone(zone['id']!),
+            Row(
+              children: [
+                Checkbox(
+                  value: isZoneSelected,
+                  activeColor: AppColors.primary,
+                  onChanged: (_) => controller.toggleZone(zone.id),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(zone.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5)),
+                      if (zone.district.isNotEmpty)
+                        Text(zone.district, style: AppTextStyles.bodySmall()),
+                    ],
+                  ),
+                ),
+                StatusBadge(
+                  text: '${zone.locations.length} Regions',
+                  type: isZoneSelected ? BadgeType.info : BadgeType.success,
+                ),
+              ],
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (isZoneSelected && zone.locations.isNotEmpty) ...[
+              const Divider(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(zone['name']!, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  Text(zone['district']!, style: AppTextStyles.bodySmall()),
+                  const Text(
+                    'Operating Locations / Sub-Regions:',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      final allSelected = zone.locations.every((l) => controller.selectedLocations.contains(l.name));
+                      if (allSelected) {
+                        for (final loc in zone.locations) {
+                          controller.selectedLocations.remove(loc.name);
+                        }
+                      } else {
+                        for (final loc in zone.locations) {
+                          if (!controller.selectedLocations.contains(loc.name)) {
+                            controller.selectedLocations.add(loc.name);
+                          }
+                        }
+                      }
+                    },
+                    child: Text(
+                      zone.locations.every((l) => controller.selectedLocations.contains(l.name))
+                          ? 'Deselect All'
+                          : 'Select All',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.secondary),
+                    ),
+                  ),
                 ],
               ),
-            ),
-            StatusBadge(
-              text: zone['surge']!,
-              type: zone['surge']!.contains('High') || zone['surge']!.contains('1.3')
-                  ? BadgeType.warning
-                  : (zone['surge']!.contains('Surge') ? BadgeType.info : BadgeType.success),
-            ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: zone.locations.map((loc) {
+                  final isLocSelected = controller.selectedLocations.contains(loc.name);
+                  return FilterChip(
+                    label: Text(
+                      loc.name,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isLocSelected ? FontWeight.w700 : FontWeight.normal,
+                        color: isLocSelected ? Colors.white : null,
+                      ),
+                    ),
+                    selected: isLocSelected,
+                    selectedColor: AppColors.primary,
+                    checkmarkColor: Colors.white,
+                    onSelected: (_) => controller.toggleLocation(loc.name),
+                  );
+                }).toList(),
+              ),
+            ],
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 
-  // STEP 5: Payout Info (Bank Account vs Mobile Money)
+  // STEP 5: Payout Info (Bank Account vs Mobile Money) & Review
   Widget _buildPayoutStep(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Step 5: Payout Information', style: AppTextStyles.headlineSmall()),
+        Text('Step 5: Review & Payout', style: AppTextStyles.headlineSmall()),
         const SizedBox(height: 4),
-        Text('Set up where your delivery earnings and tips will be transferred.', style: AppTextStyles.bodyMedium()),
+        Text('Confirm your registration details and set up your delivery earnings payout.', style: AppTextStyles.bodyMedium()),
+        const SizedBox(height: 16),
+
+        // Comprehensive Summary Card
+        CustomCard(
+          backgroundColor: AppColors.primaryContainer.withAlpha(40),
+          border: Border.all(color: AppColors.primary.withAlpha(60)),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.assignment_turned_in_rounded, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 8),
+                      Text('Application Summary', style: AppTextStyles.titleMedium()),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.successLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text('Ready to Submit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.successDark)),
+                  ),
+                ],
+              ),
+              const Divider(height: 16),
+              Obx(() => Column(
+                children: [
+                  _buildSummaryRow('Applicant', controller.fullNameController.text.isNotEmpty ? controller.fullNameController.text : 'Rider'),
+                  const SizedBox(height: 5),
+                  _buildSummaryRow('Email', controller.emailController.text.isNotEmpty ? controller.emailController.text : '-'),
+                  const SizedBox(height: 5),
+                  _buildSummaryRow('Phone', controller.onboardingPhoneController.text.isNotEmpty ? controller.onboardingPhoneController.text : '-'),
+                  const SizedBox(height: 5),
+                  _buildSummaryRow('Vehicle', '${controller.vehicleType.value} • ${controller.vehicleModelController.text} (${controller.licensePlateController.text})'),
+                  const SizedBox(height: 5),
+                  _buildSummaryRow('License No', controller.drivingLicenseNoController.text.isNotEmpty ? controller.drivingLicenseNoController.text : 'Pending'),
+                  const SizedBox(height: 5),
+                  _buildSummaryRow('Coverage', '${controller.selectedZones.length} Zones (${controller.selectedLocations.length} Regions)'),
+                  const SizedBox(height: 5),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Documents', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+                      Row(
+                        children: [
+                          _buildDocMiniBadge('ID', controller.nationalIdFrontPath.value.isNotEmpty),
+                          const SizedBox(width: 4),
+                          _buildDocMiniBadge('DL', controller.driverLicensePath.value.isNotEmpty),
+                          const SizedBox(width: 4),
+                          _buildDocMiniBadge('Insurance', controller.vehicleInsurancePath.value.isNotEmpty),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              )),
+            ],
+          ),
+        ),
         const SizedBox(height: 20),
+
+        Text('Payout Method', style: AppTextStyles.titleMedium()),
+        const SizedBox(height: 8),
 
         // Payout Method Selector
         Obx(() => Container(
@@ -699,6 +1155,56 @@ class OnboardingView extends GetView<AuthController> {
           }
         }),
       ],
+    );
+  }
+
+  Widget _buildSummaryRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight)),
+        Flexible(
+          child: Text(
+            value,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            textAlign: TextAlign.end,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDocMiniBadge(String label, bool isAttached) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isAttached ? AppColors.successLight : AppColors.lightCardBorder.withAlpha(120),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isAttached ? AppColors.success.withAlpha(120) : Colors.transparent,
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isAttached ? Icons.check : Icons.circle_outlined,
+            size: 10,
+            color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
