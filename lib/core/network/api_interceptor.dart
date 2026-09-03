@@ -14,8 +14,16 @@ class ApiInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final path = options.path;
+    final isAuthEndpoint = path.contains('/auth/login') ||
+        path.contains('/auth/register') ||
+        path.contains('/auth/verify-otp') ||
+        path.contains('/auth/resend-otp') ||
+        path.contains('/auth/forgot-password') ||
+        path.contains('/auth/phone-otp');
+
     final token = _storage.read<String>(AppConstants.tokenKey);
-    if (token != null && token.isNotEmpty) {
+    if (token != null && token.isNotEmpty && !isAuthEndpoint) {
       options.headers['Authorization'] = 'Bearer $token';
     }
     options.headers['Accept'] = 'application/json';

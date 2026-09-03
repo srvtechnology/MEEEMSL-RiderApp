@@ -26,5 +26,5 @@ class AppConstants {
   static const int receiveTimeoutMs = 15000;
 
   // Mock Settings
-  static const bool useMockApi = true; // Provides instantaneous full simulation
+  static const bool useMockApi = false; // Connect to live backend server
 }

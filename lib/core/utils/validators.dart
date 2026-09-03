@@ -39,4 +39,33 @@ class Validators {
     }
     return null;
   }
+
+  static String? validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please enter your password';
+    }
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Password must contain at least one uppercase letter.';
+    }
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Password must contain at least one number.';
+    }
+    if (!RegExp(r'[^a-zA-Z0-9]').hasMatch(value)) {
+      return 'Password must contain at least one special character.';
+    }
+    return null;
+  }
+
+  static String? validateName(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Please enter your full name';
+    }
+    if (value.trim().toLowerCase().contains('test')) {
+      return 'Name cannot contain restricted term "test"';
+    }
+    return null;
+  }
 }

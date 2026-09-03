@@ -25,33 +25,38 @@ class AuthBinding extends Bindings {
   @override
   void dependencies() {
     // Datasources
-    Get.lazyPut<AuthRemoteDataSource>(() => AuthRemoteDataSourceImpl(Get.find<DioClient>()));
-    Get.lazyPut<AuthLocalDataSource>(() => AuthLocalDataSourceImpl(Get.find()));
+    Get.lazyPut<AuthRemoteDataSource>(() => AuthRemoteDataSourceImpl(Get.find<DioClient>()), fenix: true);
+    Get.lazyPut<AuthLocalDataSource>(() => AuthLocalDataSourceImpl(Get.find()), fenix: true);
 
     // Repository
-    Get.lazyPut<AuthRepository>(() => AuthRepositoryImpl(
-          remoteDataSource: Get.find<AuthRemoteDataSource>(),
-          localDataSource: Get.find<AuthLocalDataSource>(),
-        ));
+    Get.lazyPut<AuthRepository>(
+      () => AuthRepositoryImpl(
+        remoteDataSource: Get.find<AuthRemoteDataSource>(),
+        localDataSource: Get.find<AuthLocalDataSource>(),
+      ),
+      fenix: true,
+    );
 
     // UseCases
-    Get.lazyPut(() => LoginUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => LoginWithPasswordUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => LoginWithEmailPasswordUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => SendPhoneOtpUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => VerifyPhoneOtpUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => VerifyOtpUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => RegisterRiderUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => SubmitOnboardingUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => SelfRegisterUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => VerifyRegistrationOtpUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => ResendRegistrationOtpUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => ResetPasswordUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => RegisterDeviceTokenUseCase(Get.find<AuthRepository>()));
-    Get.lazyPut(() => UnregisterDeviceTokenUseCase(Get.find<AuthRepository>()));
+    Get.lazyPut(() => LoginUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => LoginWithPasswordUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => LoginWithEmailPasswordUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => SendPhoneOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => VerifyPhoneOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => VerifyOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => RegisterRiderUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => SubmitOnboardingUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => SelfRegisterUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => VerifyRegistrationOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => ResendRegistrationOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => ResetPasswordUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => RegisterDeviceTokenUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => UnregisterDeviceTokenUseCase(Get.find<AuthRepository>()), fenix: true);
 
     // Controller
-    Get.lazyPut<AuthController>(() => AuthController(
+    if (!Get.isRegistered<AuthController>()) {
+      Get.put<AuthController>(
+        AuthController(
           loginUseCase: Get.find<LoginUseCase>(),
           loginWithPasswordUseCase: Get.find<LoginWithPasswordUseCase>(),
           loginWithEmailPasswordUseCase: Get.find<LoginWithEmailPasswordUseCase>(),
@@ -65,6 +70,9 @@ class AuthBinding extends Bindings {
           resendRegistrationOtpUseCase: Get.find<ResendRegistrationOtpUseCase>(),
           resetPasswordUseCase: Get.find<ResetPasswordUseCase>(),
           deviceInfoService: Get.find<DeviceInfoService>(),
-        ));
+        ),
+        permanent: true,
+      );
+    }
   }
 }

@@ -140,36 +140,16 @@ class AuthController extends GetxController {
   @override
   void onClose() {
     _timer?.cancel();
-    loginEmailController.dispose();
-    loginPasswordController.dispose();
-    phoneTextController.dispose();
-    otpTextController.dispose();
-    resetIdentityController.dispose();
-    resetOtpController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
-    fullNameController.dispose();
-    emailController.dispose();
-    onboardingPhoneController.dispose();
-    idExpiryController.dispose();
-    licenseExpiryController.dispose();
-    insuranceExpiryController.dispose();
-    vehicleModelController.dispose();
-    licensePlateController.dispose();
-    vehicleColorController.dispose();
-    vehicleYearController.dispose();
-    bankNameController.dispose();
-    accountNumberController.dispose();
-    accountHolderController.dispose();
-    routingNumberController.dispose();
-    mobileMoneyProviderController.dispose();
-    mobileMoneyNumberController.dispose();
-    beneficiaryNameController.dispose();
-    registerNameController.dispose();
-    registerEmailController.dispose();
-    registerPasswordController.dispose();
-    registerPhoneController.dispose();
     super.onClose();
+  }
+
+  void clearAuthFields() {
+    loginPasswordController.clear();
+    registerPasswordController.clear();
+    otpTextController.clear();
+    resetOtpController.clear();
+    newPasswordController.clear();
+    confirmPasswordController.clear();
   }
 
   void togglePasswordVisibility() {
@@ -202,8 +182,9 @@ class AuthController extends GetxController {
     final phone = registerPhoneController.text.trim();
     final countryCode = registerCountryCode.value;
 
-    if (name.isEmpty) {
-      Get.snackbar('Validation', 'Please enter your full name', snackPosition: SnackPosition.BOTTOM);
+    final nameError = Validators.validateName(name);
+    if (nameError != null) {
+      Get.snackbar('Validation', nameError, snackPosition: SnackPosition.BOTTOM);
       return;
     }
     final emailError = Validators.validateEmail(email);
@@ -211,8 +192,9 @@ class AuthController extends GetxController {
       Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    if (password.length < 6) {
-      Get.snackbar('Validation', 'Password must be at least 6 characters', snackPosition: SnackPosition.BOTTOM);
+    final passwordError = Validators.validatePassword(password);
+    if (passwordError != null) {
+      Get.snackbar('Validation', passwordError, snackPosition: SnackPosition.BOTTOM);
       return;
     }
     if (phone.isEmpty) {

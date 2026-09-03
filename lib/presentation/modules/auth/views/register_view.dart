@@ -113,7 +113,7 @@ class RegisterView extends GetView<AuthController> {
               Obx(() => CustomTextField(
                     controller: controller.registerPasswordController,
                     label: 'Password',
-                    hintText: 'Minimum 6 characters',
+                    hintText: 'Min 8 chars, 1 uppercase, 1 number, 1 symbol',
                     obscureText: !controller.registerIsPasswordVisible.value,
                     prefixIcon: Icons.lock_outline,
                     suffixIcon: IconButton(
@@ -146,7 +146,13 @@ class RegisterView extends GetView<AuthController> {
                       style: AppTextStyles.bodyMedium(),
                     ),
                     GestureDetector(
-                      onTap: () => Get.offNamed(AppRoutes.login),
+                      onTap: () {
+                        if (Navigator.canPop(context)) {
+                          Get.back();
+                        } else {
+                          Get.offAllNamed(AppRoutes.login);
+                        }
+                      },
                       child: Text(
                         'Sign In',
                         style: AppTextStyles.labelLarge(color: AppColors.primary),
