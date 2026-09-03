@@ -7,6 +7,7 @@ import 'firebase_options.dart';
 import 'app.dart';
 import 'core/network/api_client.dart';
 import 'core/network/dio_client.dart';
+import 'core/network/logger/api_logger.dart';
 import 'core/services/device_info_service.dart';
 import 'core/services/location_service.dart';
 import 'core/services/notification_service.dart';
@@ -42,6 +43,7 @@ void main() async {
   final storage = GetStorage();
   Get.put<GetStorage>(storage, permanent: true);
   Get.put<DeviceInfoService>(DeviceInfoService(storage), permanent: true);
+  Get.put<AsyncApiLogger>(AsyncApiLogger.instance, permanent: true);
   Get.put<ApiClient>(ApiClient(), permanent: true);
   Get.put<DioClient>(DioClient(), permanent: true);
   Get.put<AuthLocalDataSource>(AuthLocalDataSourceImpl(storage), permanent: true);

@@ -16,7 +16,7 @@ class MockInterceptor extends Interceptor {
     if (path.endsWith(ApiEndpoints.register)) {
       final name = options.data?['name'] ?? 'Ibrahim Koroma';
       final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 201,
         data: {
@@ -42,7 +42,7 @@ class MockInterceptor extends Interceptor {
     // 2.2 Verify Registration OTP
     if (path.endsWith(ApiEndpoints.verifyRegistrationOtp)) {
       final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -61,7 +61,7 @@ class MockInterceptor extends Interceptor {
     // 2.3 Resend Registration OTP
     if (path.endsWith(ApiEndpoints.resendRegistrationOtp)) {
       final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -79,7 +79,7 @@ class MockInterceptor extends Interceptor {
     // 3.2 A) Phone OTP Send
     if (path.endsWith(ApiEndpoints.phoneOtpSend)) {
       final phone = options.data?['phone'] ?? '+23276123456';
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -99,7 +99,7 @@ class MockInterceptor extends Interceptor {
       final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
       final phone = options.data?['phone'] ?? '76123456';
 
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -149,7 +149,7 @@ class MockInterceptor extends Interceptor {
 
     // 3.3 Refresh JWT Tokens
     if (path.endsWith(ApiEndpoints.refreshToken)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -166,7 +166,7 @@ class MockInterceptor extends Interceptor {
     // 4.1 Forgot Password Send OTP
     if (path.endsWith(ApiEndpoints.forgotPasswordSendOtp)) {
       final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -183,7 +183,7 @@ class MockInterceptor extends Interceptor {
 
     // 4.2 Reset Password
     if (path.endsWith(ApiEndpoints.forgotPasswordReset)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -198,7 +198,7 @@ class MockInterceptor extends Interceptor {
 
     // 5.1 First-Time Onboarding
     if (path.endsWith(ApiEndpoints.onboarding)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -233,7 +233,7 @@ class MockInterceptor extends Interceptor {
     if (path.endsWith(ApiEndpoints.riderProfile)) {
       if (options.method == 'PATCH') {
         final patchData = options.data is Map ? options.data as Map : {};
-        return handler.resolve(Response(
+        return _resolve(handler, Response(
           requestOptions: options,
           statusCode: 200,
           data: {
@@ -256,7 +256,7 @@ class MockInterceptor extends Interceptor {
         ));
       }
 
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -293,7 +293,7 @@ class MockInterceptor extends Interceptor {
     // 7.1 & 7.2 Settings GET and POST
     if (path.endsWith(ApiEndpoints.settings)) {
       if (options.method == 'POST') {
-        return handler.resolve(Response(
+        return _resolve(handler, Response(
           requestOptions: options,
           statusCode: 200,
           data: {
@@ -310,7 +310,7 @@ class MockInterceptor extends Interceptor {
         ));
       }
 
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -354,7 +354,7 @@ class MockInterceptor extends Interceptor {
 
     // 8.1 Delivery Zones & Hierarchical Locations
     if (path.endsWith(ApiEndpoints.zones)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -413,7 +413,7 @@ class MockInterceptor extends Interceptor {
     // 9.1 & 9.2 Push Token Management
     if (path.endsWith(ApiEndpoints.deviceToken)) {
       if (options.method == 'DELETE') {
-        return handler.resolve(Response(
+        return _resolve(handler, Response(
           requestOptions: options,
           statusCode: 200,
           data: {
@@ -426,7 +426,7 @@ class MockInterceptor extends Interceptor {
         ));
       }
 
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -451,7 +451,7 @@ class MockInterceptor extends Interceptor {
 
     // Logout
     if (path.endsWith(ApiEndpoints.logout)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {'success': true, 'message': 'Logged out successfully'},
@@ -460,7 +460,7 @@ class MockInterceptor extends Interceptor {
 
     // Orders & Dashboard simulation fallback
     if (path.contains(ApiEndpoints.dashboardSummary)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -480,7 +480,7 @@ class MockInterceptor extends Interceptor {
 
     if (path.contains(ApiEndpoints.toggleOnline)) {
       final isOnline = options.data?['isOnline'] ?? true;
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -492,7 +492,7 @@ class MockInterceptor extends Interceptor {
     }
 
     if (path.contains(ApiEndpoints.activeOrders)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -531,7 +531,7 @@ class MockInterceptor extends Interceptor {
     }
 
     if (path.contains(ApiEndpoints.incomingOrder)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -568,7 +568,7 @@ class MockInterceptor extends Interceptor {
     }
 
     if (path.contains(ApiEndpoints.earningsBreakdown)) {
-      return handler.resolve(Response(
+      return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
@@ -594,5 +594,9 @@ class MockInterceptor extends Interceptor {
 
     // Default passthrough fallback
     return handler.next(options);
+  }
+
+  void _resolve(RequestInterceptorHandler handler, Response response) {
+    handler.resolve(response, true);
   }
 }

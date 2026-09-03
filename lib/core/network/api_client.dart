@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer' as dev;
 import 'dart:io' as io;
 import 'package:get/get.dart';
 import 'package:get/get_connect/http/src/status/http_status.dart';
 import 'package:get_storage/get_storage.dart';
 import '../constants/api_endpoints.dart';
 import '../constants/app_constants.dart';
-import '../utils/secure_utils.dart';
 import 'dio_client.dart';
+import 'logger/api_logger.dart';
 
 enum AppEnvironment { staging, production }
 
@@ -86,36 +85,19 @@ class ApiClient extends GetConnect {
     super.onClose();
   }
 
-  void _logRequestBody(String method, String? url, dynamic body) {
-    if (body == null) return;
-    try {
-      if (body is FormData) {
-        final Map<String, dynamic> fields = {};
-        for (var entry in body.fields) {
-          fields[entry.key] = entry.value;
-        }
-
-        final Map<String, String> files = {};
-        for (var entry in body.files) {
-          files[entry.key] = 'File: ${entry.value.filename} (${entry.value.contentType})';
-        }
-
-        final sanitizedFields = SecureUtils.sanitizeLogPayload(fields);
-
-        dev.log(
-          '📦 $method FORM DATA [$url]\nFIELDS: $sanitizedFields\nFILES: $files',
-          name: 'API_CLIENT_BODY',
-        );
-      } else {
-        final sanitizedBody = SecureUtils.sanitizeLogPayload(body);
-        dev.log(
-          '📦 $method JSON BODY [$url]\n$sanitizedBody',
-          name: 'API_CLIENT_BODY',
-        );
+  dynamic _extractRequestBody(dynamic body) {
+    if (body == null) return null;
+    if (body is FormData) {
+      final Map<String, dynamic> fields = {};
+      for (var entry in body.fields) {
+        fields[entry.key] = entry.value;
       }
-    } catch (e) {
-      dev.log('📦 $method BODY [$url] (Error logging body: $e)', name: 'API_CLIENT_BODY');
+      for (var entry in body.files) {
+        fields[entry.key] = 'File: ${entry.value.filename} (${entry.value.contentType})';
+      }
+      return fields;
     }
+    return body;
   }
 
   /// High-performance non-blocking request executor using native dart:io HttpClient.
@@ -148,7 +130,13 @@ class ApiClient extends GetConnect {
       uri = uri.replace(queryParameters: mergedQuery);
     }
 
-    _logRequestBody(method, uri.toString(), body);
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+    final logId = AsyncApiLogger.instance.logRequest(
+      method: method,
+      url: uri.toString(),
+      headers: headers,
+      body: _extractRequestBody(body),
+    );
 
     io.HttpClientRequest? ioRequest;
     try {
@@ -176,16 +164,6 @@ class ApiClient extends GetConnect {
           ioRequest!.headers.set(key, value);
         });
       }
-
-      final logHeaders = <String, String>{};
-      ioRequest.headers.forEach((k, v) => logHeaders[k] = v.join(', '));
-      if (logHeaders.containsKey('Authorization')) {
-        logHeaders['Authorization'] = '[REDACTED]';
-      }
-      dev.log(
-        '🚀 API REQUEST: $method $uri\nHeaders: $logHeaders',
-        name: 'API_CLIENT',
-      );
 
       // Body writing
       if (body is FormData) {
@@ -292,10 +270,14 @@ class ApiClient extends GetConnect {
         respHeaders[key] = values.join(', ');
       });
 
-      final sanitizedBody = SecureUtils.sanitizeLogPayload(parsedBody);
-      dev.log(
-        '✅ API RESPONSE [${ioResponse.statusCode}] $uri\nBody: $sanitizedBody',
-        name: 'API_CLIENT',
+      final durationMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      AsyncApiLogger.instance.logResponse(
+        logId: logId,
+        statusCode: ioResponse.statusCode,
+        statusMessage: ioResponse.reasonPhrase,
+        headers: respHeaders,
+        body: parsedBody,
+        durationMs: durationMs,
       );
 
       T? decodedBody;
@@ -312,15 +294,30 @@ class ApiClient extends GetConnect {
         body: decodedBody,
         bodyString: bodyString,
       );
-    } on TimeoutException {
+    } on TimeoutException catch (e, stack) {
       ioRequest?.abort();
+      final durationMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      AsyncApiLogger.instance.logError(
+        logId: logId,
+        error: 'Connection timed out: $e',
+        stackTrace: stack,
+        statusCode: HttpStatus.requestTimeout,
+        statusMessage: 'Request Timeout',
+        durationMs: durationMs,
+      );
       return Response<T>(
         statusCode: HttpStatus.requestTimeout,
         statusText: 'Connection timed out. Please check your internet connection.',
       );
-    } catch (e) {
+    } catch (e, stack) {
       ioRequest?.abort();
-      dev.log('❌ API ERROR [$uri]: $e', name: 'API_CLIENT');
+      final durationMs = DateTime.now().millisecondsSinceEpoch - startTime;
+      AsyncApiLogger.instance.logError(
+        logId: logId,
+        error: e,
+        stackTrace: stack,
+        durationMs: durationMs,
+      );
       return Response<T>(
         statusCode: null,
         statusText: e.toString(),
