@@ -3,7 +3,8 @@ import 'dart:developer' as dev;
 import 'api_log_record.dart';
 import 'api_logger_config.dart';
 
-/// Formats ApiLogRecord instances into clean, color-coded, box-delimited terminal entries.
+/// Formats ApiLogRecord instances into clean, color-coded terminal entries.
+/// Supports both a concise, compact view (default) and a verbose box view.
 class ConsoleLogFormatter {
   ConsoleLogFormatter._();
 
@@ -25,6 +26,139 @@ class ConsoleLogFormatter {
   static void printRequest(ApiLogRecord record, ApiLoggerConfig config) {
     if (!config.printToConsole || !config.logRequests) return;
 
+    if (config.compactView) {
+      _printCompactRequest(record, config);
+    } else {
+      _printVerboseRequest(record, config);
+    }
+  }
+
+  /// Prints an incoming response log.
+  static void printResponse(ApiLogRecord record, ApiLoggerConfig config) {
+    if (!config.printToConsole || !config.logResponses) return;
+
+    if (config.compactView) {
+      _printCompactResponse(record, config);
+    } else {
+      _printVerboseResponse(record, config);
+    }
+  }
+
+  /// Prints an error log.
+  static void printError(ApiLogRecord record, ApiLoggerConfig config) {
+    if (!config.printToConsole || !config.logErrors) return;
+
+    if (config.compactView) {
+      _printCompactError(record, config);
+    } else {
+      _printVerboseError(record, config);
+    }
+  }
+
+  // ==========================================
+  // COMPACT FORMATTER (1-2 lines per event)
+  // ==========================================
+
+  static void _printCompactRequest(ApiLogRecord record, ApiLoggerConfig config) {
+    final colorize = config.colorizeConsole;
+    final methodColor = colorize ? _methodColor(record.method) : '';
+    final reset = colorize ? _reset : '';
+    final bold = colorize ? _bold : '';
+
+    final lines = <String>[];
+    lines.add(
+      '🚀 $bold$methodColor[${record.method.toUpperCase()}]$reset ${record.url}',
+    );
+
+    // Compact single-line body preview
+    if (config.logRequestBody && record.requestBody != null) {
+      final compactBody = _formatCompactPayload(
+        record.requestBody,
+        maxLength: config.compactBodyMaxLength,
+      );
+      if (compactBody != null && compactBody.isNotEmpty) {
+        lines.add('   📦 Body: $compactBody');
+      }
+    }
+
+    _printLines(lines, 'API');
+  }
+
+  static void _printCompactResponse(
+    ApiLogRecord record,
+    ApiLoggerConfig config,
+  ) {
+    final colorize = config.colorizeConsole;
+    final statusColor = colorize ? _statusColor(record.statusCode) : '';
+    final methodColor = colorize ? _methodColor(record.method) : '';
+    final reset = colorize ? _reset : '';
+    final bold = colorize ? _bold : '';
+    final dim = colorize ? _dim : '';
+
+    final statusText = record.statusCode != null
+        ? '$bold$statusColor[${record.statusCode} ${record.statusMessage ?? ''}]$reset'
+        : '[NO_STATUS]';
+
+    final lines = <String>[];
+    lines.add(
+      '✅ $statusText $dim(${record.formattedDuration})$reset $bold$methodColor[${record.method.toUpperCase()}]$reset ${record.url}',
+    );
+
+    // Full response body without hiding or truncating any data
+    if (config.logResponseBody && record.responseBody != null) {
+      final compactBody = _formatCompactPayload(
+        record.responseBody,
+        maxLength:
+            config.truncateResponseBody ? config.compactBodyMaxLength : 0,
+      );
+      if (compactBody != null && compactBody.isNotEmpty) {
+        lines.add('   📦 Body: $compactBody');
+      }
+    }
+
+    _printLines(lines, 'API');
+  }
+
+  static void _printCompactError(ApiLogRecord record, ApiLoggerConfig config) {
+    final colorize = config.colorizeConsole;
+    final red = colorize ? _red : '';
+    final reset = colorize ? _reset : '';
+    final bold = colorize ? _bold : '';
+    final dim = colorize ? _dim : '';
+    final methodColor = colorize ? _methodColor(record.method) : '';
+
+    final statusText = record.statusCode != null
+        ? '$bold$red[${record.statusCode} ${record.statusMessage ?? ''}]$reset'
+        : '$bold$red[ERROR]$reset';
+
+    final lines = <String>[];
+    lines.add(
+      '❌ $statusText $dim(${record.formattedDuration})$reset $bold$methodColor[${record.method.toUpperCase()}]$reset ${record.url}',
+    );
+
+    if (record.error != null) {
+      lines.add('   ⚠️ Error: $red${record.error}$reset');
+    }
+
+    if (config.logResponseBody && record.responseBody != null) {
+      final compactBody = _formatCompactPayload(
+        record.responseBody,
+        maxLength:
+            config.truncateResponseBody ? config.compactBodyMaxLength : 0,
+      );
+      if (compactBody != null && compactBody.isNotEmpty) {
+        lines.add('   📦 Error Body: $compactBody');
+      }
+    }
+
+    _printLines(lines, 'API');
+  }
+
+  // ==========================================
+  // VERBOSE BOX FORMATTER (multi-line cards)
+  // ==========================================
+
+  static void _printVerboseRequest(ApiLogRecord record, ApiLoggerConfig config) {
     final colorize = config.colorizeConsole;
     final methodColor = colorize ? _methodColor(record.method) : '';
     final reset = colorize ? _reset : '';
@@ -41,7 +175,8 @@ class ConsoleLogFormatter {
         record.requestHeaders != null &&
         record.requestHeaders!.isNotEmpty) {
       lines.add('│ 📋 Headers:');
-      final headerLines = _formatJsonOrMap(record.requestHeaders, config.maxBodyLength);
+      final headerLines =
+          _formatJsonOrMap(record.requestHeaders, config.maxBodyLength);
       for (final hl in headerLines) {
         lines.add('│   $hl');
       }
@@ -71,10 +206,10 @@ class ConsoleLogFormatter {
     _printLines(lines, 'API_REQUEST');
   }
 
-  /// Prints an incoming response log.
-  static void printResponse(ApiLogRecord record, ApiLoggerConfig config) {
-    if (!config.printToConsole || !config.logResponses) return;
-
+  static void _printVerboseResponse(
+    ApiLogRecord record,
+    ApiLoggerConfig config,
+  ) {
     final colorize = config.colorizeConsole;
     final statusColor = colorize ? _statusColor(record.statusCode) : '';
     final methodColor = colorize ? _methodColor(record.method) : '';
@@ -106,7 +241,10 @@ class ConsoleLogFormatter {
     // Body
     if (config.logResponseBody && record.responseBody != null) {
       lines.add('│ 📦 Body:');
-      final bodyLines = _formatBody(record.responseBody, config.maxBodyLength);
+      final bodyLines = _formatBody(
+        record.responseBody,
+        config.truncateResponseBody ? config.maxBodyLength : 0,
+      );
       for (final bl in bodyLines) {
         lines.add('│   $bl');
       }
@@ -117,10 +255,7 @@ class ConsoleLogFormatter {
     _printLines(lines, 'API_RESPONSE');
   }
 
-  /// Prints an error log.
-  static void printError(ApiLogRecord record, ApiLoggerConfig config) {
-    if (!config.printToConsole || !config.logErrors) return;
-
+  static void _printVerboseError(ApiLogRecord record, ApiLoggerConfig config) {
     final colorize = config.colorizeConsole;
     final red = colorize ? _red : '';
     final reset = colorize ? _reset : '';
@@ -143,7 +278,10 @@ class ConsoleLogFormatter {
     // Response Body (Error Payload)
     if (config.logResponseBody && record.responseBody != null) {
       lines.add('│ 📦 Error Body:');
-      final bodyLines = _formatBody(record.responseBody, config.maxBodyLength);
+      final bodyLines = _formatBody(
+        record.responseBody,
+        config.truncateResponseBody ? config.maxBodyLength : 0,
+      );
       for (final bl in bodyLines) {
         lines.add('│   $bl');
       }
@@ -152,6 +290,39 @@ class ConsoleLogFormatter {
     lines.add('└──$_divider');
 
     _printLines(lines, 'API_ERROR');
+  }
+
+  // ==========================================
+  // HELPERS
+  // ==========================================
+
+  static String? _formatCompactPayload(dynamic body, {int maxLength = 250}) {
+    if (body == null) return null;
+
+    String text;
+    try {
+      if (body is Map || body is List) {
+        text = jsonEncode(body);
+      } else if (body is String) {
+        try {
+          final decoded = jsonDecode(body);
+          text = jsonEncode(decoded);
+        } catch (_) {
+          text = body.replaceAll('\n', ' ').trim();
+        }
+      } else {
+        text = body.toString();
+      }
+    } catch (_) {
+      text = body.toString();
+    }
+
+    if (text.isEmpty) return null;
+
+    if (maxLength > 0 && text.length > maxLength) {
+      return '${text.substring(0, maxLength)}...';
+    }
+    return text;
   }
 
   static String _methodColor(String method) {
@@ -222,7 +393,6 @@ class ConsoleLogFormatter {
   }
 
   static void _printLines(List<String> lines, String name) {
-    // Join lines to log atomically
     final message = lines.join('\n');
     dev.log(message, name: name);
   }

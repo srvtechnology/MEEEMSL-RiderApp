@@ -245,10 +245,23 @@ class AsyncApiLogger {
     _recordBroadcast.add(record);
   }
 
+  dynamic _ensureTypedPayload(dynamic payload) {
+    if (payload is Map) {
+      try {
+        return Map<String, dynamic>.from(payload);
+      } catch (_) {
+        return payload;
+      }
+    }
+    return payload;
+  }
+
   void _handleResponseEvent(_LogEvent event) {
     final existing = _activeRecords.remove(event.id);
     final sanitizedHeaders = _sanitizeHeaders(event.headers);
-    final sanitizedBody = _sanitizePayload(event.body);
+    final responseBody = _config.sanitizeResponseBody
+        ? _sanitizePayload(event.body)
+        : _ensureTypedPayload(event.body);
 
     final duration = event.durationMs ??
         (existing != null
@@ -266,7 +279,7 @@ class AsyncApiLogger {
       statusCode: event.statusCode,
       statusMessage: event.statusMessage,
       responseHeaders: sanitizedHeaders,
-      responseBody: sanitizedBody,
+      responseBody: responseBody,
       responseTime: event.timestamp,
       durationMs: duration,
     );
@@ -287,7 +300,9 @@ class AsyncApiLogger {
   void _handleErrorEvent(_LogEvent event) {
     final existing = _activeRecords.remove(event.id);
     final sanitizedHeaders = _sanitizeHeaders(event.headers);
-    final sanitizedBody = _sanitizePayload(event.body);
+    final responseBody = _config.sanitizeResponseBody
+        ? _sanitizePayload(event.body)
+        : _ensureTypedPayload(event.body);
 
     final duration = event.durationMs ??
         (existing != null
@@ -305,7 +320,7 @@ class AsyncApiLogger {
       statusCode: event.statusCode,
       statusMessage: event.statusMessage,
       responseHeaders: sanitizedHeaders,
-      responseBody: sanitizedBody,
+      responseBody: responseBody,
       responseTime: event.timestamp,
       durationMs: duration,
       error: event.error,

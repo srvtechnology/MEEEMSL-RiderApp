@@ -91,10 +91,10 @@ void main() {
       expect(sanitizedReq['otp'], equals('[REDACTED]'));
       expect(sanitizedReq['phoneNumber'], equals('+23276123456'));
 
-      // Verify response payload sanitization
-      final sanitizedResp = completedRecord.responseBody as Map<String, dynamic>;
-      expect(sanitizedResp['token'], equals('[REDACTED]'));
-      expect(sanitizedResp['data']['riderId'], equals('R-1001'));
+      // Verify response payload is preserved completely without hiding any data
+      final responseBody = completedRecord.responseBody as Map<String, dynamic>;
+      expect(responseBody['token'], equals('secret_return_token'));
+      expect(responseBody['data']['riderId'], equals('R-1001'));
 
       await subscription.cancel();
     });
@@ -309,4 +309,58 @@ void main() {
       expect(history.first.isError, isTrue);
     });
   });
+
+  group('ConsoleLogFormatter Tests', () {
+    final record = ApiLogRecord(
+      id: 'test-id-123',
+      url: 'https://api.meeemsl.com/test',
+      method: 'POST',
+      requestHeaders: {'Content-Type': 'application/json'},
+      requestBody: {'key': 'value'},
+      requestTime: DateTime.now(),
+      statusCode: 200,
+      statusMessage: 'OK',
+      responseHeaders: {'content-type': 'application/json'},
+      responseBody: {'status': 'success'},
+      responseTime: DateTime.now().add(const Duration(milliseconds: 120)),
+      durationMs: 120,
+      curlCommand: 'curl -X POST "https://api.meeemsl.com/test"',
+    );
+
+    test('Renders compact view without errors', () {
+      const compactConfig = ApiLoggerConfig(
+        enabled: true,
+        compactView: true,
+        printToConsole: true,
+      );
+
+      expect(() => ConsoleLogFormatter.printRequest(record, compactConfig), returnsNormally);
+      expect(() => ConsoleLogFormatter.printResponse(record, compactConfig), returnsNormally);
+      expect(() => ConsoleLogFormatter.printError(record, compactConfig), returnsNormally);
+    });
+
+    test('Does not truncate large response bodies when truncateResponseBody is false', () {
+      final largeRegions = List.generate(50, (index) => 'REGION_$index');
+      final largeRecord = record.copyWith(
+        responseBody: {
+          'zones': [
+            {'regions': largeRegions}
+          ]
+        },
+      );
+
+      const config = ApiLoggerConfig(
+        enabled: true,
+        compactView: true,
+        truncateResponseBody: false,
+        printToConsole: true,
+      );
+
+      expect(
+        () => ConsoleLogFormatter.printResponse(largeRecord, config),
+        returnsNormally,
+      );
+    });
+  });
 }
+

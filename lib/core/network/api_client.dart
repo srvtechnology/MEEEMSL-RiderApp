@@ -248,19 +248,10 @@ class ApiClient extends GetConnect {
       );
       final bodyString = utf8.decode(responseBytes, allowMalformed: true);
 
-      // Parse JSON body safely
+      // Parse JSON body safely without stripping any response data
       dynamic parsedBody;
       try {
         parsedBody = jsonDecode(bodyString);
-        if (parsedBody is Map) {
-          if (parsedBody.containsKey('otp')) parsedBody.remove('otp');
-          if (parsedBody.containsKey('OTP')) parsedBody.remove('OTP');
-          final data = parsedBody['data'];
-          if (data is Map) {
-            if (data.containsKey('otp')) data.remove('otp');
-            if (data.containsKey('OTP')) data.remove('OTP');
-          }
-        }
       } catch (_) {
         parsedBody = bodyString;
       }

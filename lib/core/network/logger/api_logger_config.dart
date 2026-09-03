@@ -10,6 +10,23 @@ class ApiLoggerConfig {
   /// Defaults to true in debug mode, false in release mode unless overridden.
   final bool enabled;
 
+  /// Whether to format console logs in a concise, compact format (1-2 lines per event).
+  /// When true, avoids massive box cards and verbose indentation.
+  /// Defaults to true.
+  final bool compactView;
+
+  /// Maximum characters for inline payload previews in compact view.
+  /// Defaults to 250 characters.
+  final int compactBodyMaxLength;
+
+  /// Whether to sanitize/redact sensitive keys in the response body.
+  /// Defaults to false so complete server response data is never hidden or masked.
+  final bool sanitizeResponseBody;
+
+  /// Whether to truncate response bodies in console logs.
+  /// Defaults to false so complete response data is printed without being cut off.
+  final bool truncateResponseBody;
+
   /// Whether to log outgoing requests.
   final bool logRequests;
 
@@ -52,6 +69,10 @@ class ApiLoggerConfig {
 
   const ApiLoggerConfig({
     this.enabled = kDebugMode,
+    this.compactView = true,
+    this.compactBodyMaxLength = 250,
+    this.sanitizeResponseBody = false,
+    this.truncateResponseBody = false,
     this.logRequests = true,
     this.logResponses = true,
     this.logErrors = true,
@@ -70,6 +91,10 @@ class ApiLoggerConfig {
   /// Config with all logging disabled.
   const ApiLoggerConfig.disabled()
       : enabled = false,
+        compactView = true,
+        compactBodyMaxLength = 0,
+        sanitizeResponseBody = false,
+        truncateResponseBody = false,
         logRequests = false,
         logResponses = false,
         logErrors = false,
@@ -86,6 +111,10 @@ class ApiLoggerConfig {
 
   ApiLoggerConfig copyWith({
     bool? enabled,
+    bool? compactView,
+    int? compactBodyMaxLength,
+    bool? sanitizeResponseBody,
+    bool? truncateResponseBody,
     bool? logRequests,
     bool? logResponses,
     bool? logErrors,
@@ -102,6 +131,10 @@ class ApiLoggerConfig {
   }) {
     return ApiLoggerConfig(
       enabled: enabled ?? this.enabled,
+      compactView: compactView ?? this.compactView,
+      compactBodyMaxLength: compactBodyMaxLength ?? this.compactBodyMaxLength,
+      sanitizeResponseBody: sanitizeResponseBody ?? this.sanitizeResponseBody,
+      truncateResponseBody: truncateResponseBody ?? this.truncateResponseBody,
       logRequests: logRequests ?? this.logRequests,
       logResponses: logResponses ?? this.logResponses,
       logErrors: logErrors ?? this.logErrors,
