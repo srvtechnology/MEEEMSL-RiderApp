@@ -1,6 +1,7 @@
 import '../../domain/entities/document_entity.dart';
 import '../../domain/entities/payout_info_entity.dart';
 import 'package:dio/dio.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
@@ -28,6 +29,8 @@ abstract class ProfileRemoteDataSource {
     AppPreferencesSettingsModel? appPreferences,
     String? currentPassword,
     String? newPassword,
+    List<String>? selectedZones,
+    List<String>? selectedLocations,
   });
 }
 
@@ -80,33 +83,48 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
 
   @override
   Future<List<DocumentModel>> getDocuments() async {
-    try {
-      final response = await _dioClient.dio.get(ApiEndpoints.getDocuments);
-      final list = response.data['data'] as List<dynamic>;
-      return list.map((e) => DocumentModel.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (e) {
-      throw const ServerException(message: 'Failed to load documents');
-    }
+    // Note: Documents list API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
+    // Return local documents without making network calls.
+    return const [
+      DocumentModel(
+        type: 'driving_license',
+        title: "Driver's License",
+        documentNumber: 'DL-10928374',
+        expiryDate: '2028-12-31',
+        status: DocumentStatus.verified,
+        fileUrl: 'https://s3.amazonaws.com/meeem/docs/dl.png',
+      ),
+      DocumentModel(
+        type: 'national_id',
+        title: 'National Identity Card',
+        documentNumber: 'NID-9920182',
+        expiryDate: '2030-05-15',
+        status: DocumentStatus.verified,
+        fileUrl: 'https://s3.amazonaws.com/meeem/docs/id.png',
+      ),
+      DocumentModel(
+        type: 'vehicle_insurance',
+        title: 'Vehicle Insurance Certificate',
+        documentNumber: 'INS-2026-8819',
+        expiryDate: '2027-01-10',
+        status: DocumentStatus.verified,
+        fileUrl: 'https://s3.amazonaws.com/meeem/docs/ins.png',
+      ),
+    ];
   }
 
   @override
   Future<DocumentModel> uploadDocument(String docType, String filePath) async {
-    try {
-      final response = await _dioClient.dio.post(
-        ApiEndpoints.uploadDocument,
-        data: {'docType': docType, 'filePath': filePath},
-      );
-      return DocumentModel.fromJson(response.data['data'] as Map<String, dynamic>);
-    } catch (_) {
-      return DocumentModel(
-        type: docType,
-        title: 'Uploaded Document',
-        documentNumber: 'DOC-NEW-2026',
-        expiryDate: '2028-12-31',
-        status: DocumentStatus.pending,
-        fileUrl: filePath,
-      );
-    }
+    // Note: Dedicated uploadDocument endpoint is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
+    // Return local mock model without making network calls.
+    return DocumentModel(
+      type: docType,
+      title: 'Uploaded Document',
+      documentNumber: 'DOC-NEW-2026',
+      expiryDate: '2028-12-31',
+      status: DocumentStatus.pending,
+      fileUrl: filePath,
+    );
   }
 
   @override
@@ -153,9 +171,10 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   @override
   Future<bool> updateOperatingZones(List<String> zoneIds) async {
     try {
+      // Conforms to MOBILE_RIDER_APP_API_DOC_PART_1.md Section 7.2: POST /mobileapi/rider/settings
       final response = await _dioClient.dio.post(
-        ApiEndpoints.operatingZones,
-        data: {'zoneIds': zoneIds},
+        ApiEndpoints.settings,
+        data: {'selectedZones': zoneIds},
       );
       return response.statusCode == 200;
     } catch (_) {
@@ -165,44 +184,40 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
 
   @override
   Future<PayoutInfoModel?> getPayoutInfo() async {
-    try {
-      final response = await _dioClient.dio.get(ApiEndpoints.payoutInfo);
-      if (response.data != null && response.data['data'] != null) {
-        return PayoutInfoModel.fromJson(response.data['data'] as Map<String, dynamic>);
-      }
-      return null;
-    } catch (_) {
-      return const PayoutInfoModel(
-        methodType: PayoutMethodType.bank,
-        bankName: 'Chase Bank USA',
-        accountNumber: '9920184920',
-        accountHolderName: 'Alex Johnson',
-        routingNumber: '021000021',
-      );
+    final storage = GetStorage();
+    final stored = storage.read<Map<String, dynamic>>('rider_payout_info');
+    if (stored != null) {
+      return PayoutInfoModel.fromJson(stored);
     }
+    return const PayoutInfoModel(
+      methodType: PayoutMethodType.bank,
+      bankName: 'Sierra Leone Commercial Bank',
+      accountNumber: '•••• 8829',
+      accountHolderName: 'Ibrahim Koroma',
+      routingNumber: '021000021',
+    );
   }
 
   @override
   Future<PayoutInfoModel> updatePayoutInfo(PayoutInfoModel payoutInfo) async {
-    try {
-      final response = await _dioClient.dio.post(
-        ApiEndpoints.payoutInfo,
-        data: payoutInfo.toJson(),
-      );
-      return PayoutInfoModel.fromJson(response.data['data'] as Map<String, dynamic>);
-    } catch (_) {
-      return payoutInfo;
-    }
+    final storage = GetStorage();
+    await storage.write('rider_payout_info', payoutInfo.toJson());
+    return payoutInfo;
   }
 
   @override
   Future<VehicleModel> updateVehicle(VehicleModel vehicle) async {
     try {
-      final response = await _dioClient.dio.post(
-        ApiEndpoints.updateVehicle,
-        data: vehicle.toJson(),
+      // Conforms to MOBILE_RIDER_APP_API_DOC_PART_1.md Section 6.2: PATCH /mobileapi/rider/profile
+      await _dioClient.dio.patch(
+        ApiEndpoints.updateProfile,
+        data: {
+          'vehicleType': vehicle.type,
+          'vehicleName': vehicle.model,
+          'vehicleNumber': vehicle.licensePlate,
+        },
       );
-      return VehicleModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      return vehicle;
     } catch (_) {
       return vehicle;
     }
@@ -214,8 +229,25 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final response = await _dioClient.dio.get(ApiEndpoints.settings);
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'] as Map<String, dynamic>;
-        final settingsData = data['settings'] as Map<String, dynamic>? ?? data;
-        return RiderSettingsModel.fromJson(settingsData);
+
+        // Load local preferences cache if not present in response
+        final storage = GetStorage();
+        final localNotifs = storage.read<Map<String, dynamic>>('rider_pref_notifications');
+        final localNav = storage.read<Map<String, dynamic>>('rider_pref_navigation');
+        final localPrefs = storage.read<Map<String, dynamic>>('rider_pref_app_preferences');
+
+        final mergedData = Map<String, dynamic>.from(data);
+        if (mergedData['notifications'] == null && localNotifs != null) {
+          mergedData['notifications'] = localNotifs;
+        }
+        if (mergedData['navigation'] == null && localNav != null) {
+          mergedData['navigation'] = localNav;
+        }
+        if (mergedData['appPreferences'] == null && localPrefs != null) {
+          mergedData['appPreferences'] = localPrefs;
+        }
+
+        return RiderSettingsModel.fromJson(mergedData);
       }
       return const RiderSettingsModel();
     } on DioException catch (e) {
@@ -231,28 +263,61 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
     AppPreferencesSettingsModel? appPreferences,
     String? currentPassword,
     String? newPassword,
+    List<String>? selectedZones,
+    List<String>? selectedLocations,
   }) async {
     try {
-      final patchData = <String, dynamic>{
+      final storage = GetStorage();
+      if (notifications != null) {
+        await storage.write('rider_pref_notifications', notifications.toJson());
+      }
+      if (navigation != null) {
+        await storage.write('rider_pref_navigation', navigation.toJson());
+      }
+      if (appPreferences != null) {
+        await storage.write('rider_pref_app_preferences', appPreferences.toJson());
+      }
+
+      // Conforms to MOBILE_RIDER_APP_API_DOC_PART_1.md Section 7.2: POST /mobileapi/rider/settings
+      final postData = <String, dynamic>{
+        if (currentPassword != null && currentPassword.isNotEmpty) 'currentPassword': currentPassword,
+        if (newPassword != null && newPassword.isNotEmpty) 'newPassword': newPassword,
+        if (selectedZones != null) 'selectedZones': selectedZones,
+        if (selectedLocations != null) 'selectedLocations': selectedLocations,
         if (notifications != null) 'notifications': notifications.toJson(),
         if (navigation != null) 'navigation': navigation.toJson(),
         if (appPreferences != null) 'appPreferences': appPreferences.toJson(),
-        if (currentPassword != null && currentPassword.isNotEmpty && newPassword != null && newPassword.isNotEmpty)
-          'security': {
-            'currentPassword': currentPassword,
-            'newPassword': newPassword,
-          },
       };
 
-      final response = await _dioClient.dio.patch(
+      final response = await _dioClient.dio.post(
         ApiEndpoints.settings,
-        data: patchData,
+        data: postData,
       );
 
       if (response.data != null && response.data['data'] != null) {
-        final data = response.data['data'] as Map<String, dynamic>;
-        final settingsData = data['settings'] as Map<String, dynamic>? ?? data;
-        return RiderSettingsModel.fromJson(settingsData);
+        final resData = response.data['data'] as Map<String, dynamic>;
+        // Response contains { rider: { ... } }
+        final riderData = resData['rider'] as Map<String, dynamic>? ?? resData;
+
+        final localNotifs = storage.read<Map<String, dynamic>>('rider_pref_notifications');
+        final localNav = storage.read<Map<String, dynamic>>('rider_pref_navigation');
+        final localPrefs = storage.read<Map<String, dynamic>>('rider_pref_app_preferences');
+
+        return RiderSettingsModel(
+          rider: RiderModel.fromJson(riderData),
+          notifications: notifications ??
+              (localNotifs != null
+                  ? NotificationsSettingsModel.fromJson(localNotifs)
+                  : const NotificationsSettingsModel()),
+          navigation: navigation ??
+              (localNav != null
+                  ? NavigationSettingsModel.fromJson(localNav)
+                  : const NavigationSettingsModel()),
+          appPreferences: appPreferences ??
+              (localPrefs != null
+                  ? AppPreferencesSettingsModel.fromJson(localPrefs)
+                  : const AppPreferencesSettingsModel()),
+        );
       }
       return const RiderSettingsModel();
     } on DioException catch (e) {

@@ -20,7 +20,56 @@ class ApiEndpoints {
   static const String phoneOtpSend = '/auth/phone-otp/send-otp';
   static const String phoneOtpVerify = '/auth/phone-otp/verify-otp';
   static const String refreshToken = '/auth/refresh';
-  static const String logout = '/auth/logout';
+  static const String logout = '/auth/logout'; // Note: Logout in Part 1 is DELETE /device-token
+
+  /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC_PART_1.md
+  static const Set<String> part1Endpoints = {
+    // 2. Rider Registration & OTP Verification
+    register,
+    verifyRegistrationOtp,
+    resendRegistrationOtp,
+    // 3. Rider Login & Session Lifecycle
+    login,
+    phoneOtpSend,
+    phoneOtpVerify,
+    refreshToken,
+    // 4. Forgot & Reset Password Flow
+    forgotPasswordSendOtp,
+    forgotPasswordReset,
+    // 5. First-Time Onboarding Flow
+    onboarding,
+    // 6. Rider Profile Management
+    riderProfile,
+    // 7. Rider Settings & Preferences
+    settings,
+    // 8. Delivery Zones & Hierarchical Locations
+    zones,
+    // 9. Multi-Device Push Token Management
+    deviceToken,
+  };
+
+  /// Returns true ONLY if the given [path] is documented in MOBILE_RIDER_APP_API_DOC_PART_1.md.
+  static bool isPart1Endpoint(String path) {
+    var cleanPath = path;
+    if (cleanPath.contains('?')) {
+      cleanPath = cleanPath.split('?').first;
+    }
+    final uri = Uri.tryParse(cleanPath);
+    if (uri != null && uri.hasScheme) {
+      cleanPath = uri.path;
+    }
+    if (cleanPath.length > 1 && cleanPath.endsWith('/')) {
+      cleanPath = cleanPath.substring(0, cleanPath.length - 1);
+    }
+    const prefix = '/mobileapi/rider';
+    if (cleanPath.startsWith(prefix)) {
+      cleanPath = cleanPath.substring(prefix.length);
+    }
+    if (!cleanPath.startsWith('/')) {
+      cleanPath = '/$cleanPath';
+    }
+    return part1Endpoints.contains(cleanPath);
+  }
 
   // 4. Forgot & Reset Password
   static const String forgotPasswordSendOtp = '/auth/forgot-password/send-otp';

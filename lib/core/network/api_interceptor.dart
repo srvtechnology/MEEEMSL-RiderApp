@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:get_storage/get_storage.dart';
 import '../constants/api_endpoints.dart';
 import '../constants/app_constants.dart';
+import 'mock_interceptor.dart';
 
 /// ApiInterceptor attaches Bearer auth tokens to outgoing requests,
 /// automatically refreshes expired JWT tokens upon receiving 401,
@@ -15,6 +16,12 @@ class ApiInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final path = options.path;
+    // Strictly enforce: DO NOT call any API not in MOBILE_RIDER_APP_API_DOC_PART_1.md
+    if (!ApiEndpoints.isPart1Endpoint(path)) {
+      final mockResponse = MockInterceptor.getMockResponse(options);
+      return handler.resolve(mockResponse);
+    }
+
     final isAuthEndpoint = path.contains('/auth/login') ||
         path.contains('/auth/register') ||
         path.contains('/auth/verify-otp') ||

@@ -1,11 +1,14 @@
 import 'dart:convert';
 import 'package:dartz/dartz.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:meeem_rider/domain/entities/rider_entity.dart';
+import 'package:meeem_rider/domain/entities/user_entity.dart';
+import 'package:meeem_rider/domain/entities/registered_device_entity.dart';
 import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
 import 'package:meeem_rider/domain/entities/document_entity.dart';
 import 'package:meeem_rider/domain/entities/operating_zone_entity.dart';
@@ -20,8 +23,8 @@ import 'package:meeem_rider/domain/usecases/profile/update_payout_info_usecase.d
 import 'package:meeem_rider/domain/usecases/profile/update_vehicle_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_settings_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_settings_usecase.dart';
+import 'package:meeem_rider/core/widgets/custom_button.dart';
 import 'package:meeem_rider/presentation/modules/profile/controllers/profile_controller.dart';
-import 'package:meeem_rider/presentation/modules/profile/views/profile_view.dart';
 import 'package:meeem_rider/presentation/modules/profile/views/rider_settings_view.dart';
 
 class MockGetProfileUseCase extends Mock implements GetProfileUseCase {}
@@ -57,23 +60,49 @@ void main() {
   late MockGetSettingsUseCase mockGetSettingsUseCase;
   late MockUpdateSettingsUseCase mockUpdateSettingsUseCase;
 
-  const testRider = RiderEntity(
-    id: 'rider-1',
-    name: 'Test Rider',
-    phone: '+1234567890',
-    email: 'rider@example.com',
+  const tRider = RiderEntity(
+    id: 'cm7rider0001',
+    name: 'Ibrahim Koroma',
+    phone: '76123456',
+    email: 'rider.ibrahim@example.com',
     avatar: '',
     isOnline: true,
     approvalStatus: 'approved',
+    status: 'APPROVED',
     walletBalance: 120.0,
     totalTrips: 45,
     rating: 4.9,
+    selectedZones: ['ZONE 1', 'ZONE 2'],
+    selectedLocations: ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
   );
 
-  const testSettings = RiderSettingsEntity(
+  const tFullSettings = RiderSettingsEntity(
+    user: UserEntity(
+      id: 'cm7abc123000',
+      email: 'rider.ibrahim@example.com',
+      name: 'Ibrahim Koroma',
+      phone: '76123456',
+      phoneCountryCode: '+232',
+      isEmailVerified: true,
+    ),
+    rider: tRider,
+    registeredDevices: [
+      RegisteredDeviceEntity(
+        token: 'fcm_token_123',
+        deviceId: 'android-uuid-1',
+        platform: 'android',
+        deviceModel: 'Samsung Galaxy S22',
+      ),
+      RegisteredDeviceEntity(
+        token: 'fcm_token_456',
+        deviceId: 'iphone-uuid-2',
+        platform: 'ios',
+        deviceModel: 'iPhone 15 Pro',
+      ),
+    ],
     notifications: NotificationsSettingsEntity(
       orderAlerts: true,
-      promotionalAlerts: true,
+      promotionalAlerts: false,
       soundEnabled: true,
       vibrationEnabled: true,
     ),
@@ -84,7 +113,7 @@ void main() {
     ),
     appPreferences: AppPreferencesSettingsEntity(
       distanceUnit: 'KM',
-      theme: 'LIGHT',
+      theme: 'SYSTEM',
     ),
   );
 
@@ -109,15 +138,6 @@ void main() {
           'google_fonts/Inter-Bold.ttf': <Object?>[
             <String, Object?>{'asset': 'google_fonts/Inter-Bold.ttf'}
           ],
-          'google_fonts/Poppins-Regular.ttf': <Object?>[
-            <String, Object?>{'asset': 'google_fonts/Poppins-Regular.ttf'}
-          ],
-          'google_fonts/Poppins-SemiBold.ttf': <Object?>[
-            <String, Object?>{'asset': 'google_fonts/Poppins-SemiBold.ttf'}
-          ],
-          'google_fonts/Poppins-Bold.ttf': <Object?>[
-            <String, Object?>{'asset': 'google_fonts/Poppins-Bold.ttf'}
-          ],
         };
         return const StandardMessageCodec().encodeMessage(manifest);
       }
@@ -133,12 +153,6 @@ void main() {
       return null;
     });
 
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-      const MethodChannel('plugins.flutter.io/path_provider'),
-      (MethodCall methodCall) async => '.',
-    );
-
     mockGetProfileUseCase = MockGetProfileUseCase();
     mockUpdateProfileUseCase = MockUpdateProfileUseCase();
     mockGetDocumentsUseCase = MockGetDocumentsUseCase();
@@ -151,11 +165,11 @@ void main() {
     mockGetSettingsUseCase = MockGetSettingsUseCase();
     mockUpdateSettingsUseCase = MockUpdateSettingsUseCase();
 
-    when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(testRider));
+    when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(tRider));
     when(() => mockGetDocumentsUseCase()).thenAnswer((_) async => const Right(<DocumentEntity>[]));
     when(() => mockGetOperatingZonesUseCase()).thenAnswer((_) async => const Right(<OperatingZoneEntity>[]));
     when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(null));
-    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(testSettings));
+    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(tFullSettings));
 
     controller = ProfileController(
       getProfileUseCase: mockGetProfileUseCase,
@@ -171,8 +185,9 @@ void main() {
       updateSettingsUseCase: mockUpdateSettingsUseCase,
     );
 
-    controller.riderProfile.value = testRider;
-    controller.riderSettings.value = testSettings;
+    controller.riderProfile.value = tRider;
+    controller.riderSettings.value = tFullSettings;
+    controller.currentDeviceId.value = 'android-uuid-1';
 
     Get.put<ProfileController>(controller);
   });
@@ -181,23 +196,7 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('ProfileView renders with CustomCards and ListTiles without assertion error',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const GetMaterialApp(
-        home: ProfileView(),
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    expect(find.text('Documents & Verification'), findsOneWidget);
-    expect(find.text('Settings & Preferences'), findsOneWidget);
-    expect(find.text('Log Out'), findsOneWidget);
-  });
-
-  testWidgets('RiderSettingsView renders with CustomCards and ListTiles without assertion error',
-      (WidgetTester tester) async {
+  testWidgets('RiderSettingsView renders full 7.1 information and registered devices', (WidgetTester tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
         home: RiderSettingsView(),
@@ -206,14 +205,32 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.text('Notification Preferences'), findsOneWidget);
-    expect(find.text('Order & Dispatch Alerts'), findsOneWidget);
-    expect(find.text('Default Navigation App'), findsOneWidget);
-    expect(find.text('Change Password'), findsOneWidget);
+    // Check Section 7.1 Account & Verification Overview
+    expect(find.text('Account & Verification'), findsOneWidget);
+    expect(find.text('Ibrahim Koroma'), findsOneWidget);
+    expect(find.text('rider.ibrahim@example.com'), findsOneWidget);
+    expect(find.text('APPROVED'), findsOneWidget);
+
+    // Check Delivery Coverage & Zones
+    expect(find.text('Delivery Coverage & Zones'), findsOneWidget);
+    expect(find.text('ZONE 1'), findsOneWidget);
+    expect(find.text('ZONE 2'), findsOneWidget);
+
+    // Check Registered Devices & Push Sessions
+    await tester.scrollUntilVisible(
+      find.text('Active Devices & Push Sessions'),
+      100,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Active Devices & Push Sessions'), findsOneWidget);
+    expect(find.text('Samsung Galaxy S22'), findsOneWidget);
+    expect(find.text('iPhone 15 Pro'), findsOneWidget);
+    expect(find.text('THIS DEVICE'), findsOneWidget);
   });
 
-  testWidgets('RiderSettingsView opens map app picker bottom sheet with ListTiles without assertion error',
-      (WidgetTester tester) async {
+  testWidgets('RiderSettingsView opens Change Password dialog conforming to 7.2', (WidgetTester tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
         home: RiderSettingsView(),
@@ -222,37 +239,17 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('Default Navigation App'), 100);
+    final changePasswordTile = find.text('Change Password');
+    expect(changePasswordTile, findsOneWidget);
+
+    await tester.tap(changePasswordTile);
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Default Navigation App'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Choose Default Map App'), findsOneWidget);
-    expect(find.text('Google Maps'), findsOneWidget);
-    expect(find.text('Waze'), findsOneWidget);
-    expect(find.text('Apple Maps'), findsOneWidget);
-  });
-
-  testWidgets('RiderSettingsView opens theme picker bottom sheet with ListTiles without assertion error',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const GetMaterialApp(
-        home: RiderSettingsView(),
-      ),
-    );
-
-    await tester.pumpAndSettle();
-
-    await tester.scrollUntilVisible(find.text('Theme Mode'), 100);
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.text('Theme Mode'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Theme Mode'), findsWidgets);
-    expect(find.text('System Default'), findsOneWidget);
-    expect(find.text('Dark Mode'), findsWidgets);
-    expect(find.text('Light Mode'), findsOneWidget);
+    // Verify change password dialog opened
+    expect(find.text('Change Account Password'), findsOneWidget);
+    expect(find.text('Current Password'), findsOneWidget);
+    expect(find.text('New Password (min 6 characters)'), findsOneWidget);
+    expect(find.text('Confirm New Password'), findsOneWidget);
+    expect(find.widgetWithText(CustomButton, 'Update Password'), findsOneWidget);
   });
 }

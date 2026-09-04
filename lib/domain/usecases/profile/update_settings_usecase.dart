@@ -14,6 +14,8 @@ class UpdateSettingsUseCase {
     AppPreferencesSettingsEntity? appPreferences,
     String? currentPassword,
     String? newPassword,
+    List<String>? selectedZones,
+    List<String>? selectedLocations,
   }) {
     return repository.updateSettings(
       notifications: notifications,
@@ -21,6 +23,8 @@ class UpdateSettingsUseCase {
       appPreferences: appPreferences,
       currentPassword: currentPassword,
       newPassword: newPassword,
+      selectedZones: selectedZones,
+      selectedLocations: selectedLocations,
     );
   }
 }

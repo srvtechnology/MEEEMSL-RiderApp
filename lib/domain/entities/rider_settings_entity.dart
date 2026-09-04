@@ -1,4 +1,7 @@
 import 'package:equatable/equatable.dart';
+import 'user_entity.dart';
+import 'rider_entity.dart';
+import 'registered_device_entity.dart';
 
 class NotificationsSettingsEntity extends Equatable {
   final bool orderAlerts;
@@ -85,23 +88,37 @@ class AppPreferencesSettingsEntity extends Equatable {
   List<Object?> get props => [theme, language, distanceUnit];
 }
 
+/// Conforms to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1)
+/// Section 7: Rider Settings & Preferences (7.1 Get Full Settings & 7.2 Update Settings)
 class RiderSettingsEntity extends Equatable {
+  final UserEntity? user;
+  final RiderEntity? rider;
+  final List<RegisteredDeviceEntity> registeredDevices;
   final NotificationsSettingsEntity notifications;
   final NavigationSettingsEntity navigation;
   final AppPreferencesSettingsEntity appPreferences;
 
   const RiderSettingsEntity({
+    this.user,
+    this.rider,
+    this.registeredDevices = const [],
     this.notifications = const NotificationsSettingsEntity(),
     this.navigation = const NavigationSettingsEntity(),
     this.appPreferences = const AppPreferencesSettingsEntity(),
   });
 
   RiderSettingsEntity copyWith({
+    UserEntity? user,
+    RiderEntity? rider,
+    List<RegisteredDeviceEntity>? registeredDevices,
     NotificationsSettingsEntity? notifications,
     NavigationSettingsEntity? navigation,
     AppPreferencesSettingsEntity? appPreferences,
   }) {
     return RiderSettingsEntity(
+      user: user ?? this.user,
+      rider: rider ?? this.rider,
+      registeredDevices: registeredDevices ?? this.registeredDevices,
       notifications: notifications ?? this.notifications,
       navigation: navigation ?? this.navigation,
       appPreferences: appPreferences ?? this.appPreferences,
@@ -109,5 +126,12 @@ class RiderSettingsEntity extends Equatable {
   }
 
   @override
-  List<Object?> get props => [notifications, navigation, appPreferences];
+  List<Object?> get props => [
+        user,
+        rider,
+        registeredDevices,
+        notifications,
+        navigation,
+        appPreferences,
+      ];
 }

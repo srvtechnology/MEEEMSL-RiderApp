@@ -1,4 +1,7 @@
 import '../../domain/entities/rider_settings_entity.dart';
+import 'user_model.dart';
+import 'rider_model.dart';
+import 'registered_device_model.dart';
 
 class NotificationsSettingsModel extends NotificationsSettingsEntity {
   const NotificationsSettingsModel({
@@ -100,29 +103,68 @@ class AppPreferencesSettingsModel extends AppPreferencesSettingsEntity {
   }
 }
 
+/// Conforms to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1)
+/// Section 7: Rider Settings & Preferences (7.1 Get Full Settings)
 class RiderSettingsModel extends RiderSettingsEntity {
   const RiderSettingsModel({
+    super.user,
+    super.rider,
+    super.registeredDevices = const [],
     super.notifications = const NotificationsSettingsModel(),
     super.navigation = const NavigationSettingsModel(),
     super.appPreferences = const AppPreferencesSettingsModel(),
   });
 
   factory RiderSettingsModel.fromJson(Map<String, dynamic> json) {
+    UserModel? user;
+    if (json['user'] != null && json['user'] is Map<String, dynamic>) {
+      user = UserModel.fromJson(json['user'] as Map<String, dynamic>);
+    }
+
+    RiderModel? rider;
+    if (json['rider'] != null && json['rider'] is Map<String, dynamic>) {
+      rider = RiderModel.fromJson(json['rider'] as Map<String, dynamic>);
+    }
+
+    List<RegisteredDeviceModel> registeredDevices = [];
+    if (json['registeredDevices'] != null && json['registeredDevices'] is List) {
+      registeredDevices = (json['registeredDevices'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => RegisteredDeviceModel.fromJson(e))
+          .toList();
+    }
+
+    final notifs = json['notifications'] != null
+        ? NotificationsSettingsModel.fromJson(json['notifications'] as Map<String, dynamic>)
+        : const NotificationsSettingsModel();
+
+    final nav = json['navigation'] != null
+        ? NavigationSettingsModel.fromJson(json['navigation'] as Map<String, dynamic>)
+        : const NavigationSettingsModel();
+
+    final prefs = json['appPreferences'] != null
+        ? AppPreferencesSettingsModel.fromJson(json['appPreferences'] as Map<String, dynamic>)
+        : const AppPreferencesSettingsModel();
+
     return RiderSettingsModel(
-      notifications: json['notifications'] != null
-          ? NotificationsSettingsModel.fromJson(json['notifications'] as Map<String, dynamic>)
-          : const NotificationsSettingsModel(),
-      navigation: json['navigation'] != null
-          ? NavigationSettingsModel.fromJson(json['navigation'] as Map<String, dynamic>)
-          : const NavigationSettingsModel(),
-      appPreferences: json['appPreferences'] != null
-          ? AppPreferencesSettingsModel.fromJson(json['appPreferences'] as Map<String, dynamic>)
-          : const AppPreferencesSettingsModel(),
+      user: user,
+      rider: rider,
+      registeredDevices: registeredDevices,
+      notifications: notifs,
+      navigation: nav,
+      appPreferences: prefs,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      if (user != null)
+        'user': (user is UserModel ? user as UserModel : UserModel.fromEntity(user!)).toJson(),
+      if (rider != null)
+        'rider': (rider is RiderModel ? rider as RiderModel : RiderModel.fromEntity(rider!)).toJson(),
+      'registeredDevices': registeredDevices
+          .map((d) => (d is RegisteredDeviceModel ? d : RegisteredDeviceModel.fromEntity(d)).toJson())
+          .toList(),
       'notifications': NotificationsSettingsModel.fromEntity(notifications).toJson(),
       'navigation': NavigationSettingsModel.fromEntity(navigation).toJson(),
       'appPreferences': AppPreferencesSettingsModel.fromEntity(appPreferences).toJson(),
@@ -131,6 +173,9 @@ class RiderSettingsModel extends RiderSettingsEntity {
 
   factory RiderSettingsModel.fromEntity(RiderSettingsEntity entity) {
     return RiderSettingsModel(
+      user: entity.user,
+      rider: entity.rider,
+      registeredDevices: entity.registeredDevices,
       notifications: entity.notifications,
       navigation: entity.navigation,
       appPreferences: entity.appPreferences,

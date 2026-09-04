@@ -153,6 +153,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
     AppPreferencesSettingsEntity? appPreferences,
     String? currentPassword,
     String? newPassword,
+    List<String>? selectedZones,
+    List<String>? selectedLocations,
   }) async {
     try {
       final updated = await remoteDataSource.updateSettings(
@@ -161,6 +163,8 @@ class ProfileRepositoryImpl implements ProfileRepository {
         appPreferences: appPreferences != null ? AppPreferencesSettingsModel.fromEntity(appPreferences) : null,
         currentPassword: currentPassword,
         newPassword: newPassword,
+        selectedZones: selectedZones,
+        selectedLocations: selectedLocations,
       );
       return Right(updated);
     } on ServerException catch (e) {

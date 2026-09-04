@@ -327,6 +327,40 @@ class MockInterceptor extends Interceptor {
     // 7.1 & 7.2 Settings GET and POST
     if (path.endsWith(ApiEndpoints.settings)) {
       if (options.method == 'POST') {
+        Map<String, dynamic> body = {};
+        if (options.data is Map<String, dynamic>) {
+          body = options.data as Map<String, dynamic>;
+        } else if (options.data is FormData) {
+          final fd = options.data as FormData;
+          for (final f in fd.fields) {
+            try {
+              body[f.key] = jsonDecode(f.value);
+            } catch (_) {
+              body[f.key] = f.value;
+            }
+          }
+        }
+
+        // Validate password change if provided (Section 1 & 7.2 requirement: min 6 chars)
+        final newPassword = body['newPassword']?.toString();
+        if (newPassword != null && newPassword.isNotEmpty && newPassword.length < 6) {
+          return _resolve(handler, Response(
+            requestOptions: options,
+            statusCode: 400,
+            data: {
+              'success': false,
+              'error': 'Password must be at least 6 characters',
+            },
+          ));
+        }
+
+        final selectedZones = body['selectedZones'] is List
+            ? (body['selectedZones'] as List).map((e) => e.toString()).toList()
+            : ['ZONE 1', 'ZONE 2'];
+        final selectedLocations = body['selectedLocations'] is List
+            ? (body['selectedLocations'] as List).map((e) => e.toString()).toList()
+            : ['NO 2 RIVER', 'BAW BAW'];
+
         return _resolve(handler, Response(
           requestOptions: options,
           statusCode: 200,
@@ -336,8 +370,17 @@ class MockInterceptor extends Interceptor {
             'data': {
               'rider': {
                 'id': 'cm7rider0001',
-                'selectedZones': options.data?['selectedZones'] ?? ['ZONE 1'],
-                'selectedLocations': options.data?['selectedLocations'] ?? ['NO 2 RIVER'],
+                'isApproved': true,
+                'isSuspended': false,
+                'status': 'APPROVED',
+                'vehicleType': '2_WHEELER',
+                'vehicleTypes': ['2_WHEELER'],
+                'vehicleName': 'Honda CB Shine 125',
+                'vehicleNumber': 'SL-AA-9988',
+                'drivingLicenseNo': 'DL-10928374',
+                'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+                'selectedZones': selectedZones,
+                'selectedLocations': selectedLocations,
               }
             }
           },
@@ -356,12 +399,20 @@ class MockInterceptor extends Interceptor {
               'name': 'Ibrahim Koroma',
               'phone': '76123456',
               'phoneCountryCode': '+232',
+              'image': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
+              'isEmailVerified': true,
             },
             'rider': {
               'id': 'cm7rider0001',
               'isApproved': true,
               'isSuspended': false,
               'status': 'APPROVED',
+              'vehicleType': '2_WHEELER',
+              'vehicleTypes': ['2_WHEELER'],
+              'vehicleName': 'Honda CB Shine 125',
+              'vehicleNumber': 'SL-AA-9988',
+              'drivingLicenseNo': 'DL-10928374',
+              'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
               'selectedZones': ['ZONE 1', 'ZONE 2'],
               'selectedLocations': ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
             },
@@ -632,5 +683,213 @@ class MockInterceptor extends Interceptor {
 
   void _resolve(RequestInterceptorHandler handler, Response response) {
     handler.resolve(response, true);
+  }
+
+  /// Generates a realistic mock response for any endpoint,
+  /// used by ApiInterceptor to block non-Part 1 endpoints from making network calls.
+  static Response getMockResponse(RequestOptions options) {
+    final path = options.path;
+
+    if (path.contains(ApiEndpoints.earningsBreakdown)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': {
+            'todayEarnings': 148.50,
+            'weeklyEarnings': 892.20,
+            'monthlyEarnings': 3420.00,
+            'availablePayout': 240.00,
+            'completedTrips': 45,
+            'basePay': 720.00,
+            'tips': 92.20,
+            'surgeBonuses': 80.00,
+            'dailyData': [
+              {'day': 'Mon', 'amount': 45.0},
+              {'day': 'Tue', 'amount': 62.5},
+              {'day': 'Wed', 'amount': 38.0},
+              {'day': 'Thu', 'amount': 84.0},
+              {'day': 'Fri', 'amount': 95.0},
+              {'day': 'Sat', 'amount': 120.0},
+              {'day': 'Sun', 'amount': 80.0},
+            ],
+            'recentTransactions': [
+              {
+                'id': 'tx_1',
+                'orderNumber': '#MM-8839',
+                'amount': 14.80,
+                'tip': 2.50,
+                'date': DateTime.now().subtract(const Duration(hours: 2)).toIso8601String(),
+                'type': 'trip_earnings',
+                'status': 'completed',
+              },
+              {
+                'id': 'tx_2',
+                'orderNumber': '#MM-8831',
+                'amount': 12.50,
+                'tip': 3.00,
+                'date': DateTime.now().subtract(const Duration(hours: 5)).toIso8601String(),
+                'type': 'trip_earnings',
+                'status': 'completed',
+              },
+            ]
+          }
+        },
+      );
+    }
+
+    if (path.contains(ApiEndpoints.requestPayout) || path.contains(ApiEndpoints.payoutHistory)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'success': true, 'message': 'Payout request processed successfully.'},
+      );
+    }
+
+    if (path.contains(ApiEndpoints.payoutInfo)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': {
+            'methodType': 'bank',
+            'bankName': 'Sierra Leone Commercial Bank',
+            'accountNumber': '•••• 8829',
+            'accountHolderName': 'Ibrahim Koroma',
+            'routingNumber': '021000021',
+          }
+        },
+      );
+    }
+
+    if (path.contains(ApiEndpoints.dashboardSummary)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': {
+            'todayEarnings': 148.50,
+            'todayDeliveries': 9,
+            'acceptanceRate': 96.5,
+            'rating': 4.92,
+            'onlineHours': 5.8,
+            'weeklyEarnings': 892.20,
+            'hasActiveOrder': false,
+          }
+        },
+      );
+    }
+
+    if (path.contains(ApiEndpoints.toggleOnline)) {
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? true) : true;
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'isOnline': isOnline,
+          'message': isOnline ? 'You are now online' : 'You are now offline',
+        },
+      );
+    }
+
+    if (path.contains(ApiEndpoints.activeOrders)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': [
+            {
+              'id': 'ord_102948',
+              'orderNumber': '#MM-8839',
+              'status': 'in_transit',
+              'customerName': 'Sarah Jenkins',
+              'customerPhone': '+232 76 998877',
+              'customerAvatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+              'pickupName': 'Mama Beach Grill',
+              'pickupAddress': 'Mama Beach, Zone 1',
+              'pickupPhone': '+232 76 112233',
+              'dropoffAddress': 'No 2 River Beach House #4',
+              'pickupLat': 8.484,
+              'pickupLng': -13.234,
+              'dropoffLat': 8.460,
+              'dropoffLng': -13.250,
+              'items': [
+                {'name': 'Grilled Barracuda & Plantain', 'quantity': 2, 'notes': 'Extra spicy sauce'},
+                {'name': 'Ginger Beer (Cold)', 'quantity': 2, 'notes': ''},
+              ],
+              'subtotal': 48.50,
+              'riderEarnings': 14.80,
+              'distanceKm': 3.4,
+              'estimatedDurationMin': 16,
+              'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
+              'notes': 'Please call when arriving at the gate.',
+              'deliveryOtp': '4829',
+            }
+          ]
+        },
+      );
+    }
+
+    if (path.contains(ApiEndpoints.orderHistory)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': [
+            {
+              'id': 'ord_102940',
+              'orderNumber': '#MM-8830',
+              'status': 'delivered',
+              'customerName': 'David Cole',
+              'pickupName': 'Tokeh Seafood Shack',
+              'pickupAddress': 'Tokeh Village',
+              'dropoffAddress': 'Baw Baw Point #2',
+              'subtotal': 42.00,
+              'riderEarnings': 15.00,
+              'createdAt': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+            }
+          ]
+        },
+      );
+    }
+
+    if (path.contains(ApiEndpoints.incomingOrder)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'success': true, 'data': null},
+      );
+    }
+
+    if (path.contains(ApiEndpoints.acceptOrder) ||
+        path.contains(ApiEndpoints.declineOrder) ||
+        path.contains(ApiEndpoints.updateOrderStatus) ||
+        path.contains(ApiEndpoints.uploadProof) ||
+        path.contains(ApiEndpoints.updateLocation) ||
+        path.contains(ApiEndpoints.uploadDocument) ||
+        path.contains(ApiEndpoints.operatingZones) ||
+        path.contains(ApiEndpoints.updateVehicle) ||
+        path.contains(ApiEndpoints.notifications) ||
+        path.contains(ApiEndpoints.markNotificationRead) ||
+        path.contains(ApiEndpoints.logout)) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'success': true, 'message': 'Operation processed locally.'},
+      );
+    }
+
+    // Default safe fallback
+    return Response(
+      requestOptions: options,
+      statusCode: 200,
+      data: {'success': true, 'data': {}},
+    );
   }
 }

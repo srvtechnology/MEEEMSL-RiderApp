@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import '../constants/api_endpoints.dart';
 import '../constants/app_constants.dart';
 import '../network/dio_client.dart';
 
@@ -10,6 +9,7 @@ import '../network/dio_client.dart';
 /// It continuously captures rider coordinates and syncs them periodically with the backend
 /// for optimal order matching and customer live tracking.
 class LocationService extends GetxService {
+  // ignore: unused_field
   final DioClient _dioClient;
 
   LocationService([DioClient? dioClient]) : _dioClient = dioClient ?? Get.find<DioClient>();
@@ -136,31 +136,12 @@ class LocationService extends GetxService {
     isTrackingActive.value = false;
   }
 
-  /// Transmits latest coordinates to server for order matching & dispatch algorithms.
+  /// Records latest coordinates for local tracking (API Doc Part 1 does not specify location update endpoint).
   Future<void> _sendLocationUpdateToServer() async {
     if (!isTrackingActive.value) return;
 
     final pos = currentPosition.value ?? defaultFallbackPosition;
-
-    try {
-      final payload = {
-        'latitude': pos.latitude,
-        'longitude': pos.longitude,
-        'heading': pos.heading,
-        'speed': pos.speed,
-        'altitude': pos.altitude,
-        'timestamp': DateTime.now().toIso8601String(),
-      };
-
-      await _dioClient.dio.post(
-        ApiEndpoints.updateLocation,
-        data: payload,
-      );
-
-      lastSyncTimestamp.value = DateTime.now();
-      debugPrint('[LocationService] Synced GPS: ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}');
-    } catch (e) {
-      debugPrint('[LocationService] Location sync error: $e');
-    }
+    lastSyncTimestamp.value = DateTime.now();
+    debugPrint('[LocationService] Local GPS updated: ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}');
   }
 }

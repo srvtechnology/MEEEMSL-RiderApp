@@ -84,6 +84,7 @@ abstract class AuthRemoteDataSource {
   });
   Future<bool> unregisterDeviceToken({
     required String deviceId,
+    String? token,
   });
 }
 
@@ -599,9 +600,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> logout() async {
-    try {
-      await _dioClient.dio.post(ApiEndpoints.logout);
-    } catch (_) {}
+    // Note: /auth/logout is not part of MOBILE_RIDER_APP_API_DOC_PART_1.md.
+    // Unregistering device token is done via unregisterDeviceToken (DELETE /device-token).
   }
 
   @override
@@ -633,12 +633,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<bool> unregisterDeviceToken({
     required String deviceId,
+    String? token,
   }) async {
     try {
       final response = await _dioClient.dio.delete(
         ApiEndpoints.deviceToken,
         data: {
           'deviceId': deviceId,
+          if (token != null) 'token': token,
         },
       );
       return response.statusCode == 200;

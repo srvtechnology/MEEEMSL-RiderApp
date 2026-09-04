@@ -1,6 +1,3 @@
-import 'package:dio/dio.dart';
-import '../../core/constants/api_endpoints.dart';
-import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
 import '../../domain/entities/order_entity.dart';
 import '../models/order_model.dart';
@@ -21,89 +18,110 @@ abstract class OrderRemoteDataSource {
 }
 
 class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
+  // ignore: unused_field
   final DioClient _dioClient;
 
   OrderRemoteDataSourceImpl(this._dioClient);
 
+  // In-memory mock store conforming to MOBILE_RIDER_APP_API_DOC_PART_1.md constraint
+  // (Order APIs are not in Part 1 specification)
+  final List<OrderModel> _activeOrders = [
+    OrderModel.fromJson({
+      'id': 'ord_102948',
+      'orderNumber': '#MM-8839',
+      'status': 'in_transit',
+      'customerName': 'Sarah Jenkins',
+      'customerPhone': '+232 76 998877',
+      'customerAvatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
+      'pickupName': 'Mama Beach Grill',
+      'pickupAddress': 'Mama Beach, Zone 1',
+      'pickupPhone': '+232 76 112233',
+      'dropoffAddress': 'No 2 River Beach House #4',
+      'pickupLat': 8.484,
+      'pickupLng': -13.234,
+      'dropoffLat': 8.460,
+      'dropoffLng': -13.250,
+      'items': [
+        {'name': 'Grilled Barracuda & Plantain', 'quantity': 2, 'notes': 'Extra spicy sauce'},
+        {'name': 'Ginger Beer (Cold)', 'quantity': 2, 'notes': ''},
+      ],
+      'subtotal': 48.50,
+      'riderEarnings': 14.80,
+      'distanceKm': 3.4,
+      'estimatedDurationMin': 16,
+      'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
+      'notes': 'Please call when arriving at the gate.',
+      'deliveryOtp': '4829',
+    }),
+  ];
+
+  final List<OrderModel> _orderHistory = [
+    OrderModel.fromJson({
+      'id': 'ord_102940',
+      'orderNumber': '#MM-8830',
+      'status': 'delivered',
+      'customerName': 'David Cole',
+      'pickupName': 'Tokeh Seafood Shack',
+      'pickupAddress': 'Tokeh Village',
+      'dropoffAddress': 'Baw Baw Point #2',
+      'subtotal': 42.00,
+      'riderEarnings': 15.00,
+      'createdAt': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
+    }),
+    OrderModel.fromJson({
+      'id': 'ord_102935',
+      'orderNumber': '#MM-8821',
+      'status': 'delivered',
+      'customerName': 'Amara Turay',
+      'pickupName': 'Lakka Ocean Grill',
+      'pickupAddress': 'Lakka Beach',
+      'dropoffAddress': 'Hamilton Village Center',
+      'subtotal': 38.50,
+      'riderEarnings': 13.50,
+      'createdAt': DateTime.now().subtract(const Duration(hours: 7)).toIso8601String(),
+    }),
+  ];
+
   @override
   Future<List<OrderModel>> getActiveOrders() async {
-    try {
-      final response = await _dioClient.dio.get(ApiEndpoints.activeOrders);
-      if (response.statusCode == 200 && response.data != null) {
-        final list = response.data['data'] as List<dynamic>;
-        return list.map((e) => OrderModel.fromJson(e as Map<String, dynamic>)).toList();
-      }
-      return [];
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to load active orders',
-        statusCode: e.response?.statusCode,
-      );
-    }
+    return List.from(_activeOrders);
   }
 
   @override
   Future<OrderModel?> getIncomingOrder() async {
-    try {
-      final response = await _dioClient.dio.get(ApiEndpoints.incomingOrder);
-      if (response.statusCode == 200 && response.data?['data'] != null) {
-        return OrderModel.fromJson(response.data['data'] as Map<String, dynamic>);
-      }
-      return null;
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to check incoming orders',
-        statusCode: e.response?.statusCode,
-      );
-    }
+    return null;
   }
 
   @override
   Future<OrderModel> acceptOrder(String orderId) async {
-    try {
-      final response = await _dioClient.dio.post(
-        ApiEndpoints.acceptOrder,
-        data: {'orderId': orderId},
-      );
-      if (response.statusCode == 200 && response.data?['data'] != null) {
-        return OrderModel.fromJson(response.data['data'] as Map<String, dynamic>);
-      }
-      // Fallback
-      return OrderModel.fromJson({
-        'id': orderId,
-        'orderNumber': '#MM-8839',
-        'status': 'accepted',
-        'customerName': 'Sarah Jenkins',
-        'customerPhone': '+1 555 987 6543',
-        'pickupName': 'Artisan Burger Co.',
-        'pickupAddress': '742 Evergreen Terrace',
-        'dropoffAddress': '124 Conch Street, Apt 4B',
-        'subtotal': 48.50,
-        'riderEarnings': 14.80,
-        'distanceKm': 3.4,
-      });
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to accept order',
-        statusCode: e.response?.statusCode,
-      );
+    final index = _activeOrders.indexWhere((o) => o.id == orderId);
+    if (index != -1) {
+      final updatedEntity = _activeOrders[index].copyWith(status: OrderStatus.accepted);
+      final updated = OrderModel.fromEntity(updatedEntity);
+      _activeOrders[index] = updated;
+      return updated;
     }
+    final newOrder = OrderModel.fromJson({
+      'id': orderId,
+      'orderNumber': '#MM-8839',
+      'status': 'accepted',
+      'customerName': 'Sarah Jenkins',
+      'customerPhone': '+232 76 998877',
+      'pickupName': 'Mama Beach Grill',
+      'pickupAddress': 'Mama Beach, Zone 1',
+      'dropoffAddress': 'No 2 River Beach House #4',
+      'subtotal': 48.50,
+      'riderEarnings': 14.80,
+      'distanceKm': 3.4,
+    });
+    _activeOrders.add(newOrder);
+    return newOrder;
   }
 
   @override
   Future<bool> declineOrder(String orderId, String reason) async {
-    try {
-      final response = await _dioClient.dio.post(
-        ApiEndpoints.declineOrder,
-        data: {'orderId': orderId, 'reason': reason},
-      );
-      return response.statusCode == 200;
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to decline order',
-        statusCode: e.response?.statusCode,
-      );
-    }
+    _activeOrders.removeWhere((o) => o.id == orderId);
+    return true;
   }
 
   @override
@@ -113,75 +131,67 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     String? proofPhotoUrl,
     String? customerOtp,
   }) async {
-    try {
-      final response = await _dioClient.dio.post(
-        ApiEndpoints.updateOrderStatus,
-        data: {
-          'orderId': orderId,
-          'status': status.name,
-          'proofPhotoUrl': proofPhotoUrl,
-          'customerOtp': customerOtp,
-        },
+    final index = _activeOrders.indexWhere((o) => o.id == orderId);
+    if (index != -1) {
+      final updatedEntity = _activeOrders[index].copyWith(
+        status: status,
+        proofPhotoUrl: proofPhotoUrl ?? _activeOrders[index].proofPhotoUrl,
       );
-      if (response.statusCode == 200 && response.data?['data'] != null) {
-        return OrderModel.fromJson(response.data['data'] as Map<String, dynamic>);
+      final updated = OrderModel.fromEntity(updatedEntity);
+      if (status == OrderStatus.delivered || status == OrderStatus.cancelled) {
+        _activeOrders.removeAt(index);
+        _orderHistory.insert(0, updated);
+      } else {
+        _activeOrders[index] = updated;
       }
-      return OrderModel.fromJson({
-        'id': orderId,
-        'orderNumber': '#MM-8839',
-        'status': status.name,
-        'customerName': 'Sarah Jenkins',
-        'customerPhone': '+1 555 987 6543',
-        'pickupName': 'Artisan Burger Co.',
-        'pickupAddress': '742 Evergreen Terrace',
-        'dropoffAddress': '124 Conch Street, Apt 4B',
-        'subtotal': 48.50,
-        'riderEarnings': 14.80,
-        'distanceKm': 3.4,
-      });
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to update order status',
-        statusCode: e.response?.statusCode,
-      );
+      return updated;
     }
+    return OrderModel.fromJson({
+      'id': orderId,
+      'orderNumber': '#MM-8839',
+      'status': status.name,
+      'customerName': 'Sarah Jenkins',
+      'customerPhone': '+232 76 998877',
+      'pickupName': 'Mama Beach Grill',
+      'pickupAddress': 'Mama Beach, Zone 1',
+      'dropoffAddress': 'No 2 River Beach House #4',
+      'subtotal': 48.50,
+      'riderEarnings': 14.80,
+      'distanceKm': 3.4,
+    });
   }
 
   @override
   Future<List<OrderModel>> getOrderHistory({String? statusFilter}) async {
-    try {
-      final response = await _dioClient.dio.get(
-        ApiEndpoints.orderHistory,
-        queryParameters: statusFilter != null ? {'status': statusFilter} : null,
-      );
-      if (response.statusCode == 200 && response.data != null) {
-        final list = response.data['data'] as List<dynamic>;
-        return list.map((e) => OrderModel.fromJson(e as Map<String, dynamic>)).toList();
-      }
-      return [];
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to load order history',
-        statusCode: e.response?.statusCode,
-      );
+    if (statusFilter != null && statusFilter.isNotEmpty) {
+      return _orderHistory
+          .where((o) => o.status.name.toLowerCase() == statusFilter.toLowerCase())
+          .toList();
     }
+    return List.from(_orderHistory);
   }
 
   @override
   Future<OrderModel> getOrderDetails(String orderId) async {
-    try {
-      final response = await _dioClient.dio.get(
-        '\${ApiEndpoints.orderDetails}/\$orderId',
-      );
-      if (response.statusCode == 200 && response.data?['data'] != null) {
-        return OrderModel.fromJson(response.data['data'] as Map<String, dynamic>);
-      }
-      throw const ServerException(message: 'Order not found');
-    } on DioException catch (e) {
-      throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to get order details',
-        statusCode: e.response?.statusCode,
-      );
-    }
+    final active = _activeOrders.firstWhere(
+      (o) => o.id == orderId,
+      orElse: () => _orderHistory.firstWhere(
+        (o) => o.id == orderId,
+        orElse: () => OrderModel.fromJson({
+          'id': orderId,
+          'orderNumber': '#MM-8839',
+          'status': 'in_transit',
+          'customerName': 'Sarah Jenkins',
+          'customerPhone': '+232 76 998877',
+          'pickupName': 'Mama Beach Grill',
+          'pickupAddress': 'Mama Beach, Zone 1',
+          'dropoffAddress': 'No 2 River Beach House #4',
+          'subtotal': 48.50,
+          'riderEarnings': 14.80,
+          'distanceKm': 3.4,
+        }),
+      ),
+    );
+    return active;
   }
 }

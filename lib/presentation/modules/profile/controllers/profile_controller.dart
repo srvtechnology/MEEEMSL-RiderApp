@@ -23,7 +23,9 @@ import '../../../../domain/usecases/profile/update_vehicle_usecase.dart';
 import '../../../../domain/usecases/profile/get_settings_usecase.dart';
 import '../../../../domain/usecases/profile/update_settings_usecase.dart';
 import '../../../../domain/entities/rider_settings_entity.dart';
+import '../../../../domain/usecases/auth/unregister_device_token_usecase.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/device_info_service.dart';
 import '../../../routes/app_routes.dart';
 
 class ProfileController extends GetxController {
@@ -55,6 +57,7 @@ class ProfileController extends GetxController {
 
   final isLoading = false.obs;
   final isDarkMode = false.obs;
+  final currentDeviceId = ''.obs;
   final riderProfile = Rxn<RiderEntity>();
   final documents = <DocumentEntity>[].obs;
   final operatingZones = <OperatingZoneEntity>[].obs;
@@ -68,6 +71,11 @@ class ProfileController extends GetxController {
     super.onInit();
     final storage = GetStorage();
     isDarkMode.value = storage.read<bool>(AppConstants.isDarkModeKey) ?? false;
+    try {
+      if (Get.isRegistered<DeviceInfoService>()) {
+        Get.find<DeviceInfoService>().getDeviceId().then((id) => currentDeviceId.value = id);
+      }
+    } catch (_) {}
     loadAllProfileData();
   }
 
@@ -87,8 +95,19 @@ class ProfileController extends GetxController {
     final result = await getSettingsUseCase();
     result.fold(
       (failure) => null,
-      (settings) => riderSettings.value = settings,
+      (settings) {
+        riderSettings.value = settings;
+        if (settings.rider != null) {
+          riderProfile.value = settings.rider;
+        }
+      },
     );
+  }
+
+  Future<void> refreshFullSettings() async {
+    isLoading.value = true;
+    await _loadSettings();
+    isLoading.value = false;
   }
 
   Future<void> _loadProfile() async {
@@ -342,6 +361,40 @@ class ProfileController extends GetxController {
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
         );
+      },
+    );
+  }
+
+  Future<void> revokeDeviceSession(String deviceId) async {
+    Get.defaultDialog(
+      title: 'Revoke Device Session',
+      middleText: 'Are you sure you want to disconnect this device session?',
+      textConfirm: 'Revoke',
+      textCancel: 'Cancel',
+      confirmTextColor: Colors.white,
+      buttonColor: AppColors.error,
+      onConfirm: () async {
+        Get.back();
+        isLoading.value = true;
+        try {
+          if (Get.isRegistered<UnregisterDeviceTokenUseCase>()) {
+            await Get.find<UnregisterDeviceTokenUseCase>()(deviceId: deviceId);
+          }
+          final updatedDevices = riderSettings.value.registeredDevices
+              .where((d) => d.deviceId != deviceId)
+              .toList();
+          riderSettings.value = riderSettings.value.copyWith(registeredDevices: updatedDevices);
+          Get.snackbar(
+            'Session Revoked',
+            'Device session removed successfully.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+          );
+        } catch (e) {
+          Get.snackbar('Error', 'Failed to revoke device session: $e');
+        } finally {
+          isLoading.value = false;
+        }
       },
     );
   }

@@ -24,6 +24,7 @@ abstract class ProfileRepository {
     AppPreferencesSettingsEntity? appPreferences,
     String? currentPassword,
     String? newPassword,
+    List<String>? selectedZones,
+    List<String>? selectedLocations,
   });
 }
-
