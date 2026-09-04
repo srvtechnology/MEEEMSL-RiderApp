@@ -51,33 +51,39 @@ class LocationService extends GetxService {
 
   /// Initializes location permissions and checks device GPS status.
   Future<bool> checkAndRequestPermissions() async {
-    bool serviceEnabled;
-    LocationPermission permission;
+    try {
+      bool serviceEnabled;
+      LocationPermission permission;
 
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) {
-      debugPrint('[LocationService] Location services are disabled.');
-      return false;
-    }
+      serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        debugPrint('[LocationService] Location services are disabled.');
+        return false;
+      }
 
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
+      permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        debugPrint('[LocationService] Location permission denied.');
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          debugPrint('[LocationService] Location permission denied.');
+          hasPermission.value = false;
+          return false;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        debugPrint('[LocationService] Location permissions permanently denied.');
         hasPermission.value = false;
         return false;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      debugPrint('[LocationService] Location permissions permanently denied.');
+      hasPermission.value = true;
+      return true;
+    } catch (e) {
+      debugPrint('[LocationService] Error requesting location permission: $e');
       hasPermission.value = false;
       return false;
     }
-
-    hasPermission.value = true;
-    return true;
   }
 
   /// Starts background & foreground GPS tracking and periodic server synchronizations.

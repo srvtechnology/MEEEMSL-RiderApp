@@ -445,6 +445,7 @@ class OnboardingView extends GetView<AuthController> {
 
         // 1. National ID / Passport
         _buildDocumentUploadCard(
+          context: context,
           title: 'National ID / Passport (Front)',
           docType: 'national_id_front',
           pathObservable: controller.nationalIdFrontPath,
@@ -452,6 +453,7 @@ class OnboardingView extends GetView<AuthController> {
         ),
         const SizedBox(height: 12),
         _buildDocumentUploadCard(
+          context: context,
           title: 'National ID / Passport (Back)',
           docType: 'national_id_back',
           pathObservable: controller.nationalIdBackPath,
@@ -461,6 +463,7 @@ class OnboardingView extends GetView<AuthController> {
 
         // 2. Driver's License
         _buildDocumentUploadCard(
+          context: context,
           title: "Driver's License Document",
           docType: 'driver_license',
           pathObservable: controller.driverLicensePath,
@@ -470,6 +473,7 @@ class OnboardingView extends GetView<AuthController> {
 
         // 3. Vehicle Insurance
         _buildDocumentUploadCard(
+          context: context,
           title: 'Vehicle Insurance Certificate',
           docType: 'vehicle_insurance',
           pathObservable: controller.vehicleInsurancePath,
@@ -503,6 +507,7 @@ class OnboardingView extends GetView<AuthController> {
   }
 
   Widget _buildDocumentUploadCard({
+    required BuildContext context,
     required String title,
     required String docType,
     required RxString pathObservable,
@@ -512,90 +517,181 @@ class OnboardingView extends GetView<AuthController> {
       final path = pathObservable.value;
       final isAttached = path.isNotEmpty;
 
-      return CustomCard(
-        backgroundColor: isAttached
-            ? AppColors.successLight.withAlpha(40)
-            : Theme.of(Get.context!).cardColor,
-        border: Border.all(
-          color: isAttached ? AppColors.success.withAlpha(100) : AppColors.lightCardBorder,
-          width: isAttached ? 1.5 : 1,
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: isAttached ? AppColors.successLight : AppColors.primaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: isAttached && !path.startsWith('http') && File(path).existsSync()
-                    ? Image.file(File(path), fit: BoxFit.cover)
-                    : Icon(
-                        isAttached ? Icons.check_circle_rounded : icon,
-                        color: isAttached ? AppColors.successDark : AppColors.primary,
-                        size: 22,
-                      ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isAttached ? AppColors.success : AppColors.textSecondaryLight,
+      return GestureDetector(
+        onTap: () => _showDocumentSourcePicker(context, docType, title),
+        child: CustomCard(
+          backgroundColor: isAttached
+              ? AppColors.successLight.withAlpha(40)
+              : Theme.of(context).cardColor,
+          border: Border.all(
+            color: isAttached ? AppColors.success.withAlpha(100) : AppColors.lightCardBorder,
+            width: isAttached ? 1.5 : 1,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: isAttached ? AppColors.successLight : AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: isAttached && !path.startsWith('http') && File(path).existsSync()
+                      ? Image.file(File(path), fit: BoxFit.cover)
+                      : Icon(
+                          isAttached ? Icons.check_circle_rounded : icon,
+                          color: isAttached ? AppColors.successDark : AppColors.primary,
+                          size: 22,
                         ),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        isAttached ? 'Ready to Submit' : 'JPG, PNG, PDF up to 10MB',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: isAttached ? FontWeight.w600 : FontWeight.normal,
-                          color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () => controller.pickDocument(docType),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                backgroundColor: isAttached ? AppColors.success.withAlpha(15) : AppColors.primaryContainer,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              icon: Icon(
-                isAttached ? Icons.change_circle_outlined : Icons.upload_file_rounded,
-                size: 16,
-                color: isAttached ? AppColors.successDark : AppColors.primary,
-              ),
-              label: Text(
-                isAttached ? 'Replace' : 'Upload',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: isAttached ? AppColors.successDark : AppColors.primary,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isAttached ? AppColors.success : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          isAttached ? 'Ready to Submit' : 'Take Picture or Upload from Gallery',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: isAttached ? FontWeight.w600 : FontWeight.normal,
+                            color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => _showDocumentSourcePicker(context, docType, title),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  backgroundColor: isAttached ? AppColors.success.withAlpha(15) : AppColors.primaryContainer,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: Icon(
+                  isAttached ? Icons.change_circle_outlined : Icons.upload_file_rounded,
+                  size: 16,
+                  color: isAttached ? AppColors.successDark : AppColors.primary,
+                ),
+                label: Text(
+                  isAttached ? 'Replace' : 'Upload',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: isAttached ? AppColors.successDark : AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     });
+  }
+
+  void _showDocumentSourcePicker(BuildContext context, String docType, String docTitle) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Theme.of(context).cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12.0),
+          child: Wrap(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.document_scanner_rounded, color: AppColors.primary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            docTitle,
+                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Attach document for identity verification',
+                            style: TextStyle(fontSize: 11, color: AppColors.textSecondaryLight),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.camera_alt_rounded, color: AppColors.primary, size: 22),
+                ),
+                title: const Text('Take Picture / Photo', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                subtitle: const Text('Capture using device camera', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Get.back();
+                  controller.pickDocument(docType, source: ImageSource.camera);
+                },
+              ),
+              ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondary.withAlpha(25),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.photo_library_rounded, color: AppColors.secondary, size: 22),
+                ),
+                title: const Text('Choose from Gallery', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                subtitle: const Text('Select an existing photo from gallery', style: TextStyle(fontSize: 12)),
+                onTap: () {
+                  Get.back();
+                  controller.pickDocument(docType, source: ImageSource.gallery);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   // STEP 3: Vehicle Details (2-Wheeler, 3-Wheeler, 4-Wheeler, Bicycle)
@@ -668,7 +764,7 @@ class OnboardingView extends GetView<AuthController> {
               child: CustomTextField(
                 controller: controller.vehicleColorController,
                 label: 'Vehicle Color',
-                hintText: 'Sapphire Blue',
+                hintText: 'e.g. Sapphire Blue',
                 prefixIcon: Icons.color_lens_outlined,
               ),
             ),
@@ -677,7 +773,7 @@ class OnboardingView extends GetView<AuthController> {
               child: CustomTextField(
                 controller: controller.vehicleYearController,
                 label: 'Model Year',
-                hintText: '2023',
+                hintText: 'e.g. 2023',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.calendar_today_outlined,
               ),
@@ -695,7 +791,9 @@ class OnboardingView extends GetView<AuthController> {
     required String value,
   }) {
     final isSelected = controller.vehicleType.value == value ||
-        (controller.vehicleType.value.contains(title) && !value.contains('_'));
+        (controller.vehicleType.value.isNotEmpty &&
+            controller.vehicleType.value.contains(title) &&
+            !value.contains('_'));
 
     return GestureDetector(
       onTap: () => controller.vehicleType.value = value,
@@ -994,7 +1092,12 @@ class OnboardingView extends GetView<AuthController> {
                   const SizedBox(height: 5),
                   _buildSummaryRow('Phone', controller.onboardingPhoneController.text.isNotEmpty ? controller.onboardingPhoneController.text : '-'),
                   const SizedBox(height: 5),
-                  _buildSummaryRow('Vehicle', '${controller.vehicleType.value} • ${controller.vehicleModelController.text} (${controller.licensePlateController.text})'),
+                  _buildSummaryRow(
+                    'Vehicle',
+                    controller.vehicleType.value.isNotEmpty
+                        ? '${controller.vehicleType.value} • ${controller.vehicleModelController.text.isNotEmpty ? controller.vehicleModelController.text : "N/A"} (${controller.licensePlateController.text.isNotEmpty ? controller.licensePlateController.text : "N/A"})'
+                        : 'Not Selected',
+                  ),
                   const SizedBox(height: 5),
                   _buildSummaryRow('License No', controller.drivingLicenseNoController.text.isNotEmpty ? controller.drivingLicenseNoController.text : 'Pending'),
                   const SizedBox(height: 5),
@@ -1114,7 +1217,7 @@ class OnboardingView extends GetView<AuthController> {
                 CustomTextField(
                   controller: controller.accountHolderController,
                   label: AppStrings.accountHolder,
-                  hintText: 'Alex Johnson',
+                  hintText: 'e.g. Alex Johnson',
                   prefixIcon: Icons.person_outline,
                 ),
                 const SizedBox(height: 16),
@@ -1139,7 +1242,7 @@ class OnboardingView extends GetView<AuthController> {
                 CustomTextField(
                   controller: controller.mobileMoneyNumberController,
                   label: AppStrings.mobileMoneyNumber,
-                  hintText: '+1 555 234 5678',
+                  hintText: 'e.g. +232 76 123456',
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
                 ),
@@ -1147,7 +1250,7 @@ class OnboardingView extends GetView<AuthController> {
                 CustomTextField(
                   controller: controller.beneficiaryNameController,
                   label: AppStrings.beneficiaryName,
-                  hintText: 'Alex Johnson',
+                  hintText: 'e.g. Alex Johnson',
                   prefixIcon: Icons.person_outline,
                 ),
               ],

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -36,10 +37,16 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
 
   Future<void> _pickProofPhoto(ImageSource source) async {
     try {
-      final photo = await _picker.pickImage(source: source, imageQuality: 80);
+      final photo = await _picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 70,
+      );
       if (photo != null) {
+        final compressed = await ImageCompressor.compressImage(photo.path, maxWidth: 1024, maxHeight: 1024, quality: 70);
         setState(() {
-          capturedPhotoPath = photo.path;
+          capturedPhotoPath = compressed;
         });
       }
     } catch (_) {

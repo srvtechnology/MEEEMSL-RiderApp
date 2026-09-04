@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/utils/image_compressor.dart';
 import '../models/rider_model.dart';
 import '../models/registration_result_model.dart';
 import '../models/login_response_model.dart';
@@ -360,9 +361,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           profileImagePath.isNotEmpty &&
           !profileImagePath.startsWith('http')) {
         try {
-          formDataMap['profileImage'] = await MultipartFile.fromFile(
+          final compressedPath = await ImageCompressor.compressImage(
             profileImagePath,
-            filename: profileImagePath.split('/').last,
+            maxWidth: 800,
+            maxHeight: 800,
+            quality: 70,
+          );
+          formDataMap['profileImage'] = await MultipartFile.fromFile(
+            compressedPath,
+            filename: compressedPath.split('/').last,
           );
         } catch (_) {}
       }
@@ -373,9 +380,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           effectiveLicenseDoc.isNotEmpty &&
           !effectiveLicenseDoc.startsWith('http')) {
         try {
-          formDataMap['drivingLicenseDoc'] = await MultipartFile.fromFile(
+          final compressedPath = await ImageCompressor.compressImage(
             effectiveLicenseDoc,
-            filename: effectiveLicenseDoc.split('/').last,
+            maxWidth: 1200,
+            maxHeight: 1200,
+            quality: 70,
+          );
+          formDataMap['drivingLicenseDoc'] = await MultipartFile.fromFile(
+            compressedPath,
+            filename: compressedPath.split('/').last,
           );
         } catch (_) {}
       }
@@ -385,9 +398,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           effectiveIdDoc.isNotEmpty &&
           !effectiveIdDoc.startsWith('http')) {
         try {
-          formDataMap['nationalIdDoc'] = await MultipartFile.fromFile(
+          final compressedPath = await ImageCompressor.compressImage(
             effectiveIdDoc,
-            filename: effectiveIdDoc.split('/').last,
+            maxWidth: 1200,
+            maxHeight: 1200,
+            quality: 70,
+          );
+          formDataMap['nationalIdDoc'] = await MultipartFile.fromFile(
+            compressedPath,
+            filename: compressedPath.split('/').last,
           );
         } catch (_) {}
       }
@@ -396,9 +415,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           vehicleInsuranceDocPath.isNotEmpty &&
           !vehicleInsuranceDocPath.startsWith('http')) {
         try {
-          formDataMap['vehicleInsuranceDoc'] = await MultipartFile.fromFile(
+          final compressedPath = await ImageCompressor.compressImage(
             vehicleInsuranceDocPath,
-            filename: vehicleInsuranceDocPath.split('/').last,
+            maxWidth: 1200,
+            maxHeight: 1200,
+            quality: 70,
+          );
+          formDataMap['vehicleInsuranceDoc'] = await MultipartFile.fromFile(
+            compressedPath,
+            filename: compressedPath.split('/').last,
           );
         } catch (_) {}
       }
@@ -422,6 +447,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Onboarding submission failed');
     } on DioException catch (e) {
+      if (e.response?.statusCode == 413) {
+        throw const ServerException(
+          message:
+              'Uploaded files are too large. Please select smaller images or documents.',
+          statusCode: 413,
+        );
+      }
       final msg = e.response?.data?['error'] ??
           e.response?.data?['message'] ??
           'Onboarding submission failed';

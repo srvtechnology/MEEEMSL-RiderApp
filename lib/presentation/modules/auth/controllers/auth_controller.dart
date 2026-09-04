@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../domain/entities/payout_info_entity.dart';
 import '../../../../domain/entities/user_entity.dart';
@@ -116,35 +117,35 @@ class AuthController extends GetxController {
   final onboardingPhoneController = TextEditingController();
 
   // Step 2: Documents & Driving License
-  final drivingLicenseNoController = TextEditingController(text: 'DL-10928374');
-  final idExpiryController = TextEditingController(text: '2028-12-31');
-  final licenseExpiryController = TextEditingController(text: '2028-10-15');
-  final insuranceExpiryController = TextEditingController(text: '2027-05-20');
+  final drivingLicenseNoController = TextEditingController();
+  final idExpiryController = TextEditingController();
+  final licenseExpiryController = TextEditingController();
+  final insuranceExpiryController = TextEditingController();
 
   // Step 3: Vehicle Details
   // Allowed values per API doc: "2_WHEELER", "3_WHEELER", "4_WHEELER", "BICYCLE"
-  final vehicleType = '2_WHEELER'.obs;
-  final vehicleModelController = TextEditingController(text: 'Honda CB Shine 125');
-  final licensePlateController = TextEditingController(text: 'SL-AA-9988');
-  final vehicleColorController = TextEditingController(text: 'Sapphire Blue');
-  final vehicleYearController = TextEditingController(text: '2023');
+  final vehicleType = ''.obs;
+  final vehicleModelController = TextEditingController();
+  final licensePlateController = TextEditingController();
+  final vehicleColorController = TextEditingController();
+  final vehicleYearController = TextEditingController();
 
   // Step 4: Operating Zones & Hierarchical Locations
   final operatingZonesList = <OperatingZoneEntity>[].obs;
   final isLoadingZones = false.obs;
-  final selectedZones = <String>['ZONE 1'].obs;
-  final selectedLocations = <String>['NO 2 RIVER', 'BAW BAW'].obs;
+  final selectedZones = <String>[].obs;
+  final selectedLocations = <String>[].obs;
 
   // Step 5: Payout Info
   final payoutMethodType = PayoutMethodType.bank.obs;
-  final bankNameController = TextEditingController(text: 'Sierra Leone Commercial Bank');
-  final accountNumberController = TextEditingController(text: '0010029384920');
-  final accountHolderController = TextEditingController(text: 'Ibrahim Koroma');
-  final routingNumberController = TextEditingController(text: '021000021');
+  final bankNameController = TextEditingController();
+  final accountNumberController = TextEditingController();
+  final accountHolderController = TextEditingController();
+  final routingNumberController = TextEditingController();
 
-  final mobileMoneyProviderController = TextEditingController(text: 'Orange Money');
-  final mobileMoneyNumberController = TextEditingController(text: '+23276123456');
-  final beneficiaryNameController = TextEditingController(text: 'Ibrahim Koroma');
+  final mobileMoneyProviderController = TextEditingController();
+  final mobileMoneyNumberController = TextEditingController();
+  final beneficiaryNameController = TextEditingController();
 
   final _imagePicker = ImagePicker();
 
@@ -557,12 +558,23 @@ class AuthController extends GetxController {
     );
   }
 
-  // Image Picking for Onboarding & Documents
+  // Image Picking for Onboarding & Documents with Compression
   Future<void> pickProfilePhoto(ImageSource source) async {
     try {
-      final file = await _imagePicker.pickImage(source: source, imageQuality: 85);
+      final file = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 70,
+      );
       if (file != null) {
-        profilePhotoPath.value = file.path;
+        final compressed = await ImageCompressor.compressImage(
+          file.path,
+          maxWidth: 800,
+          maxHeight: 800,
+          quality: 70,
+        );
+        profilePhotoPath.value = compressed;
       }
     } catch (_) {
       // Mock fallback if running without native camera permissions
@@ -570,11 +582,24 @@ class AuthController extends GetxController {
     }
   }
 
-  Future<void> pickDocument(String docType) async {
+  Future<void> pickDocument(String docType, {ImageSource source = ImageSource.gallery}) async {
     try {
-      final file = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-      final path = file?.path ?? 'mock_doc_path_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      _setDocPath(docType, path);
+      final file = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 70,
+      );
+      final rawPath = file?.path;
+      if (rawPath != null) {
+        final compressed = await ImageCompressor.compressImage(
+          rawPath,
+          maxWidth: 1200,
+          maxHeight: 1200,
+          quality: 70,
+        );
+        _setDocPath(docType, compressed);
+      }
     } catch (_) {
       _setDocPath(docType, 'mock_doc_path_${DateTime.now().millisecondsSinceEpoch}.jpg');
     }
@@ -638,24 +663,6 @@ class AuthController extends GetxController {
             profilePhotoPath.value = savedRider.avatar;
           }
         }
-        if (savedRider.vehicleType != null && savedRider.vehicleType!.isNotEmpty) {
-          vehicleType.value = savedRider.vehicleType!;
-        }
-        if (savedRider.vehicleName != null && savedRider.vehicleName!.isNotEmpty) {
-          vehicleModelController.text = savedRider.vehicleName!;
-        }
-        if (savedRider.vehicleNumber != null && savedRider.vehicleNumber!.isNotEmpty) {
-          licensePlateController.text = savedRider.vehicleNumber!;
-        }
-        if (savedRider.drivingLicenseNo != null && savedRider.drivingLicenseNo!.isNotEmpty) {
-          drivingLicenseNoController.text = savedRider.drivingLicenseNo!;
-        }
-        if (savedRider.selectedZones.isNotEmpty) {
-          selectedZones.assignAll(savedRider.selectedZones);
-        }
-        if (savedRider.selectedLocations.isNotEmpty) {
-          selectedLocations.assignAll(savedRider.selectedLocations);
-        }
       }
 
       // Direct fallback to GetStorage if localSource was not ready or fields still empty
@@ -695,11 +702,6 @@ class AuthController extends GetxController {
           (zones) {
             if (zones.isNotEmpty) {
               operatingZonesList.assignAll(zones);
-              if (selectedZones.isEmpty) {
-                final firstZone = zones.first;
-                selectedZones.add(firstZone.id);
-                selectedLocations.addAll(firstZone.locations.map((loc) => loc.name));
-              }
             } else {
               _loadDefaultOperatingZones();
             }
@@ -764,23 +766,15 @@ class AuthController extends GetxController {
       ),
     ];
     operatingZonesList.assignAll(defaultZones);
-    if (selectedZones.isEmpty) {
-      selectedZones.add('ZONE 1');
-      selectedLocations.addAll(['NO 2 RIVER', 'BAW BAW']);
-    }
   }
 
   void toggleZone(String zoneId) {
     if (selectedZones.contains(zoneId)) {
-      if (selectedZones.length > 1) {
-        selectedZones.remove(zoneId);
-        final zone = operatingZonesList.firstWhereOrNull((z) => z.id == zoneId);
-        if (zone != null) {
-          final locNames = zone.locations.map((l) => l.name).toSet();
-          selectedLocations.removeWhere((l) => locNames.contains(l));
-        }
-      } else {
-        Get.snackbar('Operating Zones', 'Please select at least 1 operating zone');
+      selectedZones.remove(zoneId);
+      final zone = operatingZonesList.firstWhereOrNull((z) => z.id == zoneId);
+      if (zone != null) {
+        final locNames = zone.locations.map((l) => l.name).toSet();
+        selectedLocations.removeWhere((l) => locNames.contains(l));
       }
     } else {
       selectedZones.add(zoneId);
@@ -797,11 +791,7 @@ class AuthController extends GetxController {
 
   void toggleLocation(String locationName) {
     if (selectedLocations.contains(locationName)) {
-      if (selectedLocations.length > 1) {
-        selectedLocations.remove(locationName);
-      } else {
-        Get.snackbar('Operating Locations', 'Please select at least 1 location');
-      }
+      selectedLocations.remove(locationName);
     } else {
       selectedLocations.add(locationName);
     }
@@ -828,6 +818,10 @@ class AuthController extends GetxController {
         return;
       }
     } else if (current == 2) {
+      if (vehicleType.value.isEmpty) {
+        Get.snackbar('Vehicle Information', 'Please select your vehicle type', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
       final plate = licensePlateController.text.trim();
       if (plate.isEmpty) {
         Get.snackbar('Vehicle Information', 'Please enter your vehicle license plate / registration number', snackPosition: SnackPosition.BOTTOM);
@@ -866,13 +860,15 @@ class AuthController extends GetxController {
       mappedVehicleType = '4_WHEELER';
     } else if (mappedVehicleType.contains('Bicycle') || mappedVehicleType == 'BICYCLE') {
       mappedVehicleType = 'BICYCLE';
+    } else if (mappedVehicleType.contains('2-Wheeler') || mappedVehicleType == '2_WHEELER') {
+      mappedVehicleType = '2_WHEELER';
+    } else if (mappedVehicleType.isNotEmpty) {
+      mappedVehicleType = mappedVehicleType;
     } else {
       mappedVehicleType = '2_WHEELER';
     }
 
-    final dlNo = drivingLicenseNoController.text.trim().isNotEmpty
-        ? drivingLicenseNoController.text.trim()
-        : 'DL-10928374';
+    final dlNo = drivingLicenseNoController.text.trim();
 
     // Extract country code and phone
     String rawPhone = onboardingPhoneController.text.trim();
@@ -899,20 +895,33 @@ class AuthController extends GetxController {
       }
     }
 
-    final payoutData = payoutMethodType.value == PayoutMethodType.bank
-        ? {
-            'methodType': 'bank',
-            'bankName': bankNameController.text.trim().isNotEmpty ? bankNameController.text.trim() : 'Sierra Leone Commercial Bank',
-            'accountNumber': accountNumberController.text.trim().isNotEmpty ? accountNumberController.text.trim() : '0010029384920',
-            'accountHolder': accountHolderController.text.trim().isNotEmpty ? accountHolderController.text.trim() : (fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : 'Ibrahim Koroma'),
-            'routingNumber': routingNumberController.text.trim(),
-          }
-        : {
-            'methodType': 'mobile_money',
-            'provider': mobileMoneyProviderController.text.trim().isNotEmpty ? mobileMoneyProviderController.text.trim() : 'Orange Money',
-            'phone': mobileMoneyNumberController.text.trim().isNotEmpty ? mobileMoneyNumberController.text.trim() : rawPhone,
-            'accountHolder': beneficiaryNameController.text.trim().isNotEmpty ? beneficiaryNameController.text.trim() : (fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : 'Ibrahim Koroma'),
-          };
+    final hasBankDetails = bankNameController.text.trim().isNotEmpty ||
+        accountNumberController.text.trim().isNotEmpty;
+    final hasMobileMoneyDetails = mobileMoneyProviderController.text.trim().isNotEmpty ||
+        mobileMoneyNumberController.text.trim().isNotEmpty;
+
+    final Map<String, dynamic>? payoutData = payoutMethodType.value == PayoutMethodType.bank
+        ? (hasBankDetails
+            ? {
+                'methodType': 'bank',
+                'bankName': bankNameController.text.trim(),
+                'accountNumber': accountNumberController.text.trim(),
+                'accountHolder': accountHolderController.text.trim().isNotEmpty
+                    ? accountHolderController.text.trim()
+                    : fullNameController.text.trim(),
+                'routingNumber': routingNumberController.text.trim(),
+              }
+            : null)
+        : (hasMobileMoneyDetails
+            ? {
+                'methodType': 'mobile_money',
+                'provider': mobileMoneyProviderController.text.trim(),
+                'phone': mobileMoneyNumberController.text.trim(),
+                'accountHolder': beneficiaryNameController.text.trim().isNotEmpty
+                    ? beneficiaryNameController.text.trim()
+                    : fullNameController.text.trim(),
+              }
+            : null);
 
     final addressData = {
       'street': '14 Lumley Beach Rd',
@@ -927,24 +936,37 @@ class AuthController extends GetxController {
       'phone': rawPhone.isNotEmpty ? rawPhone : '+23278999888',
     };
 
+    final compProfile = profilePhotoPath.value.isNotEmpty
+        ? await ImageCompressor.compressImage(profilePhotoPath.value, maxWidth: 800, maxHeight: 800, quality: 70)
+        : null;
+    final compDl = driverLicensePath.value.isNotEmpty
+        ? await ImageCompressor.compressImage(driverLicensePath.value, maxWidth: 1200, maxHeight: 1200, quality: 70)
+        : null;
+    final compId = nationalIdFrontPath.value.isNotEmpty
+        ? await ImageCompressor.compressImage(nationalIdFrontPath.value, maxWidth: 1200, maxHeight: 1200, quality: 70)
+        : null;
+    final compInsurance = vehicleInsurancePath.value.isNotEmpty
+        ? await ImageCompressor.compressImage(vehicleInsurancePath.value, maxWidth: 1200, maxHeight: 1200, quality: 70)
+        : null;
+
     final result = await submitOnboardingUseCase(
       name: fullNameController.text.trim().isNotEmpty ? fullNameController.text.trim() : null,
       phone: phoneNumber.isNotEmpty ? phoneNumber : null,
       phoneCountryCode: phoneCountryCode,
       vehicleType: mappedVehicleType,
       vehicleTypes: [mappedVehicleType],
-      vehicleName: vehicleModelController.text.trim().isNotEmpty ? vehicleModelController.text.trim() : 'Honda CB Shine 125',
-      vehicleNumber: licensePlateController.text.trim().isNotEmpty ? licensePlateController.text.trim() : 'SL-AA-9988',
-      drivingLicenseNo: dlNo,
+      vehicleName: vehicleModelController.text.trim().isNotEmpty ? vehicleModelController.text.trim() : null,
+      vehicleNumber: licensePlateController.text.trim().isNotEmpty ? licensePlateController.text.trim() : null,
+      drivingLicenseNo: dlNo.isNotEmpty ? dlNo : null,
       selectedZones: selectedZones.toList(),
-      selectedLocations: locationsToSubmit.isNotEmpty ? locationsToSubmit : ['NO 2 RIVER', 'BAW BAW'],
+      selectedLocations: locationsToSubmit,
       address: addressData,
       emergencyContact: emergencyContactData,
       payoutInfo: payoutData,
-      profileImagePath: profilePhotoPath.value.isNotEmpty ? profilePhotoPath.value : null,
-      drivingLicenseDocPath: driverLicensePath.value.isNotEmpty ? driverLicensePath.value : null,
-      nationalIdDocPath: nationalIdFrontPath.value.isNotEmpty ? nationalIdFrontPath.value : null,
-      vehicleInsuranceDocPath: vehicleInsurancePath.value.isNotEmpty ? vehicleInsurancePath.value : null,
+      profileImagePath: compProfile,
+      drivingLicenseDocPath: compDl,
+      nationalIdDocPath: compId,
+      vehicleInsuranceDocPath: compInsurance,
     );
     isLoading.value = false;
 

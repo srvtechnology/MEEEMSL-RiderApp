@@ -5,6 +5,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_compressor.dart';
 import '../../../../domain/entities/rider_entity.dart';
 import '../../../../domain/entities/document_entity.dart';
 import '../../../../domain/entities/operating_zone_entity.dart';
@@ -129,10 +130,18 @@ class ProfileController extends GetxController {
   }
 
   // Document Upload
-  Future<void> uploadDoc(String type) async {
+  Future<void> uploadDoc(String type, {ImageSource source = ImageSource.gallery}) async {
     try {
-      final file = await _imagePicker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-      final filePath = file?.path ?? 'mock_doc_path_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final file = await _imagePicker.pickImage(
+        source: source,
+        maxWidth: 1200,
+        maxHeight: 1200,
+        imageQuality: 70,
+      );
+      var filePath = file?.path ?? 'mock_doc_path_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      if (file != null) {
+        filePath = await ImageCompressor.compressImage(file.path, maxWidth: 1200, maxHeight: 1200, quality: 70);
+      }
 
       isLoading.value = true;
       final result = await uploadDocumentUseCase(type, filePath);

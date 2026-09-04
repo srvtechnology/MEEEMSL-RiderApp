@@ -68,5 +68,23 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Location Permissions -->
+		<key>NSLocationWhenInUseUsageDescription</key>
+		<string>Meeem Rider requires location access to find nearby orders, track deliveries, and provide live navigation while the app is in use.</string>
+		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+		<string>Meeem Rider requires background location access to update order delivery status and track active delivery routes continuously.</string>
+		<key>NSLocationAlwaysUsageDescription</key>
+		<string>Meeem Rider requires continuous location access to provide accurate live delivery tracking for customers and dispatch.</string>
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>location</string>
+			<string>fetch</string>
+			<string>remote-notification</string>
+		</array>
+		<!-- Camera & Photo Library Permissions -->
+		<key>NSCameraUsageDescription</key>
+		<string>Meeem Rider requires camera access to take profile photos, upload verification documents, and capture proof of delivery photos.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>Meeem Rider requires photo library access to upload verification documents and proof of delivery images.</string>
 	</dict>
 </plist>

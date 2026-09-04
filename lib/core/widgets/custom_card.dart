@@ -20,32 +20,45 @@ class CustomCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = backgroundColor ?? (isDark ? AppColors.darkSurface : AppColors.lightSurface);
+    final cardBorderSide = border?.top ??
+        BorderSide(
+          color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
+          width: 1,
+        );
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
+    Widget content = Padding(
+      padding: padding,
+      child: child,
+    );
+
+    if (onTap != null) {
+      content = InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: padding,
-          decoration: BoxDecoration(
-            color: backgroundColor ?? (isDark ? AppColors.darkSurface : AppColors.lightSurface),
-            borderRadius: BorderRadius.circular(16),
-            border: border ??
-                Border.all(
-                  color: isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder,
-                  width: 1,
-                ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withAlpha(isDark ? 30 : 10),
-                blurRadius: 10,
-                offset: const Offset(0, 2),
-              ),
-            ],
+        child: content,
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(isDark ? 30 : 10),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
           ),
-          child: child,
+        ],
+      ),
+      child: Material(
+        color: cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: cardBorderSide,
         ),
+        clipBehavior: Clip.antiAlias,
+        child: content,
       ),
     );
   }

@@ -185,47 +185,47 @@ class RiderSettingsView extends GetView<ProfileController> {
 
   void _showMapAppPicker(BuildContext context, String current) {
     Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Wrap(
-          children: [
-            Text('Choose Default Map App', style: AppTextStyles.headlineSmall()),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('Google Maps'),
-              trailing: current == 'GOOGLE_MAPS' ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () {
-                Get.back();
-                controller.updateRiderSettings(
-                  navigation: controller.riderSettings.value.navigation.copyWith(defaultMapApp: 'GOOGLE_MAPS'),
-                );
-              },
-            ),
-            ListTile(
-              title: const Text('Waze'),
-              trailing: current == 'WAZE' ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () {
-                Get.back();
-                controller.updateRiderSettings(
-                  navigation: controller.riderSettings.value.navigation.copyWith(defaultMapApp: 'WAZE'),
-                );
-              },
-            ),
-            ListTile(
-              title: const Text('Apple Maps'),
-              trailing: current == 'APPLE_MAPS' ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () {
-                Get.back();
-                controller.updateRiderSettings(
-                  navigation: controller.riderSettings.value.navigation.copyWith(defaultMapApp: 'APPLE_MAPS'),
-                );
-              },
-            ),
-          ],
+      Material(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Wrap(
+            children: [
+              Text('Choose Default Map App', style: AppTextStyles.headlineSmall()),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('Google Maps'),
+                trailing: current == 'GOOGLE_MAPS' ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  Get.back();
+                  controller.updateRiderSettings(
+                    navigation: controller.riderSettings.value.navigation.copyWith(defaultMapApp: 'GOOGLE_MAPS'),
+                  );
+                },
+              ),
+              ListTile(
+                title: const Text('Waze'),
+                trailing: current == 'WAZE' ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  Get.back();
+                  controller.updateRiderSettings(
+                    navigation: controller.riderSettings.value.navigation.copyWith(defaultMapApp: 'WAZE'),
+                  );
+                },
+              ),
+              ListTile(
+                title: const Text('Apple Maps'),
+                trailing: current == 'APPLE_MAPS' ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  Get.back();
+                  controller.updateRiderSettings(
+                    navigation: controller.riderSettings.value.navigation.copyWith(defaultMapApp: 'APPLE_MAPS'),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -233,47 +233,47 @@ class RiderSettingsView extends GetView<ProfileController> {
 
   void _showThemePicker(BuildContext context, String current) {
     Get.bottomSheet(
-      Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Wrap(
-          children: [
-            Text('Theme Mode', style: AppTextStyles.headlineSmall()),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('System Default'),
-              trailing: current == 'SYSTEM' ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () {
-                Get.back();
-                controller.updateRiderSettings(
-                  appPreferences: controller.riderSettings.value.appPreferences.copyWith(theme: 'SYSTEM'),
-                );
-              },
-            ),
-            ListTile(
-              title: const Text('Dark Mode'),
-              trailing: current == 'DARK' ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () {
-                Get.back();
-                controller.updateRiderSettings(
-                  appPreferences: controller.riderSettings.value.appPreferences.copyWith(theme: 'DARK'),
-                );
-              },
-            ),
-            ListTile(
-              title: const Text('Light Mode'),
-              trailing: current == 'LIGHT' ? const Icon(Icons.check, color: AppColors.primary) : null,
-              onTap: () {
-                Get.back();
-                controller.updateRiderSettings(
-                  appPreferences: controller.riderSettings.value.appPreferences.copyWith(theme: 'LIGHT'),
-                );
-              },
-            ),
-          ],
+      Material(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Wrap(
+            children: [
+              Text('Theme Mode', style: AppTextStyles.headlineSmall()),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('System Default'),
+                trailing: current == 'SYSTEM' ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  Get.back();
+                  controller.updateRiderSettings(
+                    appPreferences: controller.riderSettings.value.appPreferences.copyWith(theme: 'SYSTEM'),
+                  );
+                },
+              ),
+              ListTile(
+                title: const Text('Dark Mode'),
+                trailing: current == 'DARK' ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  Get.back();
+                  controller.updateRiderSettings(
+                    appPreferences: controller.riderSettings.value.appPreferences.copyWith(theme: 'DARK'),
+                  );
+                },
+              ),
+              ListTile(
+                title: const Text('Light Mode'),
+                trailing: current == 'LIGHT' ? const Icon(Icons.check, color: AppColors.primary) : null,
+                onTap: () {
+                  Get.back();
+                  controller.updateRiderSettings(
+                    appPreferences: controller.riderSettings.value.appPreferences.copyWith(theme: 'LIGHT'),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );
