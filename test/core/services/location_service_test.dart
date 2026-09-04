@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:mocktail/mocktail.dart';
@@ -59,7 +60,9 @@ void main() {
     setUp(() {
       Get.testMode = true;
       mockDioClient = MockDioClient();
+      when(() => mockDioClient.dio).thenReturn(Dio());
       locationService = LocationService(mockDioClient);
+      locationService.onInit();
     });
 
     tearDown(() {

@@ -15,7 +15,7 @@ class LocationService extends GetxService {
   LocationService([DioClient? dioClient]) : _dioClient = dioClient ?? Get.find<DioClient>();
 
   // Reactive state
-  final Rx<Position?> currentPosition = Rx<Position?>(null);
+  final Rx<Position?> currentPosition = Rx<Position?>(defaultFallbackPosition);
   final isTrackingActive = false.obs;
   final hasPermission = false.obs;
   final lastSyncTimestamp = Rxn<DateTime>();
