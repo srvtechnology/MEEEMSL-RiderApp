@@ -34,6 +34,28 @@ class PayoutInfoEntity extends Equatable {
     }
   }
 
+  PayoutInfoEntity copyWith({
+    PayoutMethodType? methodType,
+    String? bankName,
+    String? accountNumber,
+    String? accountHolderName,
+    String? routingNumber,
+    String? mobileMoneyProvider,
+    String? mobileMoneyNumber,
+    String? beneficiaryName,
+  }) {
+    return PayoutInfoEntity(
+      methodType: methodType ?? this.methodType,
+      bankName: bankName ?? this.bankName,
+      accountNumber: accountNumber ?? this.accountNumber,
+      accountHolderName: accountHolderName ?? this.accountHolderName,
+      routingNumber: routingNumber ?? this.routingNumber,
+      mobileMoneyProvider: mobileMoneyProvider ?? this.mobileMoneyProvider,
+      mobileMoneyNumber: mobileMoneyNumber ?? this.mobileMoneyNumber,
+      beneficiaryName: beneficiaryName ?? this.beneficiaryName,
+    );
+  }
+
   @override
   List<Object?> get props => [
         methodType,

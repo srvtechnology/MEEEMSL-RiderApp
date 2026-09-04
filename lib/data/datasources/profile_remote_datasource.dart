@@ -18,7 +18,7 @@ abstract class ProfileRemoteDataSource {
   Future<List<DocumentModel>> getDocuments();
   Future<DocumentModel> uploadDocument(String docType, String filePath);
   Future<List<OperatingZoneModel>> getOperatingZones();
-  Future<bool> updateOperatingZones(List<String> zoneIds);
+  Future<bool> updateOperatingZones(List<String> zoneIds, [List<String>? locationNames]);
   Future<PayoutInfoModel?> getPayoutInfo();
   Future<PayoutInfoModel> updatePayoutInfo(PayoutInfoModel payoutInfo);
   Future<VehicleModel> updateVehicle(VehicleModel vehicle);
@@ -169,12 +169,16 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   }
 
   @override
-  Future<bool> updateOperatingZones(List<String> zoneIds) async {
+  Future<bool> updateOperatingZones(List<String> zoneIds, [List<String>? locationNames]) async {
     try {
       // Conforms to MOBILE_RIDER_APP_API_DOC_PART_1.md Section 7.2: POST /mobileapi/rider/settings
+      final data = <String, dynamic>{
+        'selectedZones': zoneIds,
+        if (locationNames != null) 'selectedLocations': locationNames,
+      };
       final response = await _dioClient.dio.post(
         ApiEndpoints.settings,
-        data: {'selectedZones': zoneIds},
+        data: data,
       );
       return response.statusCode == 200;
     } catch (_) {
@@ -202,6 +206,16 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   Future<PayoutInfoModel> updatePayoutInfo(PayoutInfoModel payoutInfo) async {
     final storage = GetStorage();
     await storage.write('rider_payout_info', payoutInfo.toJson());
+    try {
+      await _dioClient.dio.patch(
+        ApiEndpoints.riderProfile,
+        data: {
+          'payoutInfo': payoutInfo.toJson(),
+        },
+      );
+    } catch (_) {
+      // Graceful fallback to local persistence
+    }
     return payoutInfo;
   }
 
@@ -209,7 +223,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   Future<VehicleModel> updateVehicle(VehicleModel vehicle) async {
     try {
       // Conforms to MOBILE_RIDER_APP_API_DOC_PART_1.md Section 6.2: PATCH /mobileapi/rider/profile
-      await _dioClient.dio.patch(
+      final response = await _dioClient.dio.patch(
         ApiEndpoints.updateProfile,
         data: {
           'vehicleType': vehicle.type,
@@ -217,9 +231,25 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
           'vehicleNumber': vehicle.licensePlate,
         },
       );
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        final riderData = data['rider'] as Map<String, dynamic>? ?? data;
+        final updatedRider = RiderModel.fromJson(riderData);
+        return VehicleModel(
+          type: updatedRider.vehicleType ?? vehicle.type,
+          model: updatedRider.vehicleName ?? vehicle.model,
+          licensePlate: updatedRider.vehicleNumber ?? vehicle.licensePlate,
+          color: vehicle.color,
+          year: vehicle.year,
+        );
+      }
       return vehicle;
-    } catch (_) {
-      return vehicle;
+    } on DioException catch (e) {
+      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to update vehicle details';
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(message: e.toString());
     }
   }
 

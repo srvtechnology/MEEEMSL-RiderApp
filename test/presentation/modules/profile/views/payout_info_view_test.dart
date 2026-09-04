@@ -6,12 +6,12 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:meeem_rider/core/constants/app_strings.dart';
 import 'package:meeem_rider/domain/entities/rider_entity.dart';
-import 'package:meeem_rider/domain/entities/user_entity.dart';
-import 'package:meeem_rider/domain/entities/registered_device_entity.dart';
-import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
+import 'package:meeem_rider/domain/entities/payout_info_entity.dart';
 import 'package:meeem_rider/domain/entities/document_entity.dart';
 import 'package:meeem_rider/domain/entities/operating_zone_entity.dart';
+import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_profile_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_profile_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_documents_usecase.dart';
@@ -23,9 +23,8 @@ import 'package:meeem_rider/domain/usecases/profile/update_payout_info_usecase.d
 import 'package:meeem_rider/domain/usecases/profile/update_vehicle_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_settings_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_settings_usecase.dart';
-import 'package:meeem_rider/core/widgets/custom_button.dart';
 import 'package:meeem_rider/presentation/modules/profile/controllers/profile_controller.dart';
-import 'package:meeem_rider/presentation/modules/profile/views/rider_settings_view.dart';
+import 'package:meeem_rider/presentation/modules/profile/views/payout_info_view.dart';
 
 class MockGetProfileUseCase extends Mock implements GetProfileUseCase {}
 class MockUpdateProfileUseCase extends Mock implements UpdateProfileUseCase {}
@@ -42,6 +41,8 @@ class MockUpdateSettingsUseCase extends Mock implements UpdateSettingsUseCase {}
 final List<int> _fontBytes = [
   0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03, 0x00, 0x20
 ];
+
+class FakePayoutInfoEntity extends Fake implements PayoutInfoEntity {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +61,14 @@ void main() {
   late MockGetSettingsUseCase mockGetSettingsUseCase;
   late MockUpdateSettingsUseCase mockUpdateSettingsUseCase;
 
+  const tPayoutInfo = PayoutInfoEntity(
+    methodType: PayoutMethodType.bank,
+    bankName: 'Sierra Leone Commercial Bank',
+    accountNumber: '•••• 8829',
+    accountHolderName: 'Ibrahim Koroma',
+    routingNumber: '021000021',
+  );
+
   const tRider = RiderEntity(
     id: 'cm7rider0001',
     name: 'Ibrahim Koroma',
@@ -72,50 +81,11 @@ void main() {
     walletBalance: 120.0,
     totalTrips: 45,
     rating: 4.9,
-    selectedZones: ['ZONE 1', 'ZONE 2'],
-    selectedLocations: ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
   );
 
-  const tFullSettings = RiderSettingsEntity(
-    user: UserEntity(
-      id: 'cm7abc123000',
-      email: 'rider.ibrahim@example.com',
-      name: 'Ibrahim Koroma',
-      phone: '76123456',
-      phoneCountryCode: '+232',
-      isEmailVerified: true,
-    ),
-    rider: tRider,
-    registeredDevices: [
-      RegisteredDeviceEntity(
-        token: 'fcm_token_123',
-        deviceId: 'android-uuid-1',
-        platform: 'android',
-        deviceModel: 'Samsung Galaxy S22',
-      ),
-      RegisteredDeviceEntity(
-        token: 'fcm_token_456',
-        deviceId: 'iphone-uuid-2',
-        platform: 'ios',
-        deviceModel: 'iPhone 15 Pro',
-      ),
-    ],
-    notifications: NotificationsSettingsEntity(
-      orderAlerts: true,
-      promotionalAlerts: false,
-      soundEnabled: true,
-      vibrationEnabled: true,
-    ),
-    navigation: NavigationSettingsEntity(
-      defaultMapApp: 'GOOGLE_MAPS',
-      voiceGuidance: true,
-      avoidTolls: false,
-    ),
-    appPreferences: AppPreferencesSettingsEntity(
-      distanceUnit: 'KM',
-      theme: 'SYSTEM',
-    ),
-  );
+  setUpAll(() {
+    registerFallbackValue(FakePayoutInfoEntity());
+  });
 
   setUp(() {
     Get.testMode = true;
@@ -183,8 +153,8 @@ void main() {
     when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(tRider));
     when(() => mockGetDocumentsUseCase()).thenAnswer((_) async => const Right(<DocumentEntity>[]));
     when(() => mockGetOperatingZonesUseCase()).thenAnswer((_) async => const Right(<OperatingZoneEntity>[]));
-    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(null));
-    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(tFullSettings));
+    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(tPayoutInfo));
+    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(RiderSettingsEntity(rider: tRider)));
 
     controller = ProfileController(
       getProfileUseCase: mockGetProfileUseCase,
@@ -201,9 +171,7 @@ void main() {
     );
 
     controller.riderProfile.value = tRider;
-    controller.riderSettings.value = tFullSettings;
-    controller.currentDeviceId.value = 'android-uuid-1';
-
+    controller.payoutInfo.value = tPayoutInfo;
     Get.put<ProfileController>(controller);
   });
 
@@ -211,60 +179,94 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('RiderSettingsView renders full 7.1 information and registered devices', (WidgetTester tester) async {
+  testWidgets('PayoutInfoView loads and pre-populates bank details dynamically', (tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
-        home: RiderSettingsView(),
+        home: PayoutInfoView(),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    // Check Section 7.1 Account & Verification Overview
-    expect(find.text('Account & Verification'), findsOneWidget);
-    expect(find.text('Ibrahim Koroma'), findsOneWidget);
-    expect(find.text('rider.ibrahim@example.com'), findsOneWidget);
-    expect(find.text('APPROVED'), findsOneWidget);
+    // Verify title and subtitle
+    expect(find.text('Payout Information'), findsOneWidget);
+    expect(find.text('Payout & Direct Deposit'), findsOneWidget);
 
-    // Check Delivery Coverage & Zones
-    expect(find.text('Delivery Coverage & Zones'), findsOneWidget);
-    expect(find.text('ZONE 1'), findsOneWidget);
-    expect(find.text('ZONE 2'), findsOneWidget);
-
-    // Check Registered Devices & Push Sessions
-    await tester.scrollUntilVisible(
-      find.text('Active Devices & Push Sessions'),
-      100,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('Active Devices & Push Sessions'), findsOneWidget);
-    expect(find.text('Samsung Galaxy S22'), findsOneWidget);
-    expect(find.text('iPhone 15 Pro'), findsOneWidget);
-    expect(find.text('THIS DEVICE'), findsOneWidget);
+    // Verify bank fields pre-populated
+    expect(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == 'Sierra Leone Commercial Bank'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == '•••• 8829'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == 'Ibrahim Koroma'), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == '021000021'), findsOneWidget);
   });
 
-  testWidgets('RiderSettingsView opens Change Password dialog conforming to 7.2', (WidgetTester tester) async {
+  testWidgets('PayoutInfoView switches between Bank Account and Mobile Money tabs', (tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
-        home: RiderSettingsView(),
+        home: PayoutInfoView(),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    final changePasswordTile = find.text('Change Password');
-    expect(changePasswordTile, findsOneWidget);
-
-    await tester.tap(changePasswordTile);
+    // Tap Mobile Money tab
+    await tester.tap(find.text('Mobile Money'));
     await tester.pumpAndSettle();
 
-    // Verify change password dialog opened
-    expect(find.text('Change Account Password'), findsOneWidget);
-    expect(find.text('Current Password'), findsOneWidget);
-    expect(find.text('New Password (min 6 characters)'), findsOneWidget);
-    expect(find.text('Confirm New Password'), findsOneWidget);
-    expect(find.widgetWithText(CustomButton, 'Update Password'), findsOneWidget);
+    // Verify Mobile Money fields and quick chips are shown
+    expect(find.text('Mobile Money Provider'), findsOneWidget);
+    expect(find.text('Orange Money'), findsWidgets);
+    expect(find.text('Afrimoney'), findsOneWidget);
+    expect(find.text(AppStrings.mobileMoneyNumber), findsOneWidget);
+    expect(find.text('Beneficiary Name'), findsOneWidget);
+
+    // Tap Afrimoney chip
+    await tester.tap(find.text('Afrimoney'));
+    await tester.pumpAndSettle();
+
+    // Provider field now contains Afrimoney
+    expect(find.text('Afrimoney'), findsWidgets);
+  });
+
+  testWidgets('PayoutInfoView saves updated payout details successfully', (tester) async {
+    const updatedInfo = PayoutInfoEntity(
+      methodType: PayoutMethodType.bank,
+      bankName: 'Rokel Commercial Bank',
+      accountNumber: 'SL-77889900',
+      accountHolderName: 'Ibrahim Koroma',
+      routingNumber: '021000021',
+    );
+
+    when(() => mockUpdatePayoutInfoUseCase(any()))
+        .thenAnswer((_) async => const Right(updatedInfo));
+
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: PayoutInfoView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Update bank name
+    final bankField = find.widgetWithText(TextField, 'Sierra Leone Commercial Bank');
+    await tester.enterText(bankField, 'Rokel Commercial Bank');
+
+    // Update account number
+    final accField = find.widgetWithText(TextField, '•••• 8829');
+    await tester.enterText(accField, 'SL-77889900');
+
+    // Tap Save Payout Details button
+    final saveButton = find.text('Save Payout Details');
+    await tester.tap(saveButton);
+    await tester.pump(const Duration(seconds: 4));
+    await tester.pumpAndSettle();
+
+    // Verify use case was invoked
+    verify(() => mockUpdatePayoutInfoUseCase(any(
+      that: isA<PayoutInfoEntity>()
+          .having((p) => p.bankName, 'bankName', 'Rokel Commercial Bank')
+          .having((p) => p.accountNumber, 'accountNumber', 'SL-77889900'),
+    ))).called(1);
+
+    // Verify controller state updated
+    expect(controller.payoutInfo.value?.bankName, 'Rokel Commercial Bank');
+    expect(controller.payoutInfo.value?.accountNumber, 'SL-77889900');
   });
 }

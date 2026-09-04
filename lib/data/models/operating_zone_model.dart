@@ -14,10 +14,17 @@ class DeliveryLocationModel extends DeliveryLocationEntity {
   });
 
   factory DeliveryLocationModel.fromJson(Map<String, dynamic> json) {
+    final locName = (json['name'] as String?) ??
+        (json['regionName'] as String?) ??
+        (json['region_name'] as String?) ??
+        (json['locationName'] as String?) ??
+        '';
+    final locId = (json['id'] as String?) ?? (json['code'] as String?) ?? (locName.isNotEmpty ? locName : 'loc_${DateTime.now().millisecondsSinceEpoch}');
+
     return DeliveryLocationModel(
-      id: json['id'] as String? ?? json['code'] as String? ?? json['name'] as String? ?? '',
+      id: locId,
       zoneId: json['zoneId'] as String? ?? '',
-      name: json['name'] as String? ?? '',
+      name: locName.isNotEmpty ? locName : locId,
       code: json['code'] as String? ?? '',
       latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
       longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
@@ -71,7 +78,7 @@ class OperatingZoneModel extends OperatingZoneEntity {
 
   factory OperatingZoneModel.fromJson(Map<String, dynamic> json) {
     final rawLocations = (json['locations'] as List<dynamic>?) ?? (json['regions'] as List<dynamic>?) ?? [];
-    final zoneId = json['id'] as String? ?? 'zone_1';
+    final zoneId = (json['id'] as String?) ?? 'zone_1';
     final parsedLocations = rawLocations
         .map((loc) {
           if (loc is Map<String, dynamic>) {
@@ -84,9 +91,16 @@ class OperatingZoneModel extends OperatingZoneEntity {
         })
         .toList();
 
+    final zoneName = (json['name'] as String?) ??
+        (json['zoneName'] as String?) ??
+        (json['zone_name'] as String?) ??
+        (json['title'] as String?) ??
+        (json['id'] as String?) ??
+        'Downtown District';
+
     return OperatingZoneModel(
       id: zoneId,
-      name: json['name'] as String? ?? 'Downtown District',
+      name: zoneName,
       district: json['district'] as String? ?? (json['description'] as String? ?? 'Central'),
       description: json['description'] as String? ?? '',
       isActive: json['isActive'] as bool? ?? true,

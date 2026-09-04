@@ -15,6 +15,22 @@ class VehicleEntity extends Equatable {
     required this.year,
   });
 
+  VehicleEntity copyWith({
+    String? type,
+    String? model,
+    String? licensePlate,
+    String? color,
+    String? year,
+  }) {
+    return VehicleEntity(
+      type: type ?? this.type,
+      model: model ?? this.model,
+      licensePlate: licensePlate ?? this.licensePlate,
+      color: color ?? this.color,
+      year: year ?? this.year,
+    );
+  }
+
   @override
   List<Object?> get props => [type, model, licensePlate, color, year];
 }

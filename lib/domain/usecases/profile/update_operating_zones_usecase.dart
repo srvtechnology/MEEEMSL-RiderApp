@@ -7,7 +7,7 @@ class UpdateOperatingZonesUseCase {
 
   UpdateOperatingZonesUseCase(this.repository);
 
-  Future<Either<Failure, bool>> call(List<String> zoneIds) {
-    return repository.updateOperatingZones(zoneIds);
+  Future<Either<Failure, bool>> call(List<String> zoneIds, [List<String>? locationNames]) {
+    return repository.updateOperatingZones(zoneIds, locationNames);
   }
 }

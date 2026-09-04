@@ -13,7 +13,7 @@ abstract class ProfileRepository {
   Future<Either<Failure, List<DocumentEntity>>> getDocuments();
   Future<Either<Failure, DocumentEntity>> uploadDocument(String docType, String filePath);
   Future<Either<Failure, List<OperatingZoneEntity>>> getOperatingZones();
-  Future<Either<Failure, bool>> updateOperatingZones(List<String> zoneIds);
+  Future<Either<Failure, bool>> updateOperatingZones(List<String> zoneIds, [List<String>? locationNames]);
   Future<Either<Failure, PayoutInfoEntity?>> getPayoutInfo();
   Future<Either<Failure, PayoutInfoEntity>> updatePayoutInfo(PayoutInfoEntity payoutInfo);
   Future<Either<Failure, VehicleEntity>> updateVehicle(VehicleEntity vehicle);

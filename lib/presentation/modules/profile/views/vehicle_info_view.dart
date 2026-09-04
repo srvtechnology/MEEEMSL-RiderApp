@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -7,6 +8,47 @@ import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../domain/entities/vehicle_entity.dart';
 import '../controllers/profile_controller.dart';
+
+class _VehicleOptionData {
+  final String code;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+
+  const _VehicleOptionData({
+    required this.code,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+  });
+}
+
+const List<_VehicleOptionData> _vehicleOptions = [
+  _VehicleOptionData(
+    code: '2_WHEELER',
+    title: '2-Wheeler (Motorcycle / Scooter)',
+    subtitle: 'Motorcycle, Scooter, E-Bike',
+    icon: Icons.two_wheeler,
+  ),
+  _VehicleOptionData(
+    code: '3_WHEELER',
+    title: '3-Wheeler (Auto Rickshaw / TukTuk)',
+    subtitle: 'Auto Rickshaw, TukTuk, Cargo Trike',
+    icon: Icons.electric_rickshaw_rounded,
+  ),
+  _VehicleOptionData(
+    code: '4_WHEELER',
+    title: '4-Wheeler (Car / Van / Delivery Truck)',
+    subtitle: 'Car, Van, Delivery Truck',
+    icon: Icons.directions_car_rounded,
+  ),
+  _VehicleOptionData(
+    code: 'BICYCLE',
+    title: 'Bicycle / Cargo Bike',
+    subtitle: 'Standard Bicycle, Cargo Bike, Foot Courier',
+    icon: Icons.pedal_bike_rounded,
+  ),
+];
 
 class VehicleInfoView extends StatefulWidget {
   const VehicleInfoView({super.key});
@@ -18,25 +60,74 @@ class VehicleInfoView extends StatefulWidget {
 class _VehicleInfoViewState extends State<VehicleInfoView> {
   final controller = Get.find<ProfileController>();
 
-  late String selectedType;
+  String selectedType = '2_WHEELER';
   final modelCtrl = TextEditingController();
   final plateCtrl = TextEditingController();
   final colorCtrl = TextEditingController();
   final yearCtrl = TextEditingController();
 
+  StreamSubscription? _profileSubscription;
+
   @override
   void initState() {
     super.initState();
-    final vehicle = controller.riderProfile.value?.vehicle;
-    selectedType = vehicle?.type ?? '2-Wheeler (Motorcycle / Scooter)';
-    modelCtrl.text = vehicle?.model ?? 'Honda CB500X';
-    plateCtrl.text = vehicle?.licensePlate ?? 'RD-8842-NY';
-    colorCtrl.text = vehicle?.color ?? 'Sapphire Blue';
-    yearCtrl.text = vehicle?.year ?? '2023';
+    _populateFromProfile();
+
+    // Listen to real-time dynamic profile updates from API
+    _profileSubscription = controller.riderProfile.listen((rider) {
+      if (mounted && rider != null) {
+        _populateFromProfile(overwriteIfUserEdited: false);
+      }
+    });
+  }
+
+  void _populateFromProfile({bool overwriteIfUserEdited = true}) {
+    final rider = controller.riderProfile.value;
+    if (rider == null) return;
+
+    final rawType = rider.vehicleType ?? rider.vehicle?.type;
+    final normalized = _normalizeVehicleType(rawType);
+
+    final model = rider.vehicleName ?? rider.vehicle?.model ?? '';
+    final plate = rider.vehicleNumber ?? rider.vehicle?.licensePlate ?? '';
+    final color = rider.vehicle?.color ?? '';
+    final year = rider.vehicle?.year ?? '';
+
+    setState(() {
+      selectedType = normalized;
+      if (overwriteIfUserEdited || modelCtrl.text.isEmpty) {
+        modelCtrl.text = model;
+      }
+      if (overwriteIfUserEdited || plateCtrl.text.isEmpty) {
+        plateCtrl.text = plate;
+      }
+      if (overwriteIfUserEdited || colorCtrl.text.isEmpty) {
+        colorCtrl.text = color;
+      }
+      if (overwriteIfUserEdited || yearCtrl.text.isEmpty) {
+        yearCtrl.text = year;
+      }
+    });
+  }
+
+  String _normalizeVehicleType(String? raw) {
+    if (raw == null || raw.isEmpty) return '2_WHEELER';
+    final upper = raw.toUpperCase().replaceAll('-', '_');
+    if (upper.contains('3_WHEELER') || upper.contains('RICKSHAW') || upper.contains('TUKTUK')) {
+      return '3_WHEELER';
+    }
+    if (upper.contains('4_WHEELER') || upper.contains('CAR') || upper.contains('VAN') || upper.contains('TRUCK')) {
+      return '4_WHEELER';
+    }
+    if (upper.contains('BICYCLE') || upper.contains('PEDAL')) {
+      return 'BICYCLE';
+    }
+    return '2_WHEELER';
   }
 
   @override
   void dispose() {
+    _profileSubscription?.cancel();
     modelCtrl.dispose();
     plateCtrl.dispose();
     colorCtrl.dispose();
@@ -45,10 +136,22 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
   }
 
   void _saveVehicle() {
+    final plate = plateCtrl.text.trim();
+    final model = modelCtrl.text.trim();
+
+    if (plate.isEmpty) {
+      Get.snackbar('Required Field', 'Please enter your vehicle license plate number.');
+      return;
+    }
+    if (model.isEmpty) {
+      Get.snackbar('Required Field', 'Please enter your vehicle make and model.');
+      return;
+    }
+
     final vehicle = VehicleEntity(
       type: selectedType,
-      model: modelCtrl.text.trim(),
-      licensePlate: plateCtrl.text.trim(),
+      model: model,
+      licensePlate: plate,
       color: colorCtrl.text.trim(),
       year: yearCtrl.text.trim(),
     );
@@ -72,34 +175,38 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
                   children: [
                     Text('Registered Delivery Vehicle', style: AppTextStyles.headlineSmall()),
                     const SizedBox(height: 4),
-                    Text('Ensure your vehicle details match your official documents.', style: AppTextStyles.bodyMedium()),
+                    Text(
+                      'Ensure your vehicle details match your official documents.',
+                      style: AppTextStyles.bodyMedium(),
+                    ),
                     const SizedBox(height: 20),
 
-                    // Vehicle Type Selector (2-Wheeler, 3-Wheeler, 4-Wheeler)
+                    // Vehicle Type Selector (2-Wheeler, 3-Wheeler, 4-Wheeler, Bicycle)
                     const Text(
                       AppStrings.vehicleType,
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                     ),
                     const SizedBox(height: 10),
 
-                    _buildVehicleOption('2-Wheeler (Motorcycle / Scooter)', 'Motorcycle, Scooter, E-Bike', Icons.two_wheeler),
-                    const SizedBox(height: 8),
-                    _buildVehicleOption('3-Wheeler (Auto Rickshaw / TukTuk)', 'Auto Rickshaw, TukTuk, Cargo Trike', Icons.electric_rickshaw_rounded),
-                    const SizedBox(height: 8),
-                    _buildVehicleOption('4-Wheeler (Car / Van / Delivery Truck)', 'Car, Van, Delivery Truck', Icons.directions_car_rounded),
+                    ..._vehicleOptions.map((opt) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildVehicleOption(opt),
+                      );
+                    }),
 
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 16),
                     CustomTextField(
                       controller: plateCtrl,
-                      label: AppStrings.vehiclePlate,
-                      hintText: 'RD-8842-NY',
+                      label: 'License Plate Number',
+                      hintText: 'e.g. SL-AA-9988',
                       prefixIcon: Icons.badge_outlined,
                     ),
                     const SizedBox(height: 16),
                     CustomTextField(
                       controller: modelCtrl,
-                      label: AppStrings.vehicleModel,
-                      hintText: 'Honda CB500X',
+                      label: 'Vehicle Make & Model',
+                      hintText: 'e.g. Honda CB Shine 125',
                       prefixIcon: Icons.minor_crash_outlined,
                     ),
                     const SizedBox(height: 16),
@@ -109,7 +216,7 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
                           child: CustomTextField(
                             controller: colorCtrl,
                             label: 'Color',
-                            hintText: 'Sapphire Blue',
+                            hintText: 'e.g. Sapphire Blue',
                             prefixIcon: Icons.color_lens_outlined,
                           ),
                         ),
@@ -118,13 +225,14 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
                           child: CustomTextField(
                             controller: yearCtrl,
                             label: 'Year',
-                            hintText: '2023',
+                            hintText: 'e.g. 2023',
                             keyboardType: TextInputType.number,
                             prefixIcon: Icons.calendar_today_outlined,
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
@@ -136,12 +244,12 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
                 color: Theme.of(context).cardColor,
                 border: Border(top: BorderSide(color: AppColors.lightCardBorder)),
               ),
-              child: CustomButton(
-                text: 'Update Vehicle Details',
-                icon: Icons.check,
-                isLoading: controller.isLoading.value,
-                onPressed: _saveVehicle,
-              ),
+              child: Obx(() => CustomButton(
+                    text: 'Update Vehicle Details',
+                    icon: Icons.check,
+                    isLoading: controller.isLoading.value,
+                    onPressed: _saveVehicle,
+                  )),
             ),
           ],
         ),
@@ -149,11 +257,11 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
     );
   }
 
-  Widget _buildVehicleOption(String typeValue, String subtitle, IconData icon) {
-    final isSelected = selectedType.startsWith(typeValue.split(' ').first);
+  Widget _buildVehicleOption(_VehicleOptionData opt) {
+    final isSelected = selectedType == opt.code;
 
     return GestureDetector(
-      onTap: () => setState(() => selectedType = typeValue),
+      onTap: () => setState(() => selectedType = opt.code),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
@@ -172,15 +280,15 @@ class _VehicleInfoViewState extends State<VehicleInfoView> {
                 color: isSelected ? AppColors.primary : AppColors.lightSurfaceVariant,
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: isSelected ? Colors.white : AppColors.primary, size: 20),
+              child: Icon(opt.icon, color: isSelected ? Colors.white : AppColors.primary, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(typeValue, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                  Text(subtitle, style: AppTextStyles.bodySmall()),
+                  Text(opt.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                  Text(opt.subtitle, style: AppTextStyles.bodySmall()),
                 ],
               ),
             ),

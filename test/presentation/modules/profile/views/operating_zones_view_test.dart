@@ -7,11 +7,10 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:meeem_rider/domain/entities/rider_entity.dart';
-import 'package:meeem_rider/domain/entities/user_entity.dart';
-import 'package:meeem_rider/domain/entities/registered_device_entity.dart';
-import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
-import 'package:meeem_rider/domain/entities/document_entity.dart';
 import 'package:meeem_rider/domain/entities/operating_zone_entity.dart';
+import 'package:meeem_rider/domain/entities/document_entity.dart';
+import 'package:meeem_rider/domain/entities/payout_info_entity.dart';
+import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_profile_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_profile_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_documents_usecase.dart';
@@ -23,9 +22,8 @@ import 'package:meeem_rider/domain/usecases/profile/update_payout_info_usecase.d
 import 'package:meeem_rider/domain/usecases/profile/update_vehicle_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_settings_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_settings_usecase.dart';
-import 'package:meeem_rider/core/widgets/custom_button.dart';
 import 'package:meeem_rider/presentation/modules/profile/controllers/profile_controller.dart';
-import 'package:meeem_rider/presentation/modules/profile/views/rider_settings_view.dart';
+import 'package:meeem_rider/presentation/modules/profile/views/operating_zones_view.dart';
 
 class MockGetProfileUseCase extends Mock implements GetProfileUseCase {}
 class MockUpdateProfileUseCase extends Mock implements UpdateProfileUseCase {}
@@ -60,6 +58,27 @@ void main() {
   late MockGetSettingsUseCase mockGetSettingsUseCase;
   late MockUpdateSettingsUseCase mockUpdateSettingsUseCase;
 
+  const tZones = [
+    OperatingZoneEntity(
+      id: 'ZONE 1',
+      name: 'ZONE 1 (Western Rural)',
+      description: 'Outer Western Area',
+      locations: [
+        DeliveryLocationEntity(id: 'NO 2 RIVER', zoneId: 'ZONE 1', name: 'NO 2 RIVER'),
+        DeliveryLocationEntity(id: 'BAW BAW', zoneId: 'ZONE 1', name: 'BAW BAW'),
+      ],
+    ),
+    OperatingZoneEntity(
+      id: 'ZONE 2',
+      name: 'ZONE 2 (Peninsula Area)',
+      description: 'Peninsula coastal corridor',
+      locations: [
+        DeliveryLocationEntity(id: 'HAMILTON', zoneId: 'ZONE 2', name: 'HAMILTON'),
+        DeliveryLocationEntity(id: 'LAKKA', zoneId: 'ZONE 2', name: 'LAKKA'),
+      ],
+    ),
+  ];
+
   const tRider = RiderEntity(
     id: 'cm7rider0001',
     name: 'Ibrahim Koroma',
@@ -72,49 +91,8 @@ void main() {
     walletBalance: 120.0,
     totalTrips: 45,
     rating: 4.9,
-    selectedZones: ['ZONE 1', 'ZONE 2'],
-    selectedLocations: ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
-  );
-
-  const tFullSettings = RiderSettingsEntity(
-    user: UserEntity(
-      id: 'cm7abc123000',
-      email: 'rider.ibrahim@example.com',
-      name: 'Ibrahim Koroma',
-      phone: '76123456',
-      phoneCountryCode: '+232',
-      isEmailVerified: true,
-    ),
-    rider: tRider,
-    registeredDevices: [
-      RegisteredDeviceEntity(
-        token: 'fcm_token_123',
-        deviceId: 'android-uuid-1',
-        platform: 'android',
-        deviceModel: 'Samsung Galaxy S22',
-      ),
-      RegisteredDeviceEntity(
-        token: 'fcm_token_456',
-        deviceId: 'iphone-uuid-2',
-        platform: 'ios',
-        deviceModel: 'iPhone 15 Pro',
-      ),
-    ],
-    notifications: NotificationsSettingsEntity(
-      orderAlerts: true,
-      promotionalAlerts: false,
-      soundEnabled: true,
-      vibrationEnabled: true,
-    ),
-    navigation: NavigationSettingsEntity(
-      defaultMapApp: 'GOOGLE_MAPS',
-      voiceGuidance: true,
-      avoidTolls: false,
-    ),
-    appPreferences: AppPreferencesSettingsEntity(
-      distanceUnit: 'KM',
-      theme: 'SYSTEM',
-    ),
+    selectedZones: ['ZONE 1'],
+    selectedLocations: ['NO 2 RIVER'],
   );
 
   setUp(() {
@@ -182,9 +160,9 @@ void main() {
 
     when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(tRider));
     when(() => mockGetDocumentsUseCase()).thenAnswer((_) async => const Right(<DocumentEntity>[]));
-    when(() => mockGetOperatingZonesUseCase()).thenAnswer((_) async => const Right(<OperatingZoneEntity>[]));
-    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(null));
-    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(tFullSettings));
+    when(() => mockGetOperatingZonesUseCase()).thenAnswer((_) async => const Right(tZones));
+    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(PayoutInfoEntity(methodType: PayoutMethodType.bank)));
+    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(RiderSettingsEntity(rider: tRider)));
 
     controller = ProfileController(
       getProfileUseCase: mockGetProfileUseCase,
@@ -201,9 +179,8 @@ void main() {
     );
 
     controller.riderProfile.value = tRider;
-    controller.riderSettings.value = tFullSettings;
-    controller.currentDeviceId.value = 'android-uuid-1';
-
+    controller.operatingZones.assignAll(tZones);
+    controller.syncOperatingZonesWithProfile();
     Get.put<ProfileController>(controller);
   });
 
@@ -211,60 +188,121 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('RiderSettingsView renders full 7.1 information and registered devices', (WidgetTester tester) async {
+  testWidgets('OperatingZonesView renders with dynamically loaded zones and pre-selects zones & locations matching riderProfile', (tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
-        home: RiderSettingsView(),
+        home: OperatingZonesView(),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    // Check Section 7.1 Account & Verification Overview
-    expect(find.text('Account & Verification'), findsOneWidget);
-    expect(find.text('Ibrahim Koroma'), findsOneWidget);
-    expect(find.text('rider.ibrahim@example.com'), findsOneWidget);
-    expect(find.text('APPROVED'), findsOneWidget);
+    // Verify title and header
+    expect(find.text('Preferred Operating Zones'), findsOneWidget);
+    expect(find.text('Delivery Zones & Hierarchical Locations'), findsOneWidget);
 
-    // Check Delivery Coverage & Zones
-    expect(find.text('Delivery Coverage & Zones'), findsOneWidget);
-    expect(find.text('ZONE 1'), findsOneWidget);
-    expect(find.text('ZONE 2'), findsOneWidget);
+    // Verify coverage summary counter shows 1 of 2 zones, 1 region selected
+    expect(find.text('1 of 2 Zones • 1 Regions Selected'), findsOneWidget);
 
-    // Check Registered Devices & Push Sessions
+    // Verify zone names
+    expect(find.text('ZONE 1 (Western Rural)'), findsOneWidget);
+    expect(find.text('ZONE 2 (Peninsula Area)'), findsOneWidget);
+
+    // Verify locations rendered as FilterChips
+    expect(find.widgetWithText(FilterChip, 'NO 2 RIVER'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, 'BAW BAW'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, 'HAMILTON'), findsOneWidget);
+    expect(find.widgetWithText(FilterChip, 'LAKKA'), findsOneWidget);
+
+    // Verify NO 2 RIVER chip is selected
+    final no2RiverChip = tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'NO 2 RIVER'));
+    expect(no2RiverChip.selected, isTrue);
+
+    // Verify BAW BAW chip is NOT selected
+    final bawBawChip = tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'BAW BAW'));
+    expect(bawBawChip.selected, isFalse);
+  });
+
+  testWidgets('OperatingZonesView toggling an unselected location chip selects it and updates counter', (tester) async {
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: OperatingZonesView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Initially 1 region selected
+    expect(find.text('1 of 2 Zones • 1 Regions Selected'), findsOneWidget);
+
+    // Tap BAW BAW chip
+    await tester.tap(find.widgetWithText(FilterChip, 'BAW BAW'));
+    await tester.pumpAndSettle();
+
+    // Counter now reflects 2 regions selected
+    expect(find.text('1 of 2 Zones • 2 Regions Selected'), findsOneWidget);
+
+    final bawBawChip = tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'BAW BAW'));
+    expect(bawBawChip.selected, isTrue);
+  });
+
+  testWidgets('OperatingZonesView toggling zone checkbox toggles all locations in that zone', (tester) async {
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: OperatingZonesView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Find ZONE 2 checkbox and tap it
+    final zone2Checkbox = find.descendant(
+      of: find.ancestor(of: find.text('ZONE 2 (Peninsula Area)'), matching: find.byType(Container)),
+      matching: find.byType(Checkbox),
+    ).first;
+
+    await tester.tap(zone2Checkbox);
+    await tester.pumpAndSettle();
+
+    // Now 2 zones and 3 regions (NO 2 RIVER + HAMILTON + LAKKA) should be selected
+    expect(find.text('2 of 2 Zones • 3 Regions Selected'), findsOneWidget);
+
+    final hamiltonChip = tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'HAMILTON'));
+    expect(hamiltonChip.selected, isTrue);
+    final lakkaChip = tester.widget<FilterChip>(find.widgetWithText(FilterChip, 'LAKKA'));
+    expect(lakkaChip.selected, isTrue);
+  });
+
+  testWidgets('OperatingZonesView tapping Save Preferred Zones & Regions submits selected zones & locations', (tester) async {
+    when(() => mockUpdateOperatingZonesUseCase(any(), any()))
+        .thenAnswer((_) async => const Right(true));
+
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: OperatingZonesView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Scroll to Save button
+    final saveButton = find.text('Save Preferred Zones & Regions');
     await tester.scrollUntilVisible(
-      find.text('Active Devices & Push Sessions'),
-      100,
+      saveButton,
+      50,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Active Devices & Push Sessions'), findsOneWidget);
-    expect(find.text('Samsung Galaxy S22'), findsOneWidget);
-    expect(find.text('iPhone 15 Pro'), findsOneWidget);
-    expect(find.text('THIS DEVICE'), findsOneWidget);
-  });
-
-  testWidgets('RiderSettingsView opens Change Password dialog conforming to 7.2', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const GetMaterialApp(
-        home: RiderSettingsView(),
-      ),
-    );
-
+    // Tap Save button
+    await tester.tap(saveButton);
+    await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
 
-    final changePasswordTile = find.text('Change Password');
-    expect(changePasswordTile, findsOneWidget);
+    // Verify usecase was called with ZONE 1 and NO 2 RIVER
+    verify(() => mockUpdateOperatingZonesUseCase(
+      ['ZONE 1'],
+      ['NO 2 RIVER'],
+    )).called(1);
 
-    await tester.tap(changePasswordTile);
-    await tester.pumpAndSettle();
-
-    // Verify change password dialog opened
-    expect(find.text('Change Account Password'), findsOneWidget);
-    expect(find.text('Current Password'), findsOneWidget);
-    expect(find.text('New Password (min 6 characters)'), findsOneWidget);
-    expect(find.text('Confirm New Password'), findsOneWidget);
-    expect(find.widgetWithText(CustomButton, 'Update Password'), findsOneWidget);
+    // Verify controller state updated
+    expect(controller.riderProfile.value?.selectedZones, ['ZONE 1']);
+    expect(controller.riderProfile.value?.selectedLocations, ['NO 2 RIVER']);
   });
 }

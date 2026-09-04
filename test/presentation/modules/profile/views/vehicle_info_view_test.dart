@@ -7,11 +7,11 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:meeem_rider/domain/entities/rider_entity.dart';
-import 'package:meeem_rider/domain/entities/user_entity.dart';
-import 'package:meeem_rider/domain/entities/registered_device_entity.dart';
-import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
+import 'package:meeem_rider/domain/entities/vehicle_entity.dart';
 import 'package:meeem_rider/domain/entities/document_entity.dart';
 import 'package:meeem_rider/domain/entities/operating_zone_entity.dart';
+import 'package:meeem_rider/domain/entities/payout_info_entity.dart';
+import 'package:meeem_rider/domain/entities/rider_settings_entity.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_profile_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_profile_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_documents_usecase.dart';
@@ -23,9 +23,8 @@ import 'package:meeem_rider/domain/usecases/profile/update_payout_info_usecase.d
 import 'package:meeem_rider/domain/usecases/profile/update_vehicle_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/get_settings_usecase.dart';
 import 'package:meeem_rider/domain/usecases/profile/update_settings_usecase.dart';
-import 'package:meeem_rider/core/widgets/custom_button.dart';
 import 'package:meeem_rider/presentation/modules/profile/controllers/profile_controller.dart';
-import 'package:meeem_rider/presentation/modules/profile/views/rider_settings_view.dart';
+import 'package:meeem_rider/presentation/modules/profile/views/vehicle_info_view.dart';
 
 class MockGetProfileUseCase extends Mock implements GetProfileUseCase {}
 class MockUpdateProfileUseCase extends Mock implements UpdateProfileUseCase {}
@@ -42,6 +41,8 @@ class MockUpdateSettingsUseCase extends Mock implements UpdateSettingsUseCase {}
 final List<int> _fontBytes = [
   0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x03, 0x00, 0x20
 ];
+
+class FakeVehicleEntity extends Fake implements VehicleEntity {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,6 +61,14 @@ void main() {
   late MockGetSettingsUseCase mockGetSettingsUseCase;
   late MockUpdateSettingsUseCase mockUpdateSettingsUseCase;
 
+  const tVehicle = VehicleEntity(
+    type: '2_WHEELER',
+    licensePlate: 'RD-8842-NY',
+    model: 'Honda CB500X',
+    color: 'Sapphire Blue',
+    year: '2023',
+  );
+
   const tRider = RiderEntity(
     id: 'cm7rider0001',
     name: 'Ibrahim Koroma',
@@ -72,50 +81,12 @@ void main() {
     walletBalance: 120.0,
     totalTrips: 45,
     rating: 4.9,
-    selectedZones: ['ZONE 1', 'ZONE 2'],
-    selectedLocations: ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+    vehicle: tVehicle,
   );
 
-  const tFullSettings = RiderSettingsEntity(
-    user: UserEntity(
-      id: 'cm7abc123000',
-      email: 'rider.ibrahim@example.com',
-      name: 'Ibrahim Koroma',
-      phone: '76123456',
-      phoneCountryCode: '+232',
-      isEmailVerified: true,
-    ),
-    rider: tRider,
-    registeredDevices: [
-      RegisteredDeviceEntity(
-        token: 'fcm_token_123',
-        deviceId: 'android-uuid-1',
-        platform: 'android',
-        deviceModel: 'Samsung Galaxy S22',
-      ),
-      RegisteredDeviceEntity(
-        token: 'fcm_token_456',
-        deviceId: 'iphone-uuid-2',
-        platform: 'ios',
-        deviceModel: 'iPhone 15 Pro',
-      ),
-    ],
-    notifications: NotificationsSettingsEntity(
-      orderAlerts: true,
-      promotionalAlerts: false,
-      soundEnabled: true,
-      vibrationEnabled: true,
-    ),
-    navigation: NavigationSettingsEntity(
-      defaultMapApp: 'GOOGLE_MAPS',
-      voiceGuidance: true,
-      avoidTolls: false,
-    ),
-    appPreferences: AppPreferencesSettingsEntity(
-      distanceUnit: 'KM',
-      theme: 'SYSTEM',
-    ),
-  );
+  setUpAll(() {
+    registerFallbackValue(FakeVehicleEntity());
+  });
 
   setUp(() {
     Get.testMode = true;
@@ -183,8 +154,8 @@ void main() {
     when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(tRider));
     when(() => mockGetDocumentsUseCase()).thenAnswer((_) async => const Right(<DocumentEntity>[]));
     when(() => mockGetOperatingZonesUseCase()).thenAnswer((_) async => const Right(<OperatingZoneEntity>[]));
-    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(null));
-    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(tFullSettings));
+    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(PayoutInfoEntity(methodType: PayoutMethodType.bank)));
+    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(RiderSettingsEntity()));
 
     controller = ProfileController(
       getProfileUseCase: mockGetProfileUseCase,
@@ -201,9 +172,6 @@ void main() {
     );
 
     controller.riderProfile.value = tRider;
-    controller.riderSettings.value = tFullSettings;
-    controller.currentDeviceId.value = 'android-uuid-1';
-
     Get.put<ProfileController>(controller);
   });
 
@@ -211,60 +179,78 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('RiderSettingsView renders full 7.1 information and registered devices', (WidgetTester tester) async {
+  testWidgets('VehicleInfoView loads and pre-populates vehicle data dynamically from riderProfile', (tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
-        home: RiderSettingsView(),
+        home: VehicleInfoView(),
       ),
     );
-
     await tester.pumpAndSettle();
 
-    // Check Section 7.1 Account & Verification Overview
-    expect(find.text('Account & Verification'), findsOneWidget);
-    expect(find.text('Ibrahim Koroma'), findsOneWidget);
-    expect(find.text('rider.ibrahim@example.com'), findsOneWidget);
-    expect(find.text('APPROVED'), findsOneWidget);
+    // Verify title and header
+    expect(find.text('Vehicle Details'), findsOneWidget);
+    expect(find.text('Registered Delivery Vehicle'), findsOneWidget);
 
-    // Check Delivery Coverage & Zones
-    expect(find.text('Delivery Coverage & Zones'), findsOneWidget);
-    expect(find.text('ZONE 1'), findsOneWidget);
-    expect(find.text('ZONE 2'), findsOneWidget);
+    // Verify fields populated from dynamic profile
+    expect(find.text('RD-8842-NY'), findsOneWidget);
+    expect(find.text('Honda CB500X'), findsOneWidget);
+    expect(find.text('Sapphire Blue'), findsOneWidget);
+    expect(find.text('2023'), findsOneWidget);
 
-    // Check Registered Devices & Push Sessions
+    // Verify 2-Wheeler card is selected by checking check icon
+    expect(find.byIcon(Icons.check_circle), findsOneWidget);
+  });
+
+  testWidgets('VehicleInfoView allows selecting another vehicle type and submitting update via API', (tester) async {
+    const updatedVehicle = VehicleEntity(
+      type: '3_WHEELER',
+      licensePlate: 'SL-5521-AB',
+      model: 'Honda CB500X',
+      color: 'Sapphire Blue',
+      year: '2023',
+    );
+
+    when(() => mockUpdateVehicleUseCase(any())).thenAnswer((_) async => const Right(updatedVehicle));
+
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: VehicleInfoView(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap on 3-Wheeler option
+    await tester.tap(find.text('3-Wheeler (Auto Rickshaw / TukTuk)'));
+    await tester.pumpAndSettle();
+
+    // Enter new plate number
+    final plateField = find.widgetWithText(TextField, 'RD-8842-NY');
+    await tester.enterText(plateField, 'SL-5521-AB');
+
+    // Scroll to Update button
+    final updateButton = find.text('Update Vehicle Details');
     await tester.scrollUntilVisible(
-      find.text('Active Devices & Push Sessions'),
-      100,
+      updateButton,
+      50,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Active Devices & Push Sessions'), findsOneWidget);
-    expect(find.text('Samsung Galaxy S22'), findsOneWidget);
-    expect(find.text('iPhone 15 Pro'), findsOneWidget);
-    expect(find.text('THIS DEVICE'), findsOneWidget);
-  });
-
-  testWidgets('RiderSettingsView opens Change Password dialog conforming to 7.2', (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const GetMaterialApp(
-        home: RiderSettingsView(),
-      ),
-    );
-
+    // Tap Update Vehicle Details button
+    await tester.tap(updateButton);
+    // Pump past the snackbar duration so no pending timer fails the test
+    await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
 
-    final changePasswordTile = find.text('Change Password');
-    expect(changePasswordTile, findsOneWidget);
+    // Verify use case was invoked with 3_WHEELER and updated plate
+    verify(() => mockUpdateVehicleUseCase(any(
+      that: isA<VehicleEntity>()
+          .having((v) => v.type, 'type', '3_WHEELER')
+          .having((v) => v.licensePlate, 'licensePlate', 'SL-5521-AB'),
+    ))).called(1);
 
-    await tester.tap(changePasswordTile);
-    await tester.pumpAndSettle();
-
-    // Verify change password dialog opened
-    expect(find.text('Change Account Password'), findsOneWidget);
-    expect(find.text('Current Password'), findsOneWidget);
-    expect(find.text('New Password (min 6 characters)'), findsOneWidget);
-    expect(find.text('Confirm New Password'), findsOneWidget);
-    expect(find.widgetWithText(CustomButton, 'Update Password'), findsOneWidget);
+    // Verify controller state updated
+    expect(controller.riderProfile.value?.vehicle?.licensePlate, 'SL-5521-AB');
+    expect(controller.riderProfile.value?.vehicle?.type, '3_WHEELER');
   });
 }

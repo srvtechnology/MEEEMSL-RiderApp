@@ -76,6 +76,7 @@ class ProfileController extends GetxController {
         Get.find<DeviceInfoService>().getDeviceId().then((id) => currentDeviceId.value = id);
       }
     } catch (_) {}
+    ever(riderProfile, (_) => syncOperatingZonesWithProfile());
     loadAllProfileData();
   }
 
@@ -114,7 +115,10 @@ class ProfileController extends GetxController {
     final result = await getProfileUseCase();
     result.fold(
       (failure) => null,
-      (rider) => riderProfile.value = rider,
+      (rider) {
+        riderProfile.value = rider;
+        syncOperatingZonesWithProfile();
+      },
     );
   }
 
@@ -127,15 +131,31 @@ class ProfileController extends GetxController {
   }
 
   Future<void> _loadOperatingZones() async {
+    await loadOperatingZones(showLoading: false);
+  }
+
+  Future<void> loadOperatingZones({bool showLoading = true}) async {
+    if (showLoading) isLoading.value = true;
     final result = await getOperatingZonesUseCase();
+    if (showLoading) isLoading.value = false;
+
     result.fold(
       (failure) => null,
-      (zones) => operatingZones.assignAll(zones),
+      (zones) {
+        operatingZones.assignAll(zones);
+        syncOperatingZonesWithProfile();
+      },
     );
   }
 
   Future<void> _loadPayoutInfo() async {
+    await loadPayoutInfo();
+  }
+
+  Future<void> loadPayoutInfo({bool showLoading = false}) async {
+    if (showLoading) isLoading.value = true;
     final result = await getPayoutInfoUseCase();
+    if (showLoading) isLoading.value = false;
     result.fold(
       (failure) => null,
       (info) => payoutInfo.value = info,
@@ -184,9 +204,42 @@ class ProfileController extends GetxController {
     }
   }
 
-  // Operating Zones Toggle & Save
+  // Operating Zones Toggle, Sync & Save
+  void syncOperatingZonesWithProfile() {
+    if (operatingZones.isEmpty) return;
+
+    final rider = riderProfile.value ?? riderSettings.value.rider;
+    final selectedZoneIds = (rider?.selectedZones ?? [])
+        .map((z) => z.toLowerCase().trim())
+        .toSet();
+
+    final selectedLocNames = (rider?.selectedLocations ?? [])
+        .map((l) => l.toLowerCase().trim())
+        .toSet();
+
+    final updated = operatingZones.map((zone) {
+      final isZoneMatch = selectedZoneIds.contains(zone.id.toLowerCase().trim()) ||
+          selectedZoneIds.contains(zone.name.toLowerCase().trim());
+
+      final updatedLocs = zone.locations.map((loc) {
+        final isLocMatch = selectedLocNames.contains(loc.name.toLowerCase().trim()) ||
+            selectedLocNames.contains(loc.id.toLowerCase().trim()) ||
+            (isZoneMatch && selectedLocNames.isEmpty);
+        return loc.copyWith(isSelected: isLocMatch);
+      }).toList();
+
+      final isAnyLocSelected = updatedLocs.any((l) => l.isSelected);
+      return zone.copyWith(
+        isSelected: isZoneMatch || isAnyLocSelected,
+        locations: updatedLocs,
+      );
+    }).toList();
+
+    operatingZones.assignAll(updated);
+  }
+
   void toggleZoneSelection(String zoneId) {
-    final index = operatingZones.indexWhere((z) => z.id == zoneId);
+    final index = operatingZones.indexWhere((z) => z.id == zoneId || z.name == zoneId);
     if (index >= 0) {
       final current = operatingZones[index];
       final newSelected = !current.isSelected;
@@ -196,36 +249,86 @@ class ProfileController extends GetxController {
   }
 
   void toggleLocationSelection(String zoneId, String locationId) {
-    final zoneIndex = operatingZones.indexWhere((z) => z.id == zoneId);
+    final zoneIndex = operatingZones.indexWhere((z) => z.id == zoneId || z.name == zoneId);
     if (zoneIndex >= 0) {
       final zone = operatingZones[zoneIndex];
-      final locIndex = zone.locations.indexWhere((l) => l.id == locationId);
+      final locIndex = zone.locations.indexWhere((l) => l.id == locationId || l.name == locationId);
       if (locIndex >= 0) {
         final loc = zone.locations[locIndex];
         final updatedLocs = List<DeliveryLocationEntity>.from(zone.locations);
-        updatedLocs[locIndex] = loc.copyWith(isSelected: !loc.isSelected);
+        final newLocSelected = !loc.isSelected;
+        updatedLocs[locIndex] = loc.copyWith(isSelected: newLocSelected);
         final hasAnySelected = updatedLocs.any((l) => l.isSelected);
         operatingZones[zoneIndex] = zone.copyWith(isSelected: hasAnySelected, locations: updatedLocs);
       }
     }
   }
 
+  int get totalSelectedZonesCount =>
+      operatingZones.where((z) => z.isSelected || z.locations.any((l) => l.isSelected)).length;
+
+  int get totalSelectedLocationsCount =>
+      operatingZones.fold<int>(0, (sum, z) => sum + z.locations.where((l) => l.isSelected).length);
+
+  void selectAllZonesAndLocations() {
+    final updated = operatingZones.map((zone) {
+      final updatedLocs = zone.locations.map((loc) => loc.copyWith(isSelected: true)).toList();
+      return zone.copyWith(isSelected: true, locations: updatedLocs);
+    }).toList();
+    operatingZones.assignAll(updated);
+  }
+
+  void clearAllZonesAndLocations() {
+    final updated = operatingZones.map((zone) {
+      final updatedLocs = zone.locations.map((loc) => loc.copyWith(isSelected: false)).toList();
+      return zone.copyWith(isSelected: false, locations: updatedLocs);
+    }).toList();
+    operatingZones.assignAll(updated);
+  }
+
   Future<void> saveOperatingZones() async {
-    final selectedIds = operatingZones.where((z) => z.isSelected).map((z) => z.id).toList();
-    if (selectedIds.isEmpty) {
-      Get.snackbar('Operating Zones', 'Please select at least 1 operating zone');
+    final selectedZoneIds = operatingZones
+        .where((z) => z.isSelected || z.locations.any((l) => l.isSelected))
+        .map((z) => z.id.isNotEmpty ? z.id : z.name)
+        .toList();
+
+    final selectedLocations = <String>[];
+    for (final zone in operatingZones) {
+      for (final loc in zone.locations) {
+        if (loc.isSelected) {
+          selectedLocations.add(loc.name.isNotEmpty ? loc.name : loc.id);
+        }
+      }
+    }
+
+    if (selectedZoneIds.isEmpty && selectedLocations.isEmpty) {
+      Get.snackbar('Operating Zones', 'Please select at least 1 operating zone or region',
+          snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
     isLoading.value = true;
-    final result = await updateOperatingZonesUseCase(selectedIds);
+    final result = await updateOperatingZonesUseCase(selectedZoneIds, selectedLocations);
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message),
+      (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
       (success) {
+        if (riderProfile.value != null) {
+          riderProfile.value = riderProfile.value!.copyWith(
+            selectedZones: selectedZoneIds,
+            selectedLocations: selectedLocations,
+          );
+        }
+        if (riderSettings.value.rider != null) {
+          final updatedRider = riderSettings.value.rider!.copyWith(
+            selectedZones: selectedZoneIds,
+            selectedLocations: selectedLocations,
+          );
+          riderSettings.value = riderSettings.value.copyWith(rider: updatedRider);
+        }
         Get.back();
-        Get.snackbar('Zones Updated', 'Your preferred delivery zones have been saved!',
+        Get.snackbar('Zones Updated', 'Your preferred delivery zones and regions have been saved!',
             snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
       },
     );
@@ -258,7 +361,12 @@ class ProfileController extends GetxController {
       (failure) => Get.snackbar('Error', failure.message),
       (updated) {
         if (riderProfile.value != null) {
-          riderProfile.value = riderProfile.value!.copyWith(vehicle: updated);
+          riderProfile.value = riderProfile.value!.copyWith(
+            vehicle: updated,
+            vehicleType: updated.type,
+            vehicleName: updated.model,
+            vehicleNumber: updated.licensePlate,
+          );
         }
         Get.back();
         Get.snackbar('Vehicle Saved', 'Vehicle details updated successfully.',

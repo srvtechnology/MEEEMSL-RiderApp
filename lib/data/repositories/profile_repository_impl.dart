@@ -87,9 +87,9 @@ class ProfileRepositoryImpl implements ProfileRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> updateOperatingZones(List<String> zoneIds) async {
+  Future<Either<Failure, bool>> updateOperatingZones(List<String> zoneIds, [List<String>? locationNames]) async {
     try {
-      final result = await remoteDataSource.updateOperatingZones(zoneIds);
+      final result = await remoteDataSource.updateOperatingZones(zoneIds, locationNames);
       return Right(result);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));

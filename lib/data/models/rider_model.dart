@@ -104,7 +104,15 @@ class RiderModel extends RiderEntity {
           const [],
       vehicle: json['vehicle'] != null
           ? VehicleModel.fromJson(json['vehicle'] as Map<String, dynamic>)
-          : null,
+          : (json['vehicleType'] != null || json['vehicleName'] != null || json['vehicleNumber'] != null)
+              ? VehicleModel(
+                  type: json['vehicleType'] as String? ?? '2_WHEELER',
+                  model: json['vehicleName'] as String? ?? '',
+                  licensePlate: json['vehicleNumber'] as String? ?? '',
+                  color: json['vehicleColor'] as String? ?? '',
+                  year: json['vehicleYear']?.toString() ?? '',
+                )
+              : null,
       payoutInfo: json['payoutInfo'] != null
           ? PayoutInfoModel.fromJson(json['payoutInfo'] as Map<String, dynamic>)
           : null,
