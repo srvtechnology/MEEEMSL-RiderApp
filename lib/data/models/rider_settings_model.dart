@@ -123,7 +123,8 @@ class RiderSettingsModel extends RiderSettingsEntity {
 
     RiderModel? rider;
     if (json['rider'] != null && json['rider'] is Map<String, dynamic>) {
-      rider = RiderModel.fromJson(json['rider'] as Map<String, dynamic>);
+      final userJson = json['user'] is Map<String, dynamic> ? json['user'] as Map<String, dynamic> : null;
+      rider = RiderModel.fromJson(json['rider'] as Map<String, dynamic>, userJson);
     }
 
     List<RegisteredDeviceModel> registeredDevices = [];

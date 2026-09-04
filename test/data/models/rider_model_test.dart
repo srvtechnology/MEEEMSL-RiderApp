@@ -57,5 +57,36 @@ void main() {
       expect(riderTrue.onboardingCompleted, true);
       expect(riderTrue.isFirstLogin, false);
     });
+
+    test('correctly merges user details when userJson is supplied or nested', () {
+      final riderJson = {
+        "id": "cm7rider0001",
+        "status": "APPROVED",
+        "isApproved": true,
+        "isSuspended": false,
+        "vehicleType": "2_WHEELER",
+        "vehicleName": "Honda CB Shine 125",
+        "vehicleNumber": "SL-AA-9988",
+      };
+      final userJson = {
+        "id": "cm7abc123000",
+        "email": "rider.ibrahim@example.com",
+        "name": "Ibrahim Koroma",
+        "phone": "76123456",
+        "phoneCountryCode": "+232",
+        "image": "https://s3.amazonaws.com/meeem/profiles/ibrahim.jpg",
+      };
+
+      final rider = RiderModel.fromJson(riderJson, userJson);
+
+      expect(rider.id, 'cm7rider0001');
+      expect(rider.name, 'Ibrahim Koroma');
+      expect(rider.email, 'rider.ibrahim@example.com');
+      expect(rider.phone, '+232 76123456');
+      expect(rider.avatar, 'https://s3.amazonaws.com/meeem/profiles/ibrahim.jpg');
+      expect(rider.vehicleType, '2_WHEELER');
+      expect(rider.vehicleName, 'Honda CB Shine 125');
+      expect(rider.vehicleNumber, 'SL-AA-9988');
+    });
   });
 }

@@ -196,6 +196,54 @@ void main() {
     expect(find.text('Log Out'), findsOneWidget);
   });
 
+  testWidgets('ProfileView renders rider initials, name, email, phone, and status badge dynamically',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: ProfileView(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify dynamic personal details and initials
+    expect(find.text('Test Rider'), findsOneWidget);
+    expect(find.text('TR'), findsOneWidget);
+    expect(find.text('rider@example.com'), findsOneWidget);
+    expect(find.text('+1234567890'), findsOneWidget);
+    expect(find.text('APPROVED'), findsOneWidget);
+
+    // Verify stats
+    expect(find.text('45'), findsOneWidget); // totalTrips
+    expect(find.text('★ 4.9'), findsOneWidget); // rating
+    expect(find.text('\$120.0'), findsOneWidget); // walletBalance
+  });
+
+  testWidgets('ProfileView opens edit rider profile bottom sheet with vehicle type choices',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: ProfileView(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Tap the Edit button in the header
+    await tester.tap(find.text('Edit'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Edit Rider Profile'), findsOneWidget);
+    expect(find.text('Full Name'), findsOneWidget);
+    expect(find.text('Phone Number'), findsOneWidget);
+    expect(find.text('Vehicle Type'), findsOneWidget);
+    expect(find.text('2-Wheeler'), findsOneWidget);
+    expect(find.text('3-Wheeler'), findsOneWidget);
+    expect(find.text('4-Wheeler'), findsOneWidget);
+    expect(find.text('Bicycle'), findsOneWidget);
+    expect(find.text('Save Changes'), findsOneWidget);
+  });
+
   testWidgets('RiderSettingsView renders with CustomCards and ListTiles without assertion error',
       (WidgetTester tester) async {
     await tester.pumpWidget(

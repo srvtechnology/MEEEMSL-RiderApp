@@ -26,7 +26,7 @@ class LoginResponseModel extends LoginResponseEntity {
 
     return LoginResponseModel(
       user: UserModel.fromJson(userJson),
-      rider: RiderModel.fromJson(riderJson),
+      rider: RiderModel.fromJson(riderJson, userJson),
       accessToken: tokensJson['accessToken'] as String? ?? json['token'] as String? ?? '',
       refreshToken: tokensJson['refreshToken'] as String? ?? json['refreshToken'] as String? ?? '',
       expiresIn: tokensJson['expiresIn'] as int? ?? 172800,

@@ -45,8 +45,9 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final response = await _dioClient.dio.get(ApiEndpoints.riderProfile);
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'] as Map<String, dynamic>;
-        final riderData = data['rider'] as Map<String, dynamic>? ?? data;
-        return RiderModel.fromJson(riderData);
+        final userMap = data['user'] as Map<String, dynamic>?;
+        final riderMap = data['rider'] as Map<String, dynamic>? ?? data;
+        return RiderModel.fromJson(riderMap, userMap);
       }
       throw const ServerException(message: 'Invalid profile response');
     } on DioException catch (e) {
@@ -72,7 +73,38 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'] as Map<String, dynamic>;
         final riderData = data['rider'] as Map<String, dynamic>? ?? data;
-        return RiderModel.fromJson(riderData);
+        final updatedRider = RiderModel.fromJson(riderData);
+        return RiderModel(
+          id: updatedRider.id.isNotEmpty ? updatedRider.id : rider.id,
+          name: updatedRider.name.isNotEmpty ? updatedRider.name : rider.name,
+          phone: updatedRider.phone.isNotEmpty ? updatedRider.phone : rider.phone,
+          email: updatedRider.email.isNotEmpty ? updatedRider.email : rider.email,
+          avatar: updatedRider.avatar.isNotEmpty ? updatedRider.avatar : rider.avatar,
+          rating: updatedRider.rating,
+          totalTrips: updatedRider.totalTrips,
+          isOnline: updatedRider.isOnline,
+          walletBalance: updatedRider.walletBalance,
+          approvalStatus: updatedRider.approvalStatus,
+          isApproved: updatedRider.isApproved,
+          isSuspended: updatedRider.isSuspended,
+          status: updatedRider.status,
+          onboardingCompleted: updatedRider.onboardingCompleted,
+          isFirstLogin: updatedRider.isFirstLogin,
+          vehicleTypes: updatedRider.vehicleTypes.isNotEmpty ? updatedRider.vehicleTypes : rider.vehicleTypes,
+          vehicleType: updatedRider.vehicleType ?? rider.vehicleType,
+          vehicleName: updatedRider.vehicleName ?? rider.vehicleName,
+          vehicleNumber: updatedRider.vehicleNumber ?? rider.vehicleNumber,
+          drivingLicenseNo: updatedRider.drivingLicenseNo ?? rider.drivingLicenseNo,
+          profileImage: updatedRider.profileImage ?? rider.profileImage,
+          drivingLicenseDoc: updatedRider.drivingLicenseDoc ?? rider.drivingLicenseDoc,
+          nationalIdDoc: updatedRider.nationalIdDoc ?? rider.nationalIdDoc,
+          vehicleInsuranceDoc: updatedRider.vehicleInsuranceDoc ?? rider.vehicleInsuranceDoc,
+          selectedZones: updatedRider.selectedZones.isNotEmpty ? updatedRider.selectedZones : rider.selectedZones,
+          selectedLocations: updatedRider.selectedLocations.isNotEmpty ? updatedRider.selectedLocations : rider.selectedLocations,
+          vehicle: updatedRider.vehicle ?? rider.vehicle,
+          payoutInfo: updatedRider.payoutInfo ?? rider.payoutInfo,
+          operatingZones: updatedRider.operatingZones.isNotEmpty ? updatedRider.operatingZones : rider.operatingZones,
+        );
       }
       return rider;
     } on DioException catch (e) {

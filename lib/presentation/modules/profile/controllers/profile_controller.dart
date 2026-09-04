@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../data/models/rider_model.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/image_compressor.dart';
@@ -71,6 +73,21 @@ class ProfileController extends GetxController {
     super.onInit();
     final storage = GetStorage();
     isDarkMode.value = storage.read<bool>(AppConstants.isDarkModeKey) ?? false;
+
+    // Restore cached rider & user immediately for fast UI response
+    try {
+      final rawRider = storage.read<String>(AppConstants.riderProfileKey);
+      final rawUser = storage.read<String>(AppConstants.userProfileKey);
+      Map<String, dynamic>? userMap;
+      if (rawUser != null && rawUser.isNotEmpty) {
+        userMap = jsonDecode(rawUser) as Map<String, dynamic>?;
+      }
+      if (rawRider != null && rawRider.isNotEmpty) {
+        final riderMap = jsonDecode(rawRider) as Map<String, dynamic>;
+        riderProfile.value = RiderModel.fromJson(riderMap, userMap);
+      }
+    } catch (_) {}
+
     try {
       if (Get.isRegistered<DeviceInfoService>()) {
         Get.find<DeviceInfoService>().getDeviceId().then((id) => currentDeviceId.value = id);
@@ -99,7 +116,23 @@ class ProfileController extends GetxController {
       (settings) {
         riderSettings.value = settings;
         if (settings.rider != null) {
-          riderProfile.value = settings.rider;
+          final current = riderProfile.value;
+          final r = settings.rider!;
+          final u = settings.user;
+          riderProfile.value = r.copyWith(
+            name: r.name.isNotEmpty ? r.name : (u?.name.isNotEmpty == true ? u!.name : current?.name),
+            email: r.email.isNotEmpty ? r.email : (u?.email.isNotEmpty == true ? u!.email : current?.email),
+            phone: r.phone.isNotEmpty
+                ? r.phone
+                : (u?.phone.isNotEmpty == true
+                    ? (u!.phoneCountryCode.isNotEmpty && !u.phone.startsWith('+')
+                        ? '${u.phoneCountryCode} ${u.phone}'
+                        : u.phone)
+                    : current?.phone),
+            avatar: r.avatar.isNotEmpty
+                ? r.avatar
+                : (u?.image != null && u!.image!.isNotEmpty ? u.image! : current?.avatar),
+          );
         }
       },
     );
@@ -386,7 +419,8 @@ class ProfileController extends GetxController {
     if (riderProfile.value == null) return;
     isLoading.value = true;
 
-    final updated = riderProfile.value!.copyWith(
+    final current = riderProfile.value!;
+    final updated = current.copyWith(
       name: name,
       phone: phone,
       vehicleType: vehicleType,
@@ -398,9 +432,24 @@ class ProfileController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message),
+      (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
       (res) {
-        riderProfile.value = res;
+        riderProfile.value = res.copyWith(
+          name: res.name.isNotEmpty ? res.name : name,
+          phone: res.phone.isNotEmpty ? res.phone : phone,
+          email: res.email.isNotEmpty ? res.email : current.email,
+          avatar: res.avatar.isNotEmpty ? res.avatar : current.avatar,
+        );
+
+        // Keep local cache fresh
+        try {
+          final storage = GetStorage();
+          storage.write(
+            AppConstants.riderProfileKey,
+            jsonEncode(RiderModel.fromEntity(riderProfile.value!).toJson()),
+          );
+        } catch (_) {}
+
         Get.snackbar(
           'Profile Updated',
           'Profile updated successfully.',
