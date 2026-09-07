@@ -2,38 +2,76 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
-import '../constants/app_constants.dart';
+import 'package:get_storage/get_storage.dart';
+import '../constants/api_endpoints.dart';
 import '../network/dio_client.dart';
+import '../../data/datasources/auth_local_datasource.dart';
+import 'socket_service.dart';
 
-/// LocationService manages foreground and background GPS tracking.
-/// It continuously captures rider coordinates and syncs them periodically with the backend
-/// for optimal order matching and customer live tracking.
+/// Active telemetry streaming method
+enum TelemetryMode {
+  idle,
+  socketStreaming,
+  restFallback,
+  error,
+}
+
+/// LocationService manages foreground and background GPS telemetry.
+/// It continuously captures rider coordinates and streams them in real-time
+/// conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md:
+///
+/// 1.1 Primary: Socket.IO streaming every 3 to 5 seconds with event "rider:location_update".
+/// 1.2 Fallback: REST API POST /mobileapi/rider/location when WebSocket drops.
 class LocationService extends GetxService {
-  // ignore: unused_field
   final DioClient _dioClient;
+  final SocketService _socketService;
+  final AuthLocalDataSource? _authLocalDataSource;
 
-  LocationService([DioClient? dioClient]) : _dioClient = dioClient ?? Get.find<DioClient>();
+  LocationService([
+    DioClient? dioClient,
+    SocketService? socketService,
+    AuthLocalDataSource? authLocalDataSource,
+  ])  : _dioClient = dioClient ??
+            (Get.isRegistered<DioClient>()
+                ? Get.find<DioClient>()
+                : DioClient()),
+        _socketService = socketService ??
+            (Get.isRegistered<SocketService>()
+                ? Get.find<SocketService>()
+                : SocketService()),
+        _authLocalDataSource = authLocalDataSource ??
+            (Get.isRegistered<AuthLocalDataSource>()
+                ? Get.find<AuthLocalDataSource>()
+                : (Get.isRegistered<GetStorage>()
+                    ? AuthLocalDataSourceImpl(Get.find<GetStorage>())
+                    : null));
+
+  // Telemetry intervals
+  static const int telemetryIntervalSeconds = 4; // 3-5 seconds per Section 1.1
 
   // Reactive state
   final Rx<Position?> currentPosition = Rx<Position?>(defaultFallbackPosition);
-  final isTrackingActive = false.obs;
-  final hasPermission = false.obs;
-  final lastSyncTimestamp = Rxn<DateTime>();
-  
+  final RxBool isTrackingActive = false.obs;
+  final RxBool hasPermission = false.obs;
+  final Rxn<DateTime> lastSyncTimestamp = Rxn<DateTime>();
+  final RxnString activeOrderId = RxnString();
+  final Rx<TelemetryMode> telemetryMode = TelemetryMode.idle.obs;
+  final RxnString lastSyncError = RxnString();
+
   StreamSubscription<Position>? _positionSubscription;
   Timer? _periodicSyncTimer;
 
   // Fallback initial location (Downtown Delivery District)
   static final Position defaultFallbackPosition = Position(
-    latitude: 40.7580,
-    longitude: -73.9855,
+    latitude: 8.484245,
+    longitude: -13.234125,
     timestamp: DateTime.now(),
     accuracy: 5.0,
     altitude: 10.0,
     altitudeAccuracy: 1.0,
     heading: 90.0,
     headingAccuracy: 1.0,
-    speed: 15.0,
+    speed: 0.0,
     speedAccuracy: 1.0,
   );
 
@@ -47,6 +85,14 @@ class LocationService extends GetxService {
   void onClose() {
     stopTracking();
     super.onClose();
+  }
+
+  /// Sets or clears the active delivery order ID for real-time telemetry streaming.
+  /// Pass null if the rider is roaming/idle.
+  void setActiveOrderId(String? orderId) {
+    activeOrderId.value = orderId;
+    debugPrint(
+        '[LocationService] Active order ID updated for telemetry: $orderId');
   }
 
   /// Initializes location permissions and checks device GPS status.
@@ -86,25 +132,47 @@ class LocationService extends GetxService {
     }
   }
 
-  /// Starts background & foreground GPS tracking and periodic server synchronizations.
+  /// Connects to Socket.IO using stored rider credentials if not already connected.
+  void _connectSocketIfPossible() {
+    final token = _authLocalDataSource?.getToken();
+    final rider = _authLocalDataSource?.getSavedRider();
+    final riderId = rider?.id ??
+        _authLocalDataSource?.getSavedUser()?.id ??
+        'cuid_rider_id';
+
+    if (token != null && token.isNotEmpty) {
+      if (!_socketService.isConnected.value &&
+          _socketService.connectionState.value !=
+              SocketConnectionState.connecting) {
+        _socketService.connect(riderId: riderId, token: token);
+      }
+    }
+  }
+
+  /// Starts high-frequency GPS tracking and initiates telemetry streaming.
   Future<void> startTracking() async {
     if (isTrackingActive.value) return;
 
     final permissionGranted = await checkAndRequestPermissions();
     if (!permissionGranted) {
-      debugPrint('[LocationService] Running with simulated GPS coordinates.');
+      debugPrint('[LocationService] Running with fallback GPS coordinates.');
     }
 
     isTrackingActive.value = true;
 
-    // Listen to real-time position stream
+    // Connect to Socket.IO
+    _connectSocketIfPossible();
+
+    // Listen to real-time device GPS position stream
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10, // update when moved 10 meters
+      distanceFilter: 5, // update when moved 5 meters
     );
 
     try {
-      _positionSubscription = Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+      _positionSubscription =
+          Geolocator.getPositionStream(locationSettings: locationSettings)
+              .listen(
         (Position position) {
           currentPosition.value = position;
         },
@@ -116,32 +184,120 @@ class LocationService extends GetxService {
       debugPrint('[LocationService] Could not start location stream: $e');
     }
 
-    // Schedule periodic coordinate pings to backend
+    // Schedule 3-5s periodic coordinate streaming to backend
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = Timer.periodic(
-      const Duration(seconds: AppConstants.locationUpdateIntervalSeconds),
-      (_) => _sendLocationUpdateToServer(),
+      const Duration(seconds: telemetryIntervalSeconds),
+      (_) => sendLocationUpdate(),
     );
 
-    // Initial ping
-    _sendLocationUpdateToServer();
+    // Initial immediate ping
+    sendLocationUpdate();
   }
 
-  /// Stops tracking when rider goes offline.
+  /// Stops tracking, closes telemetry streaming, and disconnects socket.
   void stopTracking() {
     _positionSubscription?.cancel();
     _positionSubscription = null;
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = null;
+    _socketService.disconnect();
     isTrackingActive.value = false;
+    telemetryMode.value = TelemetryMode.idle;
+    debugPrint('[LocationService] GPS tracking & telemetry stopped.');
   }
 
-  /// Records latest coordinates for local tracking (API Doc Part 1 does not specify location update endpoint).
-  Future<void> _sendLocationUpdateToServer() async {
+  /// Transmits current GPS telemetry via Primary Socket.IO or Fallback REST API.
+  Future<void> sendLocationUpdate() async {
     if (!isTrackingActive.value) return;
 
     final pos = currentPosition.value ?? defaultFallbackPosition;
-    lastSyncTimestamp.value = DateTime.now();
-    debugPrint('[LocationService] Local GPS updated: ${pos.latitude.toStringAsFixed(4)}, ${pos.longitude.toStringAsFixed(4)}');
+    final token = _authLocalDataSource?.getToken();
+    final rider = _authLocalDataSource?.getSavedRider();
+    final riderId = rider?.id ??
+        _authLocalDataSource?.getSavedUser()?.id ??
+        'cuid_rider_id';
+
+    // Convert speed: Geolocator gives m/s -> multiply by 3.6 for km/h
+    final double speedInKmH = pos.speed < 0 ? 0.0 : (pos.speed * 3.6);
+    // Normalize heading: 0.0 - 360.0 degrees
+    final double headingDegrees =
+        pos.heading < 0 ? 0.0 : (pos.heading % 360.0);
+
+    // Ensure socket is attempting connection if we have auth token
+    if (!_socketService.isConnected.value &&
+        token != null &&
+        token.isNotEmpty) {
+      _connectSocketIfPossible();
+    }
+
+    // 1.1 Primary Real-Time Streaming (Socket.IO)
+    if (_socketService.isConnected.value) {
+      final success = _socketService.emitLocationUpdate(
+        riderId: riderId,
+        orderId: activeOrderId.value,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        heading: double.parse(headingDegrees.toStringAsFixed(1)),
+        speed: double.parse(speedInKmH.toStringAsFixed(1)),
+      );
+
+      if (success) {
+        telemetryMode.value = TelemetryMode.socketStreaming;
+        lastSyncTimestamp.value = DateTime.now();
+        lastSyncError.value = null;
+        debugPrint(
+            '[LocationService] Streamed GPS via Socket.IO: (${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}) heading: ${headingDegrees.toStringAsFixed(1)}° speed: ${speedInKmH.toStringAsFixed(1)} km/h, order: ${activeOrderId.value}');
+        return;
+      }
+    }
+
+    // 1.2 Fallback Background Telemetry (REST API)
+    // Invoked when Socket.IO connection drops or is disconnected
+    await _sendRestFallback(
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      heading: double.parse(headingDegrees.toStringAsFixed(1)),
+      speed: double.parse(speedInKmH.toStringAsFixed(1)),
+    );
+  }
+
+  /// REST API Fallback (POST /mobileapi/rider/location)
+  Future<void> _sendRestFallback({
+    required double latitude,
+    required double longitude,
+    required double heading,
+    required double speed,
+  }) async {
+    final payload = <String, dynamic>{
+      'latitude': latitude,
+      'longitude': longitude,
+      'heading': heading,
+      'speed': speed,
+      'isOnline': _authLocalDataSource?.getIsOnline() ?? true,
+    };
+
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.location,
+        data: payload,
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        telemetryMode.value = TelemetryMode.restFallback;
+        lastSyncTimestamp.value = DateTime.now();
+        lastSyncError.value = null;
+        debugPrint('[LocationService] Fallback REST telemetry synced: $payload');
+      } else {
+        telemetryMode.value = TelemetryMode.error;
+        lastSyncError.value = 'Status code: ${response.statusCode}';
+        debugPrint(
+            '[LocationService] Fallback REST telemetry failed with status: ${response.statusCode}');
+      }
+    } catch (e) {
+      telemetryMode.value = TelemetryMode.error;
+      lastSyncError.value = e.toString();
+      debugPrint('[LocationService] Fallback REST telemetry exception: $e');
+    }
   }
 }

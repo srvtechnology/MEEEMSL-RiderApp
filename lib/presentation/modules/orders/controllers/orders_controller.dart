@@ -6,6 +6,7 @@ import '../../../../domain/usecases/orders/get_active_orders_usecase.dart';
 import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_history_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
+import '../../../../core/services/location_service.dart';
 import '../widgets/delivery_proof_dialog.dart';
 import '../../../routes/app_routes.dart';
 
@@ -32,6 +33,11 @@ class OrdersController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    ever(selectedOrder, (OrderEntity? order) {
+      if (Get.isRegistered<LocationService>()) {
+        Get.find<LocationService>().setActiveOrderId(order?.id);
+      }
+    });
     loadOrders();
   }
 

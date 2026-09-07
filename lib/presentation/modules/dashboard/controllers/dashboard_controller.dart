@@ -55,6 +55,9 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    ever(activeOrder, (OrderEntity? order) {
+      _locationService?.setActiveOrderId(order?.id);
+    });
     loadDashboardData();
     if (isOnline.value) {
       _locationService?.startTracking();

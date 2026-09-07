@@ -1,12 +1,17 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
+import 'package:dio/dio.dart' as dio;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:meeem_rider/core/network/dio_client.dart';
 import 'package:meeem_rider/core/services/location_service.dart';
+import 'package:meeem_rider/core/services/socket_service.dart';
+import 'package:meeem_rider/data/datasources/auth_local_datasource.dart';
 
 class MockDioClient extends Mock implements DioClient {}
+class MockSocketService extends Mock implements SocketService {}
+class MockAuthLocalDataSource extends Mock implements AuthLocalDataSource {}
+class MockDio extends Mock implements dio.Dio {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -60,7 +65,7 @@ void main() {
     setUp(() {
       Get.testMode = true;
       mockDioClient = MockDioClient();
-      when(() => mockDioClient.dio).thenReturn(Dio());
+      when(() => mockDioClient.dio).thenReturn(dio.Dio());
       locationService = LocationService(mockDioClient);
       locationService.onInit();
     });
@@ -97,6 +102,101 @@ void main() {
       expect(locationService.isTrackingActive.value, isTrue);
       locationService.stopTracking();
       expect(locationService.isTrackingActive.value, isFalse);
+    });
+
+    test('1.1 Primary Streaming: emits via Socket.IO when socket is connected', () async {
+      final mockSocket = MockSocketService();
+      final mockAuth = MockAuthLocalDataSource();
+
+      when(() => mockSocket.isConnected).thenReturn(true.obs);
+      when(() => mockSocket.connectionState)
+          .thenReturn(SocketConnectionState.connected.obs);
+      when(() => mockAuth.getToken()).thenReturn('mock_jwt_token');
+      when(() => mockAuth.getSavedRider()).thenReturn(null);
+      when(() => mockAuth.getSavedUser()).thenReturn(null);
+      when(() => mockSocket.emitLocationUpdate(
+            riderId: any(named: 'riderId'),
+            orderId: any(named: 'orderId'),
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            heading: any(named: 'heading'),
+            speed: any(named: 'speed'),
+          )).thenReturn(true);
+
+      final telemetryService = LocationService(
+        mockDioClient,
+        mockSocket,
+        mockAuth,
+      );
+      telemetryService.isTrackingActive.value = true;
+      telemetryService.setActiveOrderId('cuid_active_order_42');
+
+      await telemetryService.sendLocationUpdate();
+
+      verify(() => mockSocket.emitLocationUpdate(
+            riderId: any(named: 'riderId'),
+            orderId: 'cuid_active_order_42',
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            heading: any(named: 'heading'),
+            speed: any(named: 'speed'),
+          )).called(1);
+
+      expect(telemetryService.telemetryMode.value,
+          TelemetryMode.socketStreaming);
+      expect(telemetryService.lastSyncTimestamp.value, isNotNull);
+      expect(telemetryService.lastSyncError.value, isNull);
+    });
+
+    test('1.2 Fallback Telemetry: posts to REST API when socket is disconnected', () async {
+      final mockSocket = MockSocketService();
+      final mockAuth = MockAuthLocalDataSource();
+      final mockDio = MockDio();
+
+      when(() => mockSocket.isConnected).thenReturn(false.obs);
+      when(() => mockSocket.connectionState)
+          .thenReturn(SocketConnectionState.disconnected.obs);
+      when(() => mockAuth.getToken()).thenReturn('mock_jwt_token');
+      when(() => mockAuth.getSavedRider()).thenReturn(null);
+      when(() => mockAuth.getSavedUser()).thenReturn(null);
+      when(() => mockAuth.getIsOnline()).thenReturn(true);
+
+      when(() => mockDioClient.dio).thenReturn(mockDio);
+      when(() => mockDio.post(
+            any(),
+            data: any(named: 'data'),
+          )).thenAnswer((_) async => dio.Response(
+            requestOptions: dio.RequestOptions(path: '/location'),
+            statusCode: 200,
+            data: {
+              'success': true,
+              'message': 'Location updated successfully',
+              'data': {
+                'id': 'cuid_rider_id',
+                'currentLatitude': 8.484245,
+                'currentLongitude': -13.234125,
+                'isOnline': true,
+              }
+            },
+          ));
+
+      final telemetryService = LocationService(
+        mockDioClient,
+        mockSocket,
+        mockAuth,
+      );
+      telemetryService.isTrackingActive.value = true;
+
+      await telemetryService.sendLocationUpdate();
+
+      verify(() => mockDio.post(
+            '/location',
+            data: any(named: 'data'),
+          )).called(1);
+
+      expect(telemetryService.telemetryMode.value, TelemetryMode.restFallback);
+      expect(telemetryService.lastSyncTimestamp.value, isNotNull);
+      expect(telemetryService.lastSyncError.value, isNull);
     });
   });
 }

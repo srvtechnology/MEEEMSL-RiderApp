@@ -10,6 +10,14 @@ class ApiEndpoints {
       ? 'wss://development.meeemsl.com/rider'
       : 'wss://www.meeemsl.com/rider';
 
+  /// WebSocket server URL for real-time GPS telemetry streaming (Section 1.1)
+  static String get telemetrySocketUrl => ApiClient.currentEnvironment == AppEnvironment.staging
+      ? 'https://development.meeemsl.com:3001'
+      : 'https://www.meeemsl.com:3001';
+
+  // 1.2 Fallback Background Telemetry (REST API)
+  static const String location = '/location';
+
   // 2. Rider Registration & OTP Verification
   static const String register = '/auth/register';
   static const String verifyRegistrationOtp = '/auth/verify-otp';
@@ -22,8 +30,10 @@ class ApiEndpoints {
   static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout'; // Note: Logout in Part 1 is DELETE /device-token
 
-  /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC_PART_1.md
+  /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC (Part 1 & Part 2)
   static const Set<String> part1Endpoints = {
+    // Part 2: 1.2 Telemetry Fallback
+    location,
     // 2. Rider Registration & OTP Verification
     register,
     verifyRegistrationOtp,
@@ -48,7 +58,7 @@ class ApiEndpoints {
     deviceToken,
   };
 
-  /// Returns true ONLY if the given [path] is documented in MOBILE_RIDER_APP_API_DOC_PART_1.md.
+  /// Returns true ONLY if the given [path] is documented in MOBILE_RIDER_APP_API_DOC.
   static bool isPart1Endpoint(String path) {
     var cleanPath = path;
     if (cleanPath.contains('?')) {

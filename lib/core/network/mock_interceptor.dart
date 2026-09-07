@@ -576,6 +576,28 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
+    // Part 2: 1.2 Fallback Background Telemetry (REST API)
+    if (path.endsWith(ApiEndpoints.location) || path.endsWith('/mobileapi/rider/location')) {
+      final lat = options.data is Map ? (options.data['latitude'] ?? 8.484245) : 8.484245;
+      final lng = options.data is Map ? (options.data['longitude'] ?? -13.234125) : -13.234125;
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? true) : true;
+      return _resolve(handler, Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Location updated successfully',
+          'data': {
+            'id': 'cuid_rider_id',
+            'currentLatitude': lat,
+            'currentLongitude': lng,
+            'isOnline': isOnline,
+            'lastLocationUpdate': DateTime.now().toUtc().toIso8601String(),
+          }
+        },
+      ));
+    }
+
     if (path.contains(ApiEndpoints.activeOrders)) {
       return _resolve(handler, Response(
         requestOptions: options,
@@ -864,6 +886,28 @@ class MockInterceptor extends Interceptor {
         requestOptions: options,
         statusCode: 200,
         data: {'success': true, 'data': null},
+      );
+    }
+
+    // Part 2: 1.2 Fallback Background Telemetry (REST API)
+    if (path.endsWith(ApiEndpoints.location) || path.endsWith('/mobileapi/rider/location')) {
+      final lat = options.data is Map ? (options.data['latitude'] ?? 8.484245) : 8.484245;
+      final lng = options.data is Map ? (options.data['longitude'] ?? -13.234125) : -13.234125;
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? true) : true;
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Location updated successfully',
+          'data': {
+            'id': 'cuid_rider_id',
+            'currentLatitude': lat,
+            'currentLongitude': lng,
+            'isOnline': isOnline,
+            'lastLocationUpdate': DateTime.now().toUtc().toIso8601String(),
+          }
+        },
       );
     }
 

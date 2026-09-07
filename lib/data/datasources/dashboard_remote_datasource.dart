@@ -1,4 +1,5 @@
 import 'package:get_storage/get_storage.dart';
+import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/network/dio_client.dart';
 
@@ -9,7 +10,6 @@ abstract class DashboardRemoteDataSource {
 }
 
 class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
-  // ignore: unused_field
   final DioClient _dioClient;
   final GetStorage _storage = GetStorage();
 
@@ -42,7 +42,21 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
 
   @override
   Future<void> updateLocation(double lat, double lng) async {
-    // Note: Location update API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // No-op locally.
+    // Part 2: 1.2 Fallback Background Telemetry (REST API)
+    final isOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? true;
+    try {
+      await _dioClient.dio.post(
+        ApiEndpoints.location,
+        data: {
+          'latitude': lat,
+          'longitude': lng,
+          'heading': 0.0,
+          'speed': 0.0,
+          'isOnline': isOnline,
+        },
+      );
+    } catch (_) {
+      // Ignored for telemetry resiliency
+    }
   }
 }
