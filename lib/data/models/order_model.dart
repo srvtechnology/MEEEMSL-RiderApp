@@ -133,9 +133,19 @@ class OrderModel extends OrderEntity {
         (json['subtotal'] as num?)?.toDouble() ??
         0.0;
 
+    double itemsShippingSum = 0.0;
+    if (rawItems is List) {
+      for (final it in rawItems) {
+        if (it is Map<String, dynamic>) {
+          itemsShippingSum += (it['shippingAmount'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+    }
+
     final earnings = (json['riderEarnings'] as num?)?.toDouble() ??
         (orderMap?['shipping'] as num?)?.toDouble() ??
-        14.80;
+        (orderMap?['shippingAmount'] as num?)?.toDouble() ??
+        (itemsShippingSum > 0.0 ? itemsShippingSum : 14.80);
 
     final distanceKm = (json['distanceKm'] as num?)?.toDouble() ?? 2.1;
     final estimatedDuration = (json['estimatedDurationMin'] as num?)?.toInt() ?? 15;

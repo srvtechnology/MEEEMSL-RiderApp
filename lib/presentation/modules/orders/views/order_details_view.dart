@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/custom_card.dart';
+import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../domain/entities/order_entity.dart';
 
@@ -44,7 +45,14 @@ class OrderDetailsView extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const StatusBadge(text: 'COMPLETED', type: BadgeType.success),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      const StatusBadge(text: 'COMPLETED', type: BadgeType.success),
+                      const SizedBox(height: 8),
+                      DeliveryEarningBadge(amount: order.riderEarnings, isCompact: true),
+                    ],
+                  ),
                 ],
               ),
             ),

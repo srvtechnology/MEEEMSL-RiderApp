@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/custom_button.dart';
+import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../controllers/dashboard_controller.dart';
 
@@ -131,7 +132,11 @@ class IncomingOrderModal extends GetView<DashboardController> {
               ],
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
+          Center(
+            child: DeliveryEarningBadge(amount: order.riderEarnings),
+          ),
+          const SizedBox(height: 16),
 
           // Pickup & Dropoff Route Details
           Container(

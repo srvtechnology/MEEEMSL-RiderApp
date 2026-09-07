@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/custom_card.dart';
+import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../controllers/orders_controller.dart';
 import 'order_details_view.dart';
@@ -88,14 +89,7 @@ class OrderHistoryView extends GetView<OrdersController> {
                               Formatters.formatDate(order.createdAt),
                               style: AppTextStyles.bodySmall(),
                             ),
-                            Text(
-                              Formatters.formatCurrency(order.riderEarnings),
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.primary,
-                              ),
-                            ),
+                            DeliveryEarningBadge(amount: order.riderEarnings, isCompact: true),
                           ],
                         ),
                       ],

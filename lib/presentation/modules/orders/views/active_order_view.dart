@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../core/widgets/custom_card.dart';
+import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/swipe_button.dart';
 import '../../../../domain/entities/order_entity.dart';
@@ -121,9 +122,16 @@ class ActiveOrderView extends GetView<OrdersController> {
                 order.status.stepNumberText.toUpperCase(),
                 style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.primary),
               ),
-              StatusBadge(
-                text: order.orderNumber,
-                type: BadgeType.info,
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  StatusBadge(
+                    text: order.orderNumber,
+                    type: BadgeType.info,
+                  ),
+                  const SizedBox(width: 8),
+                  DeliveryEarningBadge(amount: order.riderEarnings, isCompact: true),
+                ],
               ),
             ],
           ),

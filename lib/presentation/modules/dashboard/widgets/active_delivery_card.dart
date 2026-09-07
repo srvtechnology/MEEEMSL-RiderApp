@@ -6,6 +6,7 @@ import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../core/widgets/custom_button.dart';
+import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../../../routes/app_routes.dart';
@@ -91,14 +92,7 @@ class ActiveDeliveryCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  Formatters.formatCurrency(order.riderEarnings),
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.primary,
-                  ),
-                ),
+                DeliveryEarningBadge(amount: order.riderEarnings),
               ],
             ),
           ),

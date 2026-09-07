@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../controllers/dashboard_controller.dart';
 
@@ -145,22 +146,7 @@ class IncomingOfferCard extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        Row(
-                          children: [
-                            Text(
-                              'Earnings: ',
-                              style: AppTextStyles.labelSmall(),
-                            ),
-                            Text(
-                              Formatters.formatCurrency(order.riderEarnings),
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
+                        DeliveryEarningBadge(amount: order.riderEarnings),
                       ],
                     ),
                     const Divider(height: 20),
