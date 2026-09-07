@@ -103,8 +103,41 @@ class AppPreferencesSettingsModel extends AppPreferencesSettingsEntity {
   }
 }
 
-/// Conforms to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1)
+class RiderStatsModel extends RiderStatsEntity {
+  const RiderStatsModel({
+    super.totalEarnings = 0.0,
+    super.completedDeliveriesCount = 0,
+    super.activeDeliveriesCount = 0,
+  });
+
+  factory RiderStatsModel.fromJson(Map<String, dynamic> json) {
+    return RiderStatsModel(
+      totalEarnings: (json['totalEarnings'] as num?)?.toDouble() ?? 0.0,
+      completedDeliveriesCount: (json['completedDeliveriesCount'] as num?)?.toInt() ?? 0,
+      activeDeliveriesCount: (json['activeDeliveriesCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'totalEarnings': totalEarnings,
+      'completedDeliveriesCount': completedDeliveriesCount,
+      'activeDeliveriesCount': activeDeliveriesCount,
+    };
+  }
+
+  factory RiderStatsModel.fromEntity(RiderStatsEntity entity) {
+    return RiderStatsModel(
+      totalEarnings: entity.totalEarnings,
+      completedDeliveriesCount: entity.completedDeliveriesCount,
+      activeDeliveriesCount: entity.activeDeliveriesCount,
+    );
+  }
+}
+
+/// Conforms to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1 & Part 3)
 /// Section 7: Rider Settings & Preferences (7.1 Get Full Settings)
+/// Part 3 Section 4.1: Rider Dashboard & Earnings API (stats)
 class RiderSettingsModel extends RiderSettingsEntity {
   const RiderSettingsModel({
     super.user,
@@ -113,6 +146,7 @@ class RiderSettingsModel extends RiderSettingsEntity {
     super.notifications = const NotificationsSettingsModel(),
     super.navigation = const NavigationSettingsModel(),
     super.appPreferences = const AppPreferencesSettingsModel(),
+    super.stats,
   });
 
   factory RiderSettingsModel.fromJson(Map<String, dynamic> json) {
@@ -147,6 +181,10 @@ class RiderSettingsModel extends RiderSettingsEntity {
         ? AppPreferencesSettingsModel.fromJson(json['appPreferences'] as Map<String, dynamic>)
         : const AppPreferencesSettingsModel();
 
+    final stats = json['stats'] != null && json['stats'] is Map<String, dynamic>
+        ? RiderStatsModel.fromJson(json['stats'] as Map<String, dynamic>)
+        : null;
+
     return RiderSettingsModel(
       user: user,
       rider: rider,
@@ -154,6 +192,7 @@ class RiderSettingsModel extends RiderSettingsEntity {
       notifications: notifs,
       navigation: nav,
       appPreferences: prefs,
+      stats: stats,
     );
   }
 
@@ -169,6 +208,8 @@ class RiderSettingsModel extends RiderSettingsEntity {
       'notifications': NotificationsSettingsModel.fromEntity(notifications).toJson(),
       'navigation': NavigationSettingsModel.fromEntity(navigation).toJson(),
       'appPreferences': AppPreferencesSettingsModel.fromEntity(appPreferences).toJson(),
+      if (stats != null)
+        'stats': (stats is RiderStatsModel ? stats as RiderStatsModel : RiderStatsModel.fromEntity(stats!)).toJson(),
     };
   }
 
@@ -180,6 +221,7 @@ class RiderSettingsModel extends RiderSettingsEntity {
       notifications: entity.notifications,
       navigation: entity.navigation,
       appPreferences: entity.appPreferences,
+      stats: entity.stats != null ? RiderStatsModel.fromEntity(entity.stats!) : null,
     );
   }
 }

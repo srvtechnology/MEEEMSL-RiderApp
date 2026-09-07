@@ -431,7 +431,18 @@ class MockInterceptor extends Interceptor {
                 'deviceModel': 'iPhone 15 Pro',
                 'lastActiveAt': '2026-08-27T10:30:00.000Z',
               }
-            ]
+            ],
+            // Part 3 Section 4.1: Rider Settings & Stats
+            'stats': {
+              'totalEarnings': 640.00,
+              'completedDeliveriesCount': 32,
+              'activeDeliveriesCount': 1,
+            }
+          },
+          'stats': {
+            'totalEarnings': 640.00,
+            'completedDeliveriesCount': 32,
+            'activeDeliveriesCount': 1,
           }
         },
       ));

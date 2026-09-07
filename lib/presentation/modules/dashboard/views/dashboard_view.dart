@@ -530,6 +530,60 @@ class DashboardView extends GetView<DashboardController> {
               ),
             ],
           ),
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Divider(color: Colors.white24, height: 1),
+          ),
+          // Part 3 Section 4.1 & Section 7 Checklist: Total Earnings & Completed Deliveries
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Total Lifetime Earnings',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Obx(() => Text(
+                    Formatters.formatCurrency(controller.totalEarnings.value),
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  )),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  const Text(
+                    'Completed Deliveries',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white70,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Obx(() => Text(
+                    '${controller.completedDeliveriesCount.value} Completed',
+                    style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  )),
+                ],
+              ),
+            ],
+          ),
         ],
       ),
     );

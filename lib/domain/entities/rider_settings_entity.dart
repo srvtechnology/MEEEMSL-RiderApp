@@ -88,8 +88,36 @@ class AppPreferencesSettingsEntity extends Equatable {
   List<Object?> get props => [theme, language, distanceUnit];
 }
 
-/// Conforms to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1)
+class RiderStatsEntity extends Equatable {
+  final double totalEarnings;
+  final int completedDeliveriesCount;
+  final int activeDeliveriesCount;
+
+  const RiderStatsEntity({
+    this.totalEarnings = 0.0,
+    this.completedDeliveriesCount = 0,
+    this.activeDeliveriesCount = 0,
+  });
+
+  RiderStatsEntity copyWith({
+    double? totalEarnings,
+    int? completedDeliveriesCount,
+    int? activeDeliveriesCount,
+  }) {
+    return RiderStatsEntity(
+      totalEarnings: totalEarnings ?? this.totalEarnings,
+      completedDeliveriesCount: completedDeliveriesCount ?? this.completedDeliveriesCount,
+      activeDeliveriesCount: activeDeliveriesCount ?? this.activeDeliveriesCount,
+    );
+  }
+
+  @override
+  List<Object?> get props => [totalEarnings, completedDeliveriesCount, activeDeliveriesCount];
+}
+
+/// Conforms to MEEEM Delivery Network — Rider Mobile App API Doc (Part 1 & Part 3)
 /// Section 7: Rider Settings & Preferences (7.1 Get Full Settings & 7.2 Update Settings)
+/// Part 3 Section 4.1: Rider Dashboard & Earnings API (stats object)
 class RiderSettingsEntity extends Equatable {
   final UserEntity? user;
   final RiderEntity? rider;
@@ -97,6 +125,7 @@ class RiderSettingsEntity extends Equatable {
   final NotificationsSettingsEntity notifications;
   final NavigationSettingsEntity navigation;
   final AppPreferencesSettingsEntity appPreferences;
+  final RiderStatsEntity? stats;
 
   const RiderSettingsEntity({
     this.user,
@@ -105,6 +134,7 @@ class RiderSettingsEntity extends Equatable {
     this.notifications = const NotificationsSettingsEntity(),
     this.navigation = const NavigationSettingsEntity(),
     this.appPreferences = const AppPreferencesSettingsEntity(),
+    this.stats,
   });
 
   RiderSettingsEntity copyWith({
@@ -114,6 +144,7 @@ class RiderSettingsEntity extends Equatable {
     NotificationsSettingsEntity? notifications,
     NavigationSettingsEntity? navigation,
     AppPreferencesSettingsEntity? appPreferences,
+    RiderStatsEntity? stats,
   }) {
     return RiderSettingsEntity(
       user: user ?? this.user,
@@ -122,6 +153,7 @@ class RiderSettingsEntity extends Equatable {
       notifications: notifications ?? this.notifications,
       navigation: navigation ?? this.navigation,
       appPreferences: appPreferences ?? this.appPreferences,
+      stats: stats ?? this.stats,
     );
   }
 
@@ -133,5 +165,6 @@ class RiderSettingsEntity extends Equatable {
         notifications,
         navigation,
         appPreferences,
+        stats,
       ];
 }

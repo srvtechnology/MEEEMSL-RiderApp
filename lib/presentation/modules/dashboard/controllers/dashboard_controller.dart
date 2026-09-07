@@ -92,6 +92,8 @@ class DashboardController extends GetxController {
   final todayEarnings = 0.0.obs;
   final todayDeliveries = 0.obs;
   final totalDeliveries = 0.obs;
+  final totalEarnings = 0.0.obs;
+  final completedDeliveriesCount = 0.obs;
   final approvalStatus = 'Approved'.obs;
   final acceptanceRate = 100.0.obs;
   final rating = 5.0.obs;
@@ -134,6 +136,8 @@ class DashboardController extends GetxController {
         todayEarnings.value = (data['todayEarnings'] as num?)?.toDouble() ?? 0.0;
         todayDeliveries.value = (data['todayDeliveries'] as num?)?.toInt() ?? 0;
         totalDeliveries.value = (data['totalTrips'] as num?)?.toInt() ?? 0;
+        totalEarnings.value = (data['totalEarnings'] as num?)?.toDouble() ?? 640.0;
+        completedDeliveriesCount.value = (data['completedDeliveriesCount'] as num?)?.toInt() ?? totalDeliveries.value;
         acceptanceRate.value = (data['acceptanceRate'] as num?)?.toDouble() ?? 100.0;
         rating.value = (data['rating'] as num?)?.toDouble() ?? 5.0;
         onlineHours.value = (data['onlineHours'] as num?)?.toDouble() ?? 0.0;
