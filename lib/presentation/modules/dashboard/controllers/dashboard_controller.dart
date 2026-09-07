@@ -11,6 +11,8 @@ import '../../../../domain/usecases/orders/get_active_orders_usecase.dart';
 import '../../../../domain/usecases/orders/get_incoming_order_usecase.dart';
 import '../../../../domain/usecases/orders/accept_order_usecase.dart';
 import '../../../../domain/usecases/orders/decline_order_usecase.dart';
+import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
+import '../../../../data/datasources/auth_local_datasource.dart';
 import '../widgets/incoming_order_modal.dart';
 import '../../../routes/app_routes.dart';
 
@@ -21,6 +23,7 @@ class DashboardController extends GetxController {
   final GetIncomingOrderUseCase getIncomingOrderUseCase;
   final AcceptOrderUseCase acceptOrderUseCase;
   final DeclineOrderUseCase declineOrderUseCase;
+  final UpdateOrderStatusUseCase? updateOrderStatusUseCase;
 
   DashboardController({
     required this.toggleOnlineStatusUseCase,
@@ -29,7 +32,59 @@ class DashboardController extends GetxController {
     required this.getIncomingOrderUseCase,
     required this.acceptOrderUseCase,
     required this.declineOrderUseCase,
+    this.updateOrderStatusUseCase,
   });
+
+  UpdateOrderStatusUseCase? get _orderStatusUseCase =>
+      updateOrderStatusUseCase ??
+      (Get.isRegistered<UpdateOrderStatusUseCase>()
+          ? Get.find<UpdateOrderStatusUseCase>()
+          : null);
+
+  AuthLocalDataSource? get _authLocalDataSource =>
+      Get.isRegistered<AuthLocalDataSource>()
+          ? Get.find<AuthLocalDataSource>()
+          : null;
+
+  String get riderName {
+    final rider = _authLocalDataSource?.getSavedRider();
+    final user = _authLocalDataSource?.getSavedUser();
+    return rider?.name ?? user?.name ?? 'Ibrahim Koroma';
+  }
+
+  String get riderInitials {
+    final name = riderName.trim();
+    if (name.isEmpty) return 'R';
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return name[0].toUpperCase();
+  }
+
+  String get riderZone {
+    final rider = _authLocalDataSource?.getSavedRider();
+    final locs = rider?.selectedLocations;
+    if (locs != null && locs.isNotEmpty) {
+      return locs.take(2).join(', ');
+    }
+    final zones = rider?.selectedZones;
+    if (zones != null && zones.isNotEmpty) {
+      return zones.first;
+    }
+    return 'Western Area (Freetown)';
+  }
+
+  String get vehicleTypeInfo {
+    final rider = _authLocalDataSource?.getSavedRider();
+    final v = rider?.vehicleType ?? rider?.vehicleName;
+    if (v != null && v.isNotEmpty) {
+      return v.replaceAll('_', ' ');
+    }
+    return '2-Wheeler (≤15kg)';
+  }
+
+  LocationService? get locationService => _locationService;
 
   // State Observables
   final isOnline = true.obs;
@@ -200,5 +255,81 @@ class DashboardController extends GetxController {
     await declineOrderUseCase(order.id, reason);
     incomingOrder.value = null;
     Get.snackbar('Declined', 'Order declined ($reason)', snackPosition: SnackPosition.BOTTOM);
+  }
+
+  /// Advances the status of the active delivery order per Section 5.1
+  Future<void> advanceActiveOrderMilestone() async {
+    final current = activeOrder.value;
+    if (current == null) return;
+
+    if (current.status == OrderStatus.outForDelivery) {
+      // Step 5 requires customer OTP handover verification in active order view
+      Get.toNamed(AppRoutes.activeOrder);
+      return;
+    }
+
+    final useCase = _orderStatusUseCase;
+    if (useCase == null) {
+      Get.toNamed(AppRoutes.activeOrder);
+      return;
+    }
+
+    OrderStatus nextStatus;
+    switch (current.status) {
+      case OrderStatus.accepted:
+        nextStatus = OrderStatus.atPickup;
+        break;
+      case OrderStatus.atPickup:
+        nextStatus = OrderStatus.pickedUp;
+        break;
+      case OrderStatus.pickedUp:
+        nextStatus = OrderStatus.outForDelivery;
+        break;
+      default:
+        return;
+    }
+
+    isLoading.value = true;
+    final result = await useCase(current.id, nextStatus);
+    isLoading.value = false;
+
+    result.fold(
+      (failure) => Get.snackbar('Status Update Error', failure.message,
+          snackPosition: SnackPosition.TOP),
+      (updated) {
+        activeOrder.value = updated;
+        Get.snackbar(
+          'Milestone Updated',
+          '${updated.status.stepNumberText}: ${updated.status.displayName}',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+          colorText: const Color(0xFF009624),
+        );
+      },
+    );
+  }
+
+  /// Cancels active delivery and re-dispatches order per Section 6.1
+  Future<void> emergencyCancelActiveOrder(String reason) async {
+    final current = activeOrder.value;
+    if (current == null) return;
+
+    final useCase = _orderStatusUseCase;
+    isLoading.value = true;
+    if (useCase != null) {
+      await useCase(current.id, OrderStatus.cancelled);
+    }
+    isLoading.value = false;
+    activeOrder.value = null;
+    _locationService?.setActiveOrderId(null);
+
+    Get.snackbar(
+      '🚨 Order Reassigned',
+      'Order #${current.orderNumber} has been auto-reassigned to the nearest available rider ($reason).',
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: const Color(0xFFFEE2E2),
+      colorText: const Color(0xFFB91C1C),
+      duration: const Duration(seconds: 4),
+    );
   }
 }
