@@ -12,12 +12,14 @@ class UpdateOrderStatusUseCase {
     OrderStatus status, {
     String? proofPhotoUrl,
     String? customerOtp,
+    String? cancellationReason,
   }) {
     return repository.updateOrderStatus(
       orderId,
       status,
       proofPhotoUrl: proofPhotoUrl,
       customerOtp: customerOtp,
+      cancellationReason: cancellationReason,
     );
   }
 }

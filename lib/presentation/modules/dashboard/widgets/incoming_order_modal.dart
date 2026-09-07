@@ -45,7 +45,7 @@ class IncomingOrderModal extends GetView<DashboardController> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Order \${order.orderNumber}',
+                    'Order ${order.orderNumber.startsWith('#') ? order.orderNumber : '#${order.orderNumber}'}',
                     style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryLight),
                   ),
                 ],
@@ -65,7 +65,7 @@ class IncomingOrderModal extends GetView<DashboardController> {
                         ),
                       ),
                       Text(
-                        '\${controller.countdownSeconds.value}s',
+                        '${controller.countdownSeconds.value}s',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,

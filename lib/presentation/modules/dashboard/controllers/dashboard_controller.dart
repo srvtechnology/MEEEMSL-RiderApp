@@ -89,13 +89,13 @@ class DashboardController extends GetxController {
   // State Observables
   final isOnline = true.obs;
   final isLoading = false.obs;
-  final todayEarnings = 148.50.obs;
-  final todayDeliveries = 9.obs;
-  final totalDeliveries = 1420.obs;
+  final todayEarnings = 0.0.obs;
+  final todayDeliveries = 0.obs;
+  final totalDeliveries = 0.obs;
   final approvalStatus = 'Approved'.obs;
-  final acceptanceRate = 96.5.obs;
-  final rating = 4.92.obs;
-  final onlineHours = 5.8.obs;
+  final acceptanceRate = 100.0.obs;
+  final rating = 5.0.obs;
+  final onlineHours = 0.0.obs;
   
   final activeOrder = Rxn<OrderEntity>();
   final incomingOrder = Rxn<OrderEntity>();
@@ -131,12 +131,12 @@ class DashboardController extends GetxController {
     summaryResult.fold(
       (failure) => null,
       (data) {
-        todayEarnings.value = (data['todayEarnings'] as num?)?.toDouble() ?? 148.50;
-        todayDeliveries.value = (data['todayDeliveries'] as num?)?.toInt() ?? 9;
-        totalDeliveries.value = (data['totalTrips'] as num?)?.toInt() ?? 1420;
-        acceptanceRate.value = (data['acceptanceRate'] as num?)?.toDouble() ?? 96.5;
-        rating.value = (data['rating'] as num?)?.toDouble() ?? 4.92;
-        onlineHours.value = (data['onlineHours'] as num?)?.toDouble() ?? 5.8;
+        todayEarnings.value = (data['todayEarnings'] as num?)?.toDouble() ?? 0.0;
+        todayDeliveries.value = (data['todayDeliveries'] as num?)?.toInt() ?? 0;
+        totalDeliveries.value = (data['totalTrips'] as num?)?.toInt() ?? 0;
+        acceptanceRate.value = (data['acceptanceRate'] as num?)?.toDouble() ?? 100.0;
+        rating.value = (data['rating'] as num?)?.toDouble() ?? 5.0;
+        onlineHours.value = (data['onlineHours'] as num?)?.toDouble() ?? 0.0;
       },
     );
 
@@ -146,6 +146,8 @@ class DashboardController extends GetxController {
       (orders) {
         if (orders.isNotEmpty) {
           activeOrder.value = orders.first;
+        } else {
+          activeOrder.value = null;
         }
       },
     );
@@ -317,7 +319,7 @@ class DashboardController extends GetxController {
     final useCase = _orderStatusUseCase;
     isLoading.value = true;
     if (useCase != null) {
-      await useCase(current.id, OrderStatus.cancelled);
+      await useCase(current.id, OrderStatus.cancelled, cancellationReason: reason);
     }
     isLoading.value = false;
     activeOrder.value = null;
@@ -331,5 +333,73 @@ class DashboardController extends GetxController {
       colorText: const Color(0xFFB91C1C),
       duration: const Duration(seconds: 4),
     );
+  }
+
+  /// Handles incoming offer push notification payload (Section 2.1)
+  void handleIncomingOfferPush(Map<String, dynamic> data, {String? fallbackTitle, String? fallbackBody}) {
+    if (!isOnline.value) return;
+
+    final orderId = data['orderId']?.toString() ?? 'cuid_order_${DateTime.now().millisecondsSinceEpoch}';
+    final orderNumber = data['orderNumber']?.toString() ?? 'meeem00000042';
+    final timeout = int.tryParse(data['timeout']?.toString() ?? '60') ?? 60;
+
+    final offer = OrderEntity(
+      id: orderId,
+      orderNumber: orderNumber,
+      status: OrderStatus.pending,
+      customerName: 'Fatmata Koroma',
+      customerPhone: '+23276123456',
+      customerAvatar: '',
+      pickupName: 'Electronics Hub',
+      pickupAddress: '25 Siaka Stevens St, Freetown',
+      pickupPhone: '+23277987654',
+      dropoffAddress: '14 Wilkinson Road, Freetown',
+      pickupLat: 8.484,
+      pickupLng: -13.234,
+      dropoffLat: 8.460,
+      dropoffLng: -13.250,
+      items: const [],
+      subtotal: 450000,
+      riderEarnings: 18.50,
+      distanceKm: 2.1,
+      estimatedDurationMin: 15,
+      createdAt: DateTime.now(),
+    );
+
+    incomingOrder.value = offer;
+    countdownSeconds.value = timeout;
+    _notificationService?.playOrderAlertFeedback();
+    _startCountdownTimer();
+  }
+
+  /// Handles direct manual assignment push notification payload (Section 2.2)
+  void handleDirectAssignmentPush(Map<String, dynamic> data) {
+    loadDashboardData();
+    final orderNumber = data['orderNumber']?.toString() ?? 'meeem00000042';
+    Get.snackbar(
+      '🛵 Direct Delivery Assignment',
+      'You have been directly assigned delivery for Order #$orderNumber.',
+      snackPosition: SnackPosition.TOP,
+      backgroundColor: const Color(0xFFE8F8EE),
+      colorText: const Color(0xFF009624),
+      duration: const Duration(seconds: 4),
+    );
+  }
+
+  void _startCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (countdownSeconds.value > 0) {
+        countdownSeconds.value--;
+      } else {
+        timer.cancel();
+        if (Get.isBottomSheetOpen == true) {
+          Get.back();
+        }
+        incomingOrder.value = null;
+        Get.snackbar('Offer Expired', 'The 60s offer expired and cascaded to the next rider.',
+            snackPosition: SnackPosition.TOP);
+      }
+    });
   }
 }

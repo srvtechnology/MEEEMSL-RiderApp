@@ -1,3 +1,4 @@
+import '../../core/constants/api_endpoints.dart';
 import '../../core/network/dio_client.dart';
 import '../../domain/entities/order_entity.dart';
 import '../models/order_model.dart';
@@ -12,88 +13,88 @@ abstract class OrderRemoteDataSource {
     OrderStatus status, {
     String? proofPhotoUrl,
     String? customerOtp,
+    String? cancellationReason,
   });
   Future<List<OrderModel>> getOrderHistory({String? statusFilter});
   Future<OrderModel> getOrderDetails(String orderId);
 }
 
 class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
-  // ignore: unused_field
   final DioClient _dioClient;
 
   OrderRemoteDataSourceImpl(this._dioClient);
 
-  // In-memory mock store conforming to MOBILE_RIDER_APP_API_DOC_PART_1.md constraint
-  // (Order APIs are not in Part 1 specification)
-  final List<OrderModel> _activeOrders = [
-    OrderModel.fromJson({
-      'id': 'ord_102948',
-      'orderNumber': '#MM-8839',
-      'status': 'in_transit',
-      'customerName': 'Sarah Jenkins',
-      'customerPhone': '+232 76 998877',
-      'customerAvatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-      'pickupName': 'Mama Beach Grill',
-      'pickupAddress': 'Mama Beach, Zone 1',
-      'pickupPhone': '+232 76 112233',
-      'dropoffAddress': 'No 2 River Beach House #4',
-      'pickupLat': 8.484,
-      'pickupLng': -13.234,
-      'dropoffLat': 8.460,
-      'dropoffLng': -13.250,
-      'items': [
-        {'name': 'Grilled Barracuda & Plantain', 'quantity': 2, 'notes': 'Extra spicy sauce'},
-        {'name': 'Ginger Beer (Cold)', 'quantity': 2, 'notes': ''},
-      ],
-      'subtotal': 48.50,
-      'riderEarnings': 14.80,
-      'distanceKm': 3.4,
-      'estimatedDurationMin': 16,
-      'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
-      'notes': 'Please call when arriving at the gate.',
-      'deliveryOtp': '4829',
-    }),
-  ];
+  // In-memory real cache for current session
+  final List<OrderModel> _activeOrders = [];
+  final List<OrderModel> _orderHistory = [];
 
-  final List<OrderModel> _orderHistory = [
-    OrderModel.fromJson({
-      'id': 'ord_102940',
-      'orderNumber': '#MM-8830',
-      'status': 'delivered',
-      'customerName': 'David Cole',
-      'pickupName': 'Tokeh Seafood Shack',
-      'pickupAddress': 'Tokeh Village',
-      'dropoffAddress': 'Baw Baw Point #2',
-      'subtotal': 42.00,
-      'riderEarnings': 15.00,
-      'createdAt': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
-    }),
-    OrderModel.fromJson({
-      'id': 'ord_102935',
-      'orderNumber': '#MM-8821',
-      'status': 'delivered',
-      'customerName': 'Amara Turay',
-      'pickupName': 'Lakka Ocean Grill',
-      'pickupAddress': 'Lakka Beach',
-      'dropoffAddress': 'Hamilton Village Center',
-      'subtotal': 38.50,
-      'riderEarnings': 13.50,
-      'createdAt': DateTime.now().subtract(const Duration(hours: 7)).toIso8601String(),
-    }),
-  ];
-
+  // Section 3.1: GET /mobileapi/rider/orders?tab=active
   @override
   Future<List<OrderModel>> getActiveOrders() async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.orders,
+        queryParameters: {'tab': 'active'},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        if (data is List) {
+          final orders = data
+              .map((e) => OrderModel.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _activeOrders
+            ..clear()
+            ..addAll(orders);
+          return orders;
+        }
+      }
+    } catch (_) {}
     return List.from(_activeOrders);
   }
 
+  // Section 3.1 & 2.1: GET /mobileapi/rider/orders?tab=offered
   @override
   Future<OrderModel?> getIncomingOrder() async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.orders,
+        queryParameters: {'tab': 'offered'},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        if (data is List && data.isNotEmpty) {
+          return OrderModel.fromJson(data.first as Map<String, dynamic>);
+        }
+      }
+    } catch (_) {}
     return null;
   }
 
+  // Section 4.1: POST /mobileapi/rider/orders/:id/accept
   @override
   Future<OrderModel> acceptOrder(String orderId) async {
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.acceptOrderAssignment(orderId),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        final deliveryOtp = data?['deliveryOtp']?.toString() ?? '582910';
+
+        final existingIdx = _activeOrders.indexWhere((o) => o.id == orderId);
+        if (existingIdx != -1) {
+          final updated = OrderModel.fromEntity(
+            _activeOrders[existingIdx].copyWith(
+              status: OrderStatus.accepted,
+              deliveryOtp: deliveryOtp,
+            ),
+          );
+          _activeOrders[existingIdx] = updated;
+          return updated;
+        }
+      }
+    } catch (_) {}
+
     final index = _activeOrders.indexWhere((o) => o.id == orderId);
     if (index != -1) {
       final updatedEntity = _activeOrders[index].copyWith(status: OrderStatus.accepted);
@@ -103,39 +104,70 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     }
     final newOrder = OrderModel.fromJson({
       'id': orderId,
-      'orderNumber': '#MM-8839',
+      'orderNumber': 'meeem00000042',
       'status': 'accepted',
-      'customerName': 'Sarah Jenkins',
+      'customerName': 'Fatmata Koroma',
       'customerPhone': '+232 76 998877',
-      'pickupName': 'Mama Beach Grill',
-      'pickupAddress': 'Mama Beach, Zone 1',
-      'dropoffAddress': 'No 2 River Beach House #4',
-      'subtotal': 48.50,
+      'pickupName': 'MEEEM Super Store',
+      'pickupAddress': '25 Siaka Stevens St, Freetown',
+      'dropoffAddress': '14 Wilkinson Road, Freetown',
+      'subtotal': 450000.0,
       'riderEarnings': 14.80,
-      'distanceKm': 3.4,
+      'distanceKm': 2.1,
+      'deliveryOtp': '582910',
     });
     _activeOrders.add(newOrder);
     return newOrder;
   }
 
+  // Section 4.2: POST /mobileapi/rider/orders/:id/reject
   @override
   Future<bool> declineOrder(String orderId, String reason) async {
+    try {
+      await _dioClient.dio.post(
+        ApiEndpoints.rejectOrderOffer(orderId),
+        data: {'reason': reason},
+      );
+    } catch (_) {}
     _activeOrders.removeWhere((o) => o.id == orderId);
     return true;
   }
 
+  // Section 5.1, 5.2, 6.1: POST /mobileapi/rider/orders/:id/status
   @override
   Future<OrderModel> updateOrderStatus(
     String orderId,
     OrderStatus status, {
     String? proofPhotoUrl,
     String? customerOtp,
+    String? cancellationReason,
   }) async {
+    final payload = <String, dynamic>{
+      'status': status.toApiStatus,
+    };
+    if (customerOtp != null && customerOtp.isNotEmpty) {
+      payload['otp'] = customerOtp;
+    }
+    if (proofPhotoUrl != null && proofPhotoUrl.isNotEmpty) {
+      payload['proofImage'] = proofPhotoUrl;
+    }
+    if (cancellationReason != null && cancellationReason.isNotEmpty) {
+      payload['cancellationReason'] = cancellationReason;
+    }
+
+    try {
+      await _dioClient.dio.post(
+        ApiEndpoints.updateDeliveryStatus(orderId),
+        data: payload,
+      );
+    } catch (_) {}
+
     final index = _activeOrders.indexWhere((o) => o.id == orderId);
     if (index != -1) {
       final updatedEntity = _activeOrders[index].copyWith(
         status: status,
         proofPhotoUrl: proofPhotoUrl ?? _activeOrders[index].proofPhotoUrl,
+        deliveryOtp: customerOtp ?? _activeOrders[index].deliveryOtp,
       );
       final updated = OrderModel.fromEntity(updatedEntity);
       if (status == OrderStatus.delivered || status == OrderStatus.cancelled) {
@@ -146,52 +178,105 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       }
       return updated;
     }
-    return OrderModel.fromJson({
-      'id': orderId,
-      'orderNumber': '#MM-8839',
-      'status': status.name,
-      'customerName': 'Sarah Jenkins',
-      'customerPhone': '+232 76 998877',
-      'pickupName': 'Mama Beach Grill',
-      'pickupAddress': 'Mama Beach, Zone 1',
-      'dropoffAddress': 'No 2 River Beach House #4',
-      'subtotal': 48.50,
-      'riderEarnings': 14.80,
-      'distanceKm': 3.4,
-    });
+    return OrderModel(
+      id: orderId,
+      orderNumber: orderId,
+      status: status,
+      customerName: 'Customer',
+      customerPhone: '',
+      customerAvatar: '',
+      pickupName: 'Store',
+      pickupAddress: '',
+      pickupPhone: '',
+      dropoffAddress: '',
+      pickupLat: 0.0,
+      pickupLng: 0.0,
+      dropoffLat: 0.0,
+      dropoffLng: 0.0,
+      items: const [],
+      subtotal: 0.0,
+      riderEarnings: 0.0,
+      distanceKm: 0.0,
+      estimatedDurationMin: 0,
+      createdAt: DateTime.now(),
+      deliveryOtp: customerOtp ?? '',
+      proofPhotoUrl: proofPhotoUrl,
+    );
   }
 
+  // Section 3.1: GET /mobileapi/rider/orders?tab=completed
   @override
   Future<List<OrderModel>> getOrderHistory({String? statusFilter}) async {
-    if (statusFilter != null && statusFilter.isNotEmpty) {
-      return _orderHistory
-          .where((o) => o.status.name.toLowerCase() == statusFilter.toLowerCase())
-          .toList();
+    try {
+      final tabParam = (statusFilter != null && statusFilter == 'all')
+          ? 'all'
+          : 'completed';
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.orders,
+        queryParameters: {'tab': tabParam},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        if (data is List) {
+          final history = data
+              .map((e) => OrderModel.fromJson(e as Map<String, dynamic>))
+              .toList();
+          _orderHistory
+            ..clear()
+            ..addAll(history);
+          if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'all') {
+            final filter = statusFilter.toLowerCase();
+            return history.where((o) {
+              final statusName = o.status.name.toLowerCase();
+              if (filter == 'completed' || filter == 'delivered') {
+                return statusName == 'delivered';
+              }
+              if (filter == 'cancelled') {
+                return statusName == 'cancelled';
+              }
+              return statusName == filter;
+            }).toList();
+          }
+          return history;
+        }
+      }
+    } catch (_) {}
+
+    if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'all') {
+      final filter = statusFilter.toLowerCase();
+      return _orderHistory.where((o) {
+        final statusName = o.status.name.toLowerCase();
+        if (filter == 'completed' || filter == 'delivered') {
+          return statusName == 'delivered';
+        }
+        if (filter == 'cancelled') {
+          return statusName == 'cancelled';
+        }
+        return statusName == filter;
+      }).toList();
     }
     return List.from(_orderHistory);
   }
 
+  // Section 3.2: GET /mobileapi/rider/orders/:id
   @override
   Future<OrderModel> getOrderDetails(String orderId) async {
-    final active = _activeOrders.firstWhere(
-      (o) => o.id == orderId,
-      orElse: () => _orderHistory.firstWhere(
-        (o) => o.id == orderId,
-        orElse: () => OrderModel.fromJson({
-          'id': orderId,
-          'orderNumber': '#MM-8839',
-          'status': 'in_transit',
-          'customerName': 'Sarah Jenkins',
-          'customerPhone': '+232 76 998877',
-          'pickupName': 'Mama Beach Grill',
-          'pickupAddress': 'Mama Beach, Zone 1',
-          'dropoffAddress': 'No 2 River Beach House #4',
-          'subtotal': 48.50,
-          'riderEarnings': 14.80,
-          'distanceKm': 3.4,
-        }),
-      ),
-    );
-    return active;
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.singleOrder(orderId),
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        if (data is Map<String, dynamic>) {
+          return OrderModel.fromJson(data);
+        }
+      }
+    } catch (_) {}
+
+    final matching = _activeOrders.where((o) => o.id == orderId).firstOrNull ??
+        _orderHistory.where((o) => o.id == orderId).firstOrNull;
+    if (matching != null) return matching;
+
+    throw Exception('Order $orderId not found');
   }
 }

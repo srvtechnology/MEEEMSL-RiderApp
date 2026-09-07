@@ -49,11 +49,11 @@ class NotificationService extends GetxService {
         registerCurrentDeviceToken();
       });
 
-      // Handle foreground push messages
+      // Handle foreground push messages conforming to Section 2
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final title = message.notification?.title ?? 'New Dispatch Alert';
-        final body = message.notification?.body ?? 'You have a new delivery order update!';
-        showInfoNotification(title: title, message: body);
+        final title = message.notification?.title;
+        final body = message.notification?.body;
+        handleFcmPayload(message.data, title: title, body: body);
       });
     } catch (_) {
       // Fallback if running on simulator or without Google Play Services
@@ -62,6 +62,42 @@ class NotificationService extends GetxService {
       final storage = GetStorage();
       storage.write(AppConstants.devicePushTokenKey, fallbackToken);
     }
+  }
+
+  /// Handles FCM data payload conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md Section 2:
+  /// - 2.1: type == "NEW_OFFER" (Automated Waterfall Offer with 60s countdown)
+  /// - 2.2: type == "MANUAL_ASSIGN" (Direct Admin/Seller Assignment)
+  void handleFcmPayload(Map<String, dynamic> data, {String? title, String? body}) {
+    final type = data['type']?.toString().toUpperCase();
+    playOrderAlertFeedback();
+
+    if (type == 'NEW_OFFER') {
+      showOrderDispatchAlert(
+        title: title ?? '📦 New Delivery Assignment Offer!',
+        message: body ?? 'Pickup offer received. Tap to accept within 60s!',
+        onTap: () {
+          // Navigate to dashboard
+        },
+      );
+      return;
+    }
+
+    if (type == 'MANUAL_ASSIGN') {
+      showOrderDispatchAlert(
+        title: title ?? '🛵 Direct Delivery Assignment',
+        message: body ?? 'You have been directly assigned a new delivery order.',
+        onTap: () {
+          // Navigate to active order
+        },
+      );
+      return;
+    }
+
+    // Default notifications
+    showInfoNotification(
+      title: title ?? 'New Dispatch Alert',
+      message: body ?? 'You have a new delivery order update!',
+    );
   }
 
   /// 9.1 Register or Update Device Token with Backend

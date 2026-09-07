@@ -16,8 +16,8 @@ class ApiInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     final path = options.path;
-    // Strictly enforce: DO NOT call any API not in MOBILE_RIDER_APP_API_DOC_PART_1.md
-    if (!ApiEndpoints.isPart1Endpoint(path)) {
+    // Strictly enforce: DO NOT call any API not documented in Part 1 or Part 2
+    if (!ApiEndpoints.isDocumentedEndpoint(path)) {
       final mockResponse = MockInterceptor.getMockResponse(options);
       return handler.resolve(mockResponse);
     }

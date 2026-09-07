@@ -16,7 +16,7 @@ class OrderDetailsView extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Trip Details \${order.orderNumber}'),
+        title: Text('Trip Details ${order.orderNumber.startsWith('#') ? order.orderNumber : '#${order.orderNumber}'}'),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -110,7 +110,7 @@ class OrderDetailsView extends StatelessWidget {
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text('\${item.quantity}x \${item.name}'),
+                            Text('${item.quantity}x ${item.name}'),
                             const Icon(Icons.check, size: 16, color: AppColors.success),
                           ],
                         ),

@@ -145,20 +145,20 @@ class OrdersController extends GetxController {
 
   // Customer Contact Actions
   Future<void> callContact(String phone) async {
-    final uri = Uri.parse('tel:\$phone');
+    final uri = Uri.parse('tel:$phone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      Get.snackbar('Contact', 'Calling \$phone...');
+      Get.snackbar('Contact', 'Calling $phone...');
     }
   }
 
   Future<void> messageContact(String phone) async {
-    final uri = Uri.parse('sms:\$phone');
+    final uri = Uri.parse('sms:$phone');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     } else {
-      Get.snackbar('Contact', 'Opening SMS for \$phone...');
+      Get.snackbar('Contact', 'Opening SMS for $phone...');
     }
   }
 }

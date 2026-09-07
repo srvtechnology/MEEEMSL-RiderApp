@@ -8,8 +8,13 @@ class OrderItemModel extends OrderItemEntity {
   });
 
   factory OrderItemModel.fromJson(Map<String, dynamic> json) {
+    final productName = json['productNameSnapshot'] as String? ??
+        (json['product'] is Map ? (json['product'] as Map)['name'] as String? : null) ??
+        json['name'] as String? ??
+        'Item';
+
     return OrderItemModel(
-      name: json['name'] as String? ?? '',
+      name: productName,
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
       notes: json['notes'] as String? ?? '',
     );

@@ -29,75 +29,144 @@ class OrderModel extends OrderEntity {
   });
 
   static OrderStatus _parseStatus(String? statusStr) {
-    switch (statusStr) {
+    switch (statusStr?.trim().toLowerCase()) {
       case 'accepted':
         return OrderStatus.accepted;
       case 'at_pickup':
+      case 'atpickup':
       case 'arrived_at_pickup':
         return OrderStatus.atPickup;
       case 'picked_up':
+      case 'pickedup':
         return OrderStatus.pickedUp;
       case 'out_for_delivery':
+      case 'outfordelivery':
       case 'in_transit':
       case 'arrived_at_dropoff':
         return OrderStatus.outForDelivery;
       case 'delivered':
         return OrderStatus.delivered;
       case 'cancelled':
+      case 'cancelled_by_rider':
+      case 'cancelledbyrider':
+      case 'timed_out':
+      case 'timedout':
         return OrderStatus.cancelled;
+      case 'offered':
+      case 'pending':
       default:
         return OrderStatus.pending;
     }
   }
 
   static String _statusToString(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.accepted:
-        return 'accepted';
-      case OrderStatus.atPickup:
-        return 'at_pickup';
-      case OrderStatus.pickedUp:
-        return 'picked_up';
-      case OrderStatus.outForDelivery:
-        return 'out_for_delivery';
-      case OrderStatus.delivered:
-        return 'delivered';
-      case OrderStatus.cancelled:
-        return 'cancelled';
-      case OrderStatus.pending:
-        return 'pending';
-    }
+    return status.toApiStatus;
   }
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
+    final orderMap = json['order'] as Map<String, dynamic>?;
+    final sellerMap = orderMap?['seller'] as Map<String, dynamic>?;
+    final businessInfo = sellerMap?['businessInfo'] as Map<String, dynamic>?;
+    final store = sellerMap?['store'] as Map<String, dynamic>?;
+
+    final customerName = orderMap?['shippingFullName'] as String? ??
+        json['customerName'] as String? ??
+        'Customer';
+
+    final customerPhone = orderMap?['shippingPhone'] as String? ??
+        json['customerPhone'] as String? ??
+        '';
+
+    final dropoffParts = [
+      orderMap?['shippingAddressLine1'],
+      orderMap?['shippingAddressLine2'],
+      orderMap?['shippingCity'],
+    ].where((s) => s != null && s.toString().trim().isNotEmpty).toList();
+
+    final dropoffAddress = dropoffParts.isNotEmpty
+        ? dropoffParts.join(', ')
+        : (json['dropoffAddress'] as String? ?? '');
+
+    final pickupName = store?['name'] as String? ??
+        businessInfo?['businessName'] as String? ??
+        json['pickupName'] as String? ??
+        'Store / Vendor';
+
+    final pickupParts = [
+      businessInfo?['street'],
+      businessInfo?['city'],
+    ].where((s) => s != null && s.toString().trim().isNotEmpty).toList();
+
+    final pickupAddress = pickupParts.isNotEmpty
+        ? pickupParts.join(', ')
+        : (json['pickupAddress'] as String? ?? '');
+
+    final pickupPhone = businessInfo?['pocContact'] as String? ??
+        json['pickupPhone'] as String? ??
+        '';
+
+    final pickupLat = (businessInfo?['latitude'] as num?)?.toDouble() ??
+        (json['pickupLat'] as num?)?.toDouble() ??
+        8.484245;
+
+    final pickupLng = (businessInfo?['longitude'] as num?)?.toDouble() ??
+        (json['pickupLng'] as num?)?.toDouble() ??
+        -13.234125;
+
+    final rawItems = orderMap?['items'] ?? json['items'];
+    final items = (rawItems is List)
+        ? rawItems
+            .map((e) => OrderItemModel.fromJson(e as Map<String, dynamic>))
+            .toList()
+        : <OrderItemModel>[];
+
+    final orderNumber = orderMap?['orderNumber'] as String? ??
+        json['orderNumber'] as String? ??
+        '';
+
+    final deliveryOtp = json['deliveryOtp'] as String? ??
+        orderMap?['deliveryOtp'] as String? ??
+        '';
+
+    final subtotal = (orderMap?['totalAmount'] as num?)?.toDouble() ??
+        (orderMap?['subtotal'] as num?)?.toDouble() ??
+        (json['subtotal'] as num?)?.toDouble() ??
+        0.0;
+
+    final earnings = (json['riderEarnings'] as num?)?.toDouble() ??
+        (orderMap?['shipping'] as num?)?.toDouble() ??
+        14.80;
+
+    final distanceKm = (json['distanceKm'] as num?)?.toDouble() ?? 2.1;
+    final estimatedDuration = (json['estimatedDurationMin'] as num?)?.toInt() ?? 15;
+
     return OrderModel(
-      id: json['id'] as String? ?? '',
-      orderNumber: json['orderNumber'] as String? ?? '',
+      id: json['id'] as String? ?? orderMap?['id'] as String? ?? '',
+      orderNumber: orderNumber,
       status: _parseStatus(json['status'] as String?),
-      customerName: json['customerName'] as String? ?? 'Customer',
-      customerPhone: json['customerPhone'] as String? ?? '',
+      customerName: customerName,
+      customerPhone: customerPhone,
       customerAvatar: json['customerAvatar'] as String? ?? '',
-      pickupName: json['pickupName'] as String? ?? 'Restaurant / Store',
-      pickupAddress: json['pickupAddress'] as String? ?? '',
-      pickupPhone: json['pickupPhone'] as String? ?? '',
-      dropoffAddress: json['dropoffAddress'] as String? ?? '',
-      pickupLat: (json['pickupLat'] as num?)?.toDouble() ?? 40.7128,
-      pickupLng: (json['pickupLng'] as num?)?.toDouble() ?? -74.0060,
-      dropoffLat: (json['dropoffLat'] as num?)?.toDouble() ?? 40.7306,
-      dropoffLng: (json['dropoffLng'] as num?)?.toDouble() ?? -73.9352,
-      items: (json['items'] as List<dynamic>?)
-              ?.map((e) => OrderItemModel.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      subtotal: (json['subtotal'] as num?)?.toDouble() ?? 0.0,
-      riderEarnings: (json['riderEarnings'] as num?)?.toDouble() ?? 0.0,
-      distanceKm: (json['distanceKm'] as num?)?.toDouble() ?? 0.0,
-      estimatedDurationMin: (json['estimatedDurationMin'] as num?)?.toInt() ?? 15,
+      pickupName: pickupName,
+      pickupAddress: pickupAddress,
+      pickupPhone: pickupPhone,
+      dropoffAddress: dropoffAddress,
+      pickupLat: pickupLat,
+      pickupLng: pickupLng,
+      dropoffLat: (json['dropoffLat'] as num?)?.toDouble() ?? 8.460,
+      dropoffLng: (json['dropoffLng'] as num?)?.toDouble() ?? -13.250,
+      items: items,
+      subtotal: subtotal,
+      riderEarnings: earnings,
+      distanceKm: distanceKm,
+      estimatedDurationMin: estimatedDuration,
       createdAt: json['createdAt'] != null
           ? DateTime.tryParse(json['createdAt'] as String) ?? DateTime.now()
-          : DateTime.now(),
+          : (json['offeredAt'] != null
+              ? DateTime.tryParse(json['offeredAt'] as String) ?? DateTime.now()
+              : DateTime.now()),
       notes: json['notes'] as String? ?? '',
-      deliveryOtp: json['deliveryOtp'] as String? ?? '',
+      deliveryOtp: deliveryOtp,
       proofPhotoUrl: json['proofPhotoUrl'] as String?,
     );
   }

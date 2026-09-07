@@ -30,9 +30,16 @@ class ApiEndpoints {
   static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout'; // Note: Logout in Part 1 is DELETE /device-token
 
-  /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC (Part 1 & Part 2)
+  // Part 2: Delivery Orders Retrieval, Acceptance, Milestones & Cancellation
+  static const String orders = '/orders';
+  static String singleOrder(String id) => '/orders/$id';
+  static String acceptOrderAssignment(String id) => '/orders/$id/accept';
+  static String rejectOrderOffer(String id) => '/orders/$id/reject';
+  static String updateDeliveryStatus(String id) => '/orders/$id/status';
+
+  /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC (Part 1)
   static const Set<String> part1Endpoints = {
-    // Part 2: 1.2 Telemetry Fallback
+    // Part 2: 1.2 Telemetry Fallback (also in Part 1)
     location,
     // 2. Rider Registration & OTP Verification
     register,
@@ -58,8 +65,8 @@ class ApiEndpoints {
     deviceToken,
   };
 
-  /// Returns true ONLY if the given [path] is documented in MOBILE_RIDER_APP_API_DOC.
-  static bool isPart1Endpoint(String path) {
+  /// Normalizes a request path for whitelist verification.
+  static String normalizePath(String path) {
     var cleanPath = path;
     if (cleanPath.contains('?')) {
       cleanPath = cleanPath.split('?').first;
@@ -78,7 +85,34 @@ class ApiEndpoints {
     if (!cleanPath.startsWith('/')) {
       cleanPath = '/$cleanPath';
     }
+    return cleanPath;
+  }
+
+  /// Returns true ONLY if the given [path] is documented in MOBILE_RIDER_APP_API_DOC (Part 1).
+  static bool isPart1Endpoint(String path) {
+    final cleanPath = normalizePath(path);
     return part1Endpoints.contains(cleanPath);
+  }
+
+  /// Returns true if [path] is documented in Part 2 (Delivery Orders Retrieval, Acceptance, Milestones & Reassignment)
+  static bool isPart2Endpoint(String path) {
+    final cleanPath = normalizePath(path);
+    if (cleanPath == location) return true;
+    if (cleanPath == orders) return true;
+    const legacySubpaths = {'/active', '/incoming', '/accept', '/decline', '/history', '/status/update'};
+    for (final legacy in legacySubpaths) {
+      if (cleanPath == '$orders$legacy' || cleanPath.startsWith('$orders$legacy/')) {
+        return false;
+      }
+    }
+    // Part 2 dynamic paths: /orders/:id, /orders/:id/accept, /orders/:id/reject, /orders/:id/status
+    final regExp = RegExp(r'^/orders/[^/]+(/(accept|reject|status))?$');
+    return regExp.hasMatch(cleanPath);
+  }
+
+  /// Returns true if [path] is documented in Part 1 or Part 2.
+  static bool isDocumentedEndpoint(String path) {
+    return isPart1Endpoint(path) || isPart2Endpoint(path);
   }
 
   // 4. Forgot & Reset Password

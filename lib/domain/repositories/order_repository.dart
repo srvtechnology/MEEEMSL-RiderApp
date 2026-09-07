@@ -12,6 +12,7 @@ abstract class OrderRepository {
     OrderStatus status, {
     String? proofPhotoUrl,
     String? customerOtp,
+    String? cancellationReason,
   });
   Future<Either<Failure, List<OrderEntity>>> getOrderHistory({String? statusFilter});
   Future<Either<Failure, OrderEntity>> getOrderDetails(String orderId);

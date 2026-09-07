@@ -62,6 +62,26 @@ extension OrderStatusX on OrderStatus {
         return 'Confirm Step';
     }
   }
+
+  /// Exact uppercase API status string conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md Section 8
+  String get toApiStatus {
+    switch (this) {
+      case OrderStatus.pending:
+        return 'OFFERED';
+      case OrderStatus.accepted:
+        return 'ACCEPTED';
+      case OrderStatus.atPickup:
+        return 'AT_PICKUP';
+      case OrderStatus.pickedUp:
+        return 'PICKED_UP';
+      case OrderStatus.outForDelivery:
+        return 'OUT_FOR_DELIVERY';
+      case OrderStatus.delivered:
+        return 'DELIVERED';
+      case OrderStatus.cancelled:
+        return 'CANCELLED_BY_RIDER';
+    }
+  }
 }
 
 class OrderEntity extends Equatable {

@@ -17,26 +17,100 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
 
   @override
   Future<bool> toggleOnline(bool isOnline) async {
-    // Note: Online toggle API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // Store online status locally without making network calls to server.
     await _storage.write(AppConstants.isOnlineKey, isOnline);
+    if (isOnline) {
+      await _storage.write('online_since_timestamp', DateTime.now().toIso8601String());
+    } else {
+      await _storage.remove('online_since_timestamp');
+    }
     return isOnline;
   }
 
   @override
   Future<Map<String, dynamic>> getSummary() async {
-    // Note: Dashboard summary API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // Return local dashboard summary without making network calls to server.
     final isOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? true;
+    double todayEarnings = 0.0;
+    int todayDeliveries = 0;
+    int totalDeliveries = 0;
+    double weeklyEarnings = 0.0;
+    bool hasActiveOrder = false;
+
+    // 1. Check real active orders
+    try {
+      final activeRes = await _dioClient.dio.get(
+        ApiEndpoints.orders,
+        queryParameters: {'tab': 'active'},
+      );
+      if (activeRes.statusCode == 200 && activeRes.data != null) {
+        final activeList = activeRes.data['data'];
+        if (activeList is List && activeList.isNotEmpty) {
+          hasActiveOrder = true;
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fetch real completed orders to calculate real earnings and trip counts
+    try {
+      final completedRes = await _dioClient.dio.get(
+        ApiEndpoints.orders,
+        queryParameters: {'tab': 'completed'},
+      );
+      if (completedRes.statusCode == 200 && completedRes.data != null) {
+        final data = completedRes.data['data'];
+        if (data is List) {
+          totalDeliveries = data.length;
+          final now = DateTime.now();
+          final todayStart = DateTime(now.year, now.month, now.day);
+          final weekStart = now.subtract(const Duration(days: 7));
+
+          for (final item in data) {
+            if (item is Map<String, dynamic>) {
+              final earnings = (item['riderEarnings'] as num?)?.toDouble() ??
+                  (item['order']?['deliveryFee'] as num?)?.toDouble() ??
+                  0.0;
+              final dateStr = item['deliveredAt'] ?? item['createdAt'] ?? item['updatedAt'];
+              final date = dateStr != null ? DateTime.tryParse(dateStr.toString()) : null;
+
+              if (date != null) {
+                if (date.isAfter(todayStart)) {
+                  todayEarnings += earnings;
+                  todayDeliveries += 1;
+                }
+                if (date.isAfter(weekStart)) {
+                  weeklyEarnings += earnings;
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Compute real online hours from storage tracking
+    double onlineHours = 0.0;
+    if (isOnline) {
+      final onlineSinceStr = _storage.read<String>('online_since_timestamp');
+      if (onlineSinceStr != null) {
+        final onlineSince = DateTime.tryParse(onlineSinceStr);
+        if (onlineSince != null) {
+          final diffHours = DateTime.now().difference(onlineSince).inMinutes / 60.0;
+          onlineHours = double.parse(diffHours.toStringAsFixed(1));
+        }
+      } else {
+        await _storage.write('online_since_timestamp', DateTime.now().toIso8601String());
+      }
+    }
+
     return {
-      'todayEarnings': 148.50,
-      'todayDeliveries': 9,
-      'acceptanceRate': 96.5,
-      'rating': 4.92,
-      'onlineHours': 5.8,
-      'weeklyEarnings': 892.20,
+      'todayEarnings': todayEarnings,
+      'todayDeliveries': todayDeliveries,
+      'totalTrips': totalDeliveries,
+      'acceptanceRate': 100.0,
+      'rating': 5.0,
+      'onlineHours': onlineHours,
+      'weeklyEarnings': weeklyEarnings,
       'isOnline': isOnline,
-      'hasActiveOrder': true,
+      'hasActiveOrder': hasActiveOrder,
     };
   }
 

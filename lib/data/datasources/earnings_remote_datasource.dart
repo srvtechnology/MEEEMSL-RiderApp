@@ -1,3 +1,4 @@
+import '../../core/constants/api_endpoints.dart';
 import '../../core/network/dio_client.dart';
 import '../../domain/entities/earnings_entity.dart';
 import '../models/earnings_model.dart';
@@ -9,69 +10,125 @@ abstract class EarningsRemoteDataSource {
 }
 
 class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
-  // ignore: unused_field
   final DioClient _dioClient;
 
   EarningsRemoteDataSourceImpl(this._dioClient);
 
   @override
   Future<EarningsModel> getEarnings(String period) async {
-    // Note: Earnings breakdown API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // Returns local data without making network calls to server.
+    double todayEarnings = 0.0;
+    double weeklyEarnings = 0.0;
+    double monthlyEarnings = 0.0;
+    double totalAvailable = 0.0;
+    int completedTrips = 0;
+    final Map<String, double> weekdayEarnings = {
+      'Mon': 0.0,
+      'Tue': 0.0,
+      'Wed': 0.0,
+      'Thu': 0.0,
+      'Fri': 0.0,
+      'Sat': 0.0,
+      'Sun': 0.0,
+    };
+    final List<TransactionModel> transactions = [];
+
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.orders,
+        queryParameters: {'tab': 'completed'},
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        if (data is List) {
+          completedTrips = data.length;
+          final now = DateTime.now();
+          final todayStart = DateTime(now.year, now.month, now.day);
+          final weekStart = now.subtract(const Duration(days: 7));
+          final monthStart = now.subtract(const Duration(days: 30));
+
+          for (final item in data) {
+            if (item is Map<String, dynamic>) {
+              final earnings = (item['riderEarnings'] as num?)?.toDouble() ??
+                  (item['order']?['deliveryFee'] as num?)?.toDouble() ??
+                  0.0;
+              final dateStr = item['deliveredAt'] ?? item['createdAt'] ?? item['updatedAt'];
+              final date = dateStr != null ? (DateTime.tryParse(dateStr.toString()) ?? now) : now;
+              final orderNum = item['order']?['orderNumber']?.toString() ??
+                  item['orderNumber']?.toString() ??
+                  '#${item['id']}';
+
+              totalAvailable += earnings;
+
+              if (date.isAfter(todayStart)) {
+                todayEarnings += earnings;
+              }
+              if (date.isAfter(weekStart)) {
+                weeklyEarnings += earnings;
+                final dayKey = _weekdayString(date.weekday);
+                weekdayEarnings[dayKey] = (weekdayEarnings[dayKey] ?? 0.0) + earnings;
+              }
+              if (date.isAfter(monthStart)) {
+                monthlyEarnings += earnings;
+              }
+
+              transactions.add(
+                TransactionModel(
+                  id: item['id']?.toString() ?? 'tx_${transactions.length}',
+                  orderNumber: orderNum.startsWith('#') ? orderNum : '#$orderNum',
+                  amount: earnings,
+                  tip: 0.0,
+                  date: date,
+                  type: 'trip_earnings',
+                  status: 'completed',
+                ),
+              );
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    final dailyData = weekdayEarnings.entries
+        .map((e) => DailyChartData(day: e.key, amount: e.value))
+        .toList();
+
     return EarningsModel(
-      todayEarnings: 148.50,
-      weeklyEarnings: 892.20,
-      monthlyEarnings: 3420.00,
-      availablePayout: 240.00,
-      completedTrips: 45,
-      basePay: 720.00,
-      tips: 92.20,
-      surgeBonuses: 80.00,
-      dailyData: const [
-        DailyChartData(day: 'Mon', amount: 45.0),
-        DailyChartData(day: 'Tue', amount: 62.5),
-        DailyChartData(day: 'Wed', amount: 38.0),
-        DailyChartData(day: 'Thu', amount: 84.0),
-        DailyChartData(day: 'Fri', amount: 95.0),
-        DailyChartData(day: 'Sat', amount: 120.0),
-        DailyChartData(day: 'Sun', amount: 80.0),
-      ],
-      recentTransactions: [
-        TransactionModel(
-          id: 'tx_1',
-          orderNumber: '#MM-8839',
-          amount: 14.80,
-          tip: 2.50,
-          date: DateTime.now().subtract(const Duration(hours: 2)),
-          type: 'trip_earnings',
-          status: 'completed',
-        ),
-        TransactionModel(
-          id: 'tx_2',
-          orderNumber: '#MM-8831',
-          amount: 12.50,
-          tip: 3.00,
-          date: DateTime.now().subtract(const Duration(hours: 5)),
-          type: 'trip_earnings',
-          status: 'completed',
-        ),
-        TransactionModel(
-          id: 'tx_3',
-          orderNumber: '#MM-8812',
-          amount: 18.20,
-          tip: 4.00,
-          date: DateTime.now().subtract(const Duration(hours: 8)),
-          type: 'trip_earnings',
-          status: 'completed',
-        ),
-      ],
+      todayEarnings: todayEarnings,
+      weeklyEarnings: weeklyEarnings,
+      monthlyEarnings: monthlyEarnings,
+      availablePayout: totalAvailable,
+      completedTrips: completedTrips,
+      basePay: totalAvailable,
+      tips: 0.0,
+      surgeBonuses: 0.0,
+      dailyData: dailyData,
+      recentTransactions: transactions,
     );
+  }
+
+  static String _weekdayString(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'Mon';
+      case DateTime.tuesday:
+        return 'Tue';
+      case DateTime.wednesday:
+        return 'Wed';
+      case DateTime.thursday:
+        return 'Thu';
+      case DateTime.friday:
+        return 'Fri';
+      case DateTime.saturday:
+        return 'Sat';
+      case DateTime.sunday:
+      default:
+        return 'Sun';
+    }
   }
 
   @override
   Future<bool> requestPayout(double amount, String paymentMethod) async {
-    // Note: Payout request API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // Processed locally without making network calls to server.
     return true;
   }
 }

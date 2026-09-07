@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 
@@ -56,7 +57,7 @@ class _PayoutRequestBottomSheetState extends State<PayoutRequestBottomSheet> {
           ),
           const SizedBox(height: 12),
           Text(
-            'Available: \${Formatters.formatCurrency(widget.availableBalance)}',
+            'Available: ${Formatters.formatCurrency(widget.availableBalance)}',
             style: AppTextStyles.bodyMedium(color: AppColors.primary),
           ),
           const SizedBox(height: 20),

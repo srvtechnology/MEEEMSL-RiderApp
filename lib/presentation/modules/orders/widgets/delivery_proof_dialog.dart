@@ -115,7 +115,7 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Enter customer 4-digit OTP and optionally take a dropoff proof photo.',
+                'Enter customer 6-digit delivery OTP and optionally take a dropoff proof photo.',
                 style: AppTextStyles.bodySmall(),
               ),
               const SizedBox(height: 20),
@@ -124,7 +124,7 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
               CustomTextField(
                 controller: otpController,
                 label: AppStrings.enterCustomerOtp,
-                hintText: 'e.g. 4829',
+                hintText: 'e.g. 582910',
                 keyboardType: TextInputType.number,
                 prefixIcon: Icons.pin_outlined,
               ),
@@ -185,7 +185,7 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
                 onPressed: () {
                   final otp = otpController.text.trim();
                   if (otp.isEmpty) {
-                    Get.snackbar('Input Required', 'Please enter customer delivery OTP (e.g. 4829)');
+                    Get.snackbar('Input Required', 'Please enter customer 6-digit delivery OTP (e.g. 582910)');
                     return;
                   }
                   Get.back();

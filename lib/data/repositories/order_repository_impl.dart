@@ -64,6 +64,7 @@ class OrderRepositoryImpl implements OrderRepository {
     OrderStatus status, {
     String? proofPhotoUrl,
     String? customerOtp,
+    String? cancellationReason,
   }) async {
     try {
       final order = await remoteDataSource.updateOrderStatus(
@@ -71,6 +72,7 @@ class OrderRepositoryImpl implements OrderRepository {
         status,
         proofPhotoUrl: proofPhotoUrl,
         customerOtp: customerOtp,
+        cancellationReason: cancellationReason,
       );
       return Right(order);
     } on ServerException catch (e) {

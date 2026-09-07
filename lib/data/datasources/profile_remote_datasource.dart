@@ -1,8 +1,10 @@
+import 'dart:convert';
 import '../../domain/entities/document_entity.dart';
 import '../../domain/entities/payout_info_entity.dart';
 import 'package:dio/dio.dart';
 import 'package:get_storage/get_storage.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
 import '../models/rider_model.dart';
@@ -36,6 +38,7 @@ abstract class ProfileRemoteDataSource {
 
 class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
   final DioClient _dioClient;
+  final GetStorage _storage = GetStorage();
 
   ProfileRemoteDataSourceImpl(this._dioClient);
 
@@ -115,34 +118,46 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
 
   @override
   Future<List<DocumentModel>> getDocuments() async {
-    // Note: Documents list API is not in MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // Return local documents without making network calls.
-    return const [
-      DocumentModel(
+    final savedRider = _storage.read<String>(AppConstants.riderProfileKey);
+    RiderModel? rider;
+    if (savedRider != null) {
+      try {
+        rider = RiderModel.fromJson(jsonDecode(savedRider) as Map<String, dynamic>);
+      } catch (_) {}
+    }
+
+    final docs = <DocumentModel>[];
+    if (rider?.drivingLicenseDoc != null && rider!.drivingLicenseDoc!.isNotEmpty) {
+      docs.add(DocumentModel(
         type: 'driving_license',
         title: "Driver's License",
-        documentNumber: 'DL-10928374',
+        documentNumber: rider.drivingLicenseNo ?? 'Registered',
         expiryDate: '2028-12-31',
-        status: DocumentStatus.verified,
-        fileUrl: 'https://s3.amazonaws.com/meeem/docs/dl.png',
-      ),
-      DocumentModel(
+        status: rider.isApproved ? DocumentStatus.verified : DocumentStatus.pending,
+        fileUrl: rider.drivingLicenseDoc!,
+      ));
+    }
+    if (rider?.nationalIdDoc != null && rider!.nationalIdDoc!.isNotEmpty) {
+      docs.add(DocumentModel(
         type: 'national_id',
         title: 'National Identity Card',
-        documentNumber: 'NID-9920182',
+        documentNumber: 'National ID',
         expiryDate: '2030-05-15',
-        status: DocumentStatus.verified,
-        fileUrl: 'https://s3.amazonaws.com/meeem/docs/id.png',
-      ),
-      DocumentModel(
+        status: rider.isApproved ? DocumentStatus.verified : DocumentStatus.pending,
+        fileUrl: rider.nationalIdDoc!,
+      ));
+    }
+    if (rider?.vehicleInsuranceDoc != null && rider!.vehicleInsuranceDoc!.isNotEmpty) {
+      docs.add(DocumentModel(
         type: 'vehicle_insurance',
         title: 'Vehicle Insurance Certificate',
-        documentNumber: 'INS-2026-8819',
+        documentNumber: rider.vehicleNumber ?? 'Insurance',
         expiryDate: '2027-01-10',
-        status: DocumentStatus.verified,
-        fileUrl: 'https://s3.amazonaws.com/meeem/docs/ins.png',
-      ),
-    ];
+        status: rider.isApproved ? DocumentStatus.verified : DocumentStatus.pending,
+        fileUrl: rider.vehicleInsuranceDoc!,
+      ));
+    }
+    return docs;
   }
 
   @override

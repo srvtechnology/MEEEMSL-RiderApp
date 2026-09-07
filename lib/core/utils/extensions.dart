@@ -17,13 +17,13 @@ extension ContextExtension on BuildContext {
 extension StringExtension on String {
   String capitalize() {
     if (isEmpty) return this;
-    return '\${this[0].toUpperCase()}\${substring(1)}';
+    return '${this[0].toUpperCase()}${substring(1)}';
   }
 
   String get initials {
     final parts = trim().split(' ');
     if (parts.isEmpty) return '';
     if (parts.length == 1) return parts.first.isNotEmpty ? parts.first[0].toUpperCase() : '';
-    return '\${parts.first[0]}\${parts.last[0]}'.toUpperCase();
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 }

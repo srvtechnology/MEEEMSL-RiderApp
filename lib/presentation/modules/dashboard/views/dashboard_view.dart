@@ -51,10 +51,6 @@ class DashboardView extends GetView<DashboardController> {
 
               // 5. 4-Grid Shift Metrics Overview
               _buildMetricsGrid(context),
-              const SizedBox(height: 18),
-
-              // 6. Developer / Demonstration Waterfall Simulator
-              _buildSimulatedOrderTrigger(context),
               const SizedBox(height: 24),
             ],
           ),
@@ -610,50 +606,6 @@ class DashboardView extends GetView<DashboardController> {
               fontSize: 17,
               fontWeight: FontWeight.w800,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimulatedOrderTrigger(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.primaryContainer.withAlpha(70),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppColors.primary.withAlpha(35)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '⚡ Demo Waterfall Offer (60s)',
-                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
-                ),
-                Text(
-                  'Simulate an automated cascade offer with timer',
-                  style: AppTextStyles.bodySmall(),
-                ),
-              ],
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              minimumSize: const Size(80, 36),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () => controller.simulateIncomingOrder(),
-            child: const Text('Simulate', style: TextStyle(fontSize: 12)),
           ),
         ],
       ),

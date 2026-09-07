@@ -43,7 +43,7 @@ class EarningsController extends GetxController {
   void openPayoutModal() {
     Get.bottomSheet(
       PayoutRequestBottomSheet(
-        availableBalance: earningsData.value?.availablePayout ?? 642.50,
+        availableBalance: earningsData.value?.availablePayout ?? 0.0,
         onSubmitted: (amount, method) => _submitPayout(amount, method),
       ),
       isScrollControlled: true,

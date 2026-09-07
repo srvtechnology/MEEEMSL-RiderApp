@@ -62,17 +62,24 @@ class OrderHistoryView extends GetView<OrdersController> {
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Text(order.orderNumber, style: AppTextStyles.titleMedium()),
+                            Text(
+                              order.orderNumber.startsWith('#')
+                                  ? order.orderNumber
+                                  : '#${order.orderNumber}',
+                              style: AppTextStyles.titleMedium(),
+                            ),
                             StatusBadge(
                               text: order.status.displayName,
-                              type: BadgeType.success,
+                              type: order.status == OrderStatus.delivered
+                                  ? BadgeType.success
+                                  : BadgeType.warning,
                             ),
                           ],
                         ),
                         const SizedBox(height: 8),
                         Text(order.pickupName, style: AppTextStyles.bodyLarge()),
                         const SizedBox(height: 2),
-                        Text('To: \${order.dropoffAddress}', style: AppTextStyles.bodySmall()),
+                        Text('To: ${order.dropoffAddress}', style: AppTextStyles.bodySmall()),
                         const SizedBox(height: 12),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -598,80 +598,9 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
-    if (path.contains(ApiEndpoints.activeOrders)) {
-      return _resolve(handler, Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'success': true,
-          'data': [
-            {
-              'id': 'ord_102948',
-              'orderNumber': '#MM-8839',
-              'status': 'in_transit',
-              'customerName': 'Sarah Jenkins',
-              'customerPhone': '+232 76 998877',
-              'customerAvatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-              'pickupName': 'Mama Beach Grill',
-              'pickupAddress': 'Mama Beach, Zone 1',
-              'pickupPhone': '+232 76 112233',
-              'dropoffAddress': 'No 2 River Beach House #4',
-              'pickupLat': 8.484,
-              'pickupLng': -13.234,
-              'dropoffLat': 8.460,
-              'dropoffLng': -13.250,
-              'items': [
-                {'name': 'Grilled Barracuda & Plantain', 'quantity': 2, 'notes': 'Extra spicy sauce'},
-                {'name': 'Ginger Beer (Cold)', 'quantity': 2, 'notes': ''},
-              ],
-              'subtotal': 48.50,
-              'riderEarnings': 14.80,
-              'distanceKm': 3.4,
-              'estimatedDurationMin': 16,
-              'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
-              'notes': 'Please call when arriving at the gate.',
-              'deliveryOtp': '4829',
-            }
-          ]
-        },
-      ));
-    }
-
-    if (path.contains(ApiEndpoints.incomingOrder)) {
-      return _resolve(handler, Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'success': true,
-          'data': {
-            'id': 'ord_${DateTime.now().millisecondsSinceEpoch}',
-            'orderNumber': '#MM-${(DateTime.now().millisecondsSinceEpoch % 9000) + 1000}',
-            'status': 'pending',
-            'customerName': 'Michael Koroma',
-            'customerPhone': '+232 76 443322',
-            'customerAvatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-            'pickupName': 'Lakka Ocean Bites',
-            'pickupAddress': 'Lakka Beach Road',
-            'pickupPhone': '+232 76 887766',
-            'dropoffAddress': 'Hamilton Junction',
-            'pickupLat': 8.470,
-            'pickupLng': -13.240,
-            'dropoffLat': 8.455,
-            'dropoffLng': -13.255,
-            'items': [
-              {'name': 'Cassava Leaf Stew with Rice', 'quantity': 1, 'notes': ''},
-              {'name': 'Star Beer', 'quantity': 1, 'notes': 'Chilled'},
-            ],
-            'subtotal': 35.00,
-            'riderEarnings': 12.50,
-            'distanceKm': 2.8,
-            'estimatedDurationMin': 14,
-            'createdAt': DateTime.now().toIso8601String(),
-            'notes': 'Call on arrival.',
-            'deliveryOtp': '6192',
-          }
-        },
-      ));
+    // Part 2: Delivery Orders (Section 3, 4, 5, 6)
+    if (path.contains('/orders')) {
+      return _resolve(handler, _handleOrdersEndpoint(options));
     }
 
     if (path.contains(ApiEndpoints.earningsBreakdown)) {
@@ -818,75 +747,9 @@ class MockInterceptor extends Interceptor {
       );
     }
 
-    if (path.contains(ApiEndpoints.activeOrders)) {
-      return Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'success': true,
-          'data': [
-            {
-              'id': 'ord_102948',
-              'orderNumber': '#MM-8839',
-              'status': 'in_transit',
-              'customerName': 'Sarah Jenkins',
-              'customerPhone': '+232 76 998877',
-              'customerAvatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-              'pickupName': 'Mama Beach Grill',
-              'pickupAddress': 'Mama Beach, Zone 1',
-              'pickupPhone': '+232 76 112233',
-              'dropoffAddress': 'No 2 River Beach House #4',
-              'pickupLat': 8.484,
-              'pickupLng': -13.234,
-              'dropoffLat': 8.460,
-              'dropoffLng': -13.250,
-              'items': [
-                {'name': 'Grilled Barracuda & Plantain', 'quantity': 2, 'notes': 'Extra spicy sauce'},
-                {'name': 'Ginger Beer (Cold)', 'quantity': 2, 'notes': ''},
-              ],
-              'subtotal': 48.50,
-              'riderEarnings': 14.80,
-              'distanceKm': 3.4,
-              'estimatedDurationMin': 16,
-              'createdAt': DateTime.now().subtract(const Duration(minutes: 25)).toIso8601String(),
-              'notes': 'Please call when arriving at the gate.',
-              'deliveryOtp': '4829',
-            }
-          ]
-        },
-      );
-    }
-
-    if (path.contains(ApiEndpoints.orderHistory)) {
-      return Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {
-          'success': true,
-          'data': [
-            {
-              'id': 'ord_102940',
-              'orderNumber': '#MM-8830',
-              'status': 'delivered',
-              'customerName': 'David Cole',
-              'pickupName': 'Tokeh Seafood Shack',
-              'pickupAddress': 'Tokeh Village',
-              'dropoffAddress': 'Baw Baw Point #2',
-              'subtotal': 42.00,
-              'riderEarnings': 15.00,
-              'createdAt': DateTime.now().subtract(const Duration(hours: 4)).toIso8601String(),
-            }
-          ]
-        },
-      );
-    }
-
-    if (path.contains(ApiEndpoints.incomingOrder)) {
-      return Response(
-        requestOptions: options,
-        statusCode: 200,
-        data: {'success': true, 'data': null},
-      );
+    // Part 2: Delivery Orders (Section 3, 4, 5, 6)
+    if (path.contains('/orders')) {
+      return _handleOrdersEndpoint(options);
     }
 
     // Part 2: 1.2 Fallback Background Telemetry (REST API)
@@ -935,5 +798,300 @@ class MockInterceptor extends Interceptor {
       statusCode: 200,
       data: {'success': true, 'data': {}},
     );
+  }
+
+  /// Handles all Part 2 delivery order endpoints consistently for mock & demo modes.
+  static Response _handleOrdersEndpoint(RequestOptions options) {
+    final path = options.path;
+    final method = options.method.toUpperCase();
+
+    // 4.1 Accept Delivery Assignment: POST /orders/:id/accept
+    if (path.endsWith('/accept')) {
+      final assignmentId = path.split('/').reversed.skip(1).first;
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Delivery assignment accepted successfully',
+          'data': {
+            'assignment': {
+              'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
+              'status': 'ACCEPTED',
+              'acceptedAt': DateTime.now().toUtc().toIso8601String(),
+            },
+            'deliveryOtp': '582910',
+          },
+        },
+      );
+    }
+
+    // 4.2 Decline Delivery Offer: POST /orders/:id/reject
+    if (path.endsWith('/reject')) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Offer rejected. Cascaded to next available rider.',
+        },
+      );
+    }
+
+    // 5.1, 5.2, 6.1 Status Updates & Cancellation: POST /orders/:id/status
+    if (path.endsWith('/status')) {
+      final data = options.data is Map ? options.data as Map : {};
+      final status = data['status']?.toString() ?? 'ACCEPTED';
+      final assignmentId = path.split('/').reversed.skip(1).first;
+
+      if (status == 'CANCELLED_BY_RIDER') {
+        return Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'cancelled': true,
+            'message': 'Delivery cancelled and auto-reassigned to nearest available rider.',
+          },
+        );
+      }
+
+      if (status == 'DELIVERED') {
+        return Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'message': 'Delivery status updated to DELIVERED',
+            'data': {
+              'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
+              'status': 'DELIVERED',
+              'deliveredAt': DateTime.now().toUtc().toIso8601String(),
+            },
+          },
+        );
+      }
+
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Delivery status updated to $status',
+          'data': {
+            'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
+            'status': status,
+            'updatedAt': DateTime.now().toUtc().toIso8601String(),
+          },
+        },
+      );
+    }
+
+    // Legacy compatibility handlers
+    if (path.contains('/orders/active')) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': [
+            _buildPart2OrderAssignment(
+              id: 'ord_102948',
+              orderNumber: 'meeem00000042',
+              status: 'ACCEPTED',
+            ),
+          ],
+        },
+      );
+    }
+
+    if (path.contains('/orders/history')) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': [
+            _buildPart2OrderAssignment(
+              id: 'ord_102940',
+              orderNumber: 'meeem00000030',
+              status: 'DELIVERED',
+            ),
+          ],
+        },
+      );
+    }
+
+    if (path.contains('/orders/incoming')) {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {'success': true, 'data': null},
+      );
+    }
+
+    // 3.2 Single Delivery Order Snapshot: GET /orders/:id
+    final uri = Uri.tryParse(path);
+    final cleanPath = uri?.path ?? path;
+    final segments = cleanPath.split('/').where((s) => s.isNotEmpty).toList();
+    final ordersIdx = segments.indexOf('orders');
+    if (ordersIdx != -1 &&
+        segments.length > ordersIdx + 1 &&
+        method == 'GET' &&
+        !['active', 'history', 'incoming', 'details'].contains(segments[ordersIdx + 1])) {
+      final orderOrAssignmentId = segments[ordersIdx + 1];
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'data': _buildPart2OrderAssignment(
+            id: orderOrAssignmentId,
+            orderNumber: 'meeem00000042',
+            status: 'ACCEPTED',
+          ),
+        },
+      );
+    }
+
+    // 3.1 Filtered Orders List: GET /orders?tab=active|offered|completed|all
+    final tab = options.queryParameters['tab']?.toString() ?? 'active';
+    if (tab == 'completed') {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'tab': tab,
+          'count': 2,
+          'data': [
+            _buildPart2OrderAssignment(
+              id: 'ord_102940',
+              orderNumber: 'meeem00000030',
+              status: 'DELIVERED',
+              pickupName: 'Tokeh Seafood Shack',
+              dropoffAddress: 'Baw Baw Point #2',
+              riderEarnings: 15.00,
+              subtotal: 420000,
+            ),
+            _buildPart2OrderAssignment(
+              id: 'ord_102935',
+              orderNumber: 'meeem00000021',
+              status: 'DELIVERED',
+              pickupName: 'Lakka Ocean Grill',
+              dropoffAddress: 'Hamilton Village Center',
+              riderEarnings: 13.50,
+              subtotal: 385000,
+            ),
+          ],
+        },
+      );
+    }
+
+    if (tab == 'offered') {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'tab': tab,
+          'count': 1,
+          'data': [
+            _buildPart2OrderAssignment(
+              id: 'ord_offer_99',
+              orderNumber: 'meeem00000042',
+              status: 'OFFERED',
+              pickupName: 'Electronics Hub',
+              dropoffAddress: '14 Wilkinson Road, Freetown',
+              riderEarnings: 18.50,
+              subtotal: 450000,
+            ),
+          ],
+        },
+      );
+    }
+
+    // Default 'active'
+    return Response(
+      requestOptions: options,
+      statusCode: 200,
+      data: {
+        'success': true,
+        'tab': 'active',
+        'count': 1,
+        'data': [
+          _buildPart2OrderAssignment(
+            id: 'cuid_assignment_id',
+            orderNumber: 'meeem00000042',
+            status: 'ACCEPTED',
+            pickupName: 'MEEEM Super Store',
+            dropoffAddress: '14 Wilkinson Road, Freetown',
+            riderEarnings: 14.80,
+            subtotal: 450000,
+          ),
+        ],
+      },
+    );
+  }
+
+  static Map<String, dynamic> _buildPart2OrderAssignment({
+    required String id,
+    required String orderNumber,
+    required String status,
+    String pickupName = 'MEEEM Super Store',
+    String dropoffAddress = '14 Wilkinson Road, Freetown',
+    double riderEarnings = 14.80,
+    double subtotal = 450000.0,
+    double distanceKm = 2.1,
+    String deliveryOtp = '582910',
+  }) {
+    return {
+      'id': id,
+      'orderId': 'order_$id',
+      'status': status,
+      'dispatchMode': 'AUTO_CASCADE',
+      'distanceKm': distanceKm,
+      'offeredAt': DateTime.now().subtract(const Duration(minutes: 5)).toUtc().toIso8601String(),
+      'acceptedAt': DateTime.now().subtract(const Duration(minutes: 4)).toUtc().toIso8601String(),
+      'deliveryOtp': deliveryOtp,
+      'riderEarnings': riderEarnings,
+      'estimatedDurationMin': 15,
+      'order': {
+        'id': 'order_$id',
+        'orderNumber': orderNumber,
+        'totalAmount': subtotal,
+        'subtotal': subtotal - 20000,
+        'shipping': 20000,
+        'paymentMethod': 'COD',
+        'paymentStatus': 'PENDING',
+        'shippingFullName': 'Fatmata Koroma',
+        'shippingPhone': '+23276123456',
+        'shippingAddressLine1': dropoffAddress,
+        'shippingCity': 'Freetown',
+        'seller': {
+          'store': {'name': pickupName},
+          'businessInfo': {
+            'businessName': '$pickupName Ltd',
+            'pocContact': '+23277987654',
+            'street': '25 Siaka Stevens St',
+            'city': 'Freetown',
+            'latitude': 8.484,
+            'longitude': -13.234,
+          },
+        },
+        'items': [
+          {
+            'id': 'cuid_item_1',
+            'quantity': 1,
+            'price': subtotal,
+            'productNameSnapshot': 'Samsung Galaxy A54',
+            'product': {
+              'name': 'Samsung Galaxy A54',
+              'images': ['https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=400'],
+            },
+          },
+        ],
+      },
+    };
   }
 }
