@@ -868,6 +868,8 @@ class MockInterceptor extends Interceptor {
       }
 
       if (status == 'DELIVERED') {
+        final proofImage = data['proofImage']?.toString() ??
+            'https://development.meeemsl.com/delivery-proofs/proof-123.jpg';
         return Response(
           requestOptions: options,
           statusCode: 200,
@@ -878,6 +880,7 @@ class MockInterceptor extends Interceptor {
               'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
               'status': 'DELIVERED',
               'deliveredAt': DateTime.now().toUtc().toIso8601String(),
+              'deliveryProofImage': proofImage,
             },
           },
         );

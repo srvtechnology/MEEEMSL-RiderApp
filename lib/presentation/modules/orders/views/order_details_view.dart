@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -126,6 +127,56 @@ class OrderDetailsView extends StatelessWidget {
                 ],
               ),
             ),
+
+            // Proof of Delivery Photo (Part 3 Section 4.3 & 5.3)
+            if (order.proofPhotoUrl != null && order.proofPhotoUrl!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              CustomCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.verified_outlined, color: AppColors.success, size: 20),
+                        const SizedBox(width: 8),
+                        Text('Handover Proof Photo', style: AppTextStyles.titleMedium()),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: order.proofPhotoUrl!.startsWith('http')
+                          ? Image.network(
+                              order.proofPhotoUrl!,
+                              width: double.infinity,
+                              height: 200,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 120,
+                                color: AppColors.lightSurfaceVariant,
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                                ),
+                              ),
+                            )
+                          : Image.file(
+                              File(order.proofPhotoUrl!),
+                              width: double.infinity,
+                              height: 200,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 120,
+                                color: AppColors.lightSurfaceVariant,
+                                child: const Center(
+                                  child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

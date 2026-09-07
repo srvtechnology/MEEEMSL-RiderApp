@@ -177,7 +177,7 @@ class OrderModel extends OrderEntity {
               : DateTime.now()),
       notes: json['notes'] as String? ?? '',
       deliveryOtp: deliveryOtp,
-      proofPhotoUrl: json['proofPhotoUrl'] as String?,
+      proofPhotoUrl: (json['proofPhotoUrl'] ?? json['deliveryProofImage']) as String?,
     );
   }
 

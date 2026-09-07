@@ -16,6 +16,8 @@ class CustomTextField extends StatelessWidget {
   final int maxLines;
   final bool readOnly;
   final VoidCallback? onTap;
+  final bool autofocus;
+  final int? maxLength;
 
   const CustomTextField({
     super.key,
@@ -32,6 +34,8 @@ class CustomTextField extends StatelessWidget {
     this.maxLines = 1,
     this.readOnly = false,
     this.onTap,
+    this.autofocus = false,
+    this.maxLength,
   });
 
   @override
@@ -58,6 +62,8 @@ class CustomTextField extends StatelessWidget {
           onChanged: onChanged,
           maxLines: maxLines,
           readOnly: readOnly,
+          autofocus: autofocus,
+          maxLength: maxLength,
           onTap: onTap,
           decoration: InputDecoration(
             hintText: hintText,

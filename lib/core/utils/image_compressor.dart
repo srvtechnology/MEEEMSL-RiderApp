@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -85,6 +86,27 @@ class ImageCompressor {
       debugPrint('[ImageCompressor] Note: Falling back to original path: $e');
     }
 
+    return filePath;
+  }
+
+  /// Converts a local image file at [filePath] into a Base64 Data URI
+  /// conforming to MOBILE_RIDER_APP_API_DOC_PART_3.md Section 4.3:
+  /// `"data:image/jpeg;base64,..."`
+  static Future<String> fileToBase64DataUri(String? filePath) async {
+    if (filePath == null || filePath.isEmpty) return '';
+    if (filePath.startsWith('http') || filePath.startsWith('data:')) {
+      return filePath;
+    }
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        final bytes = await file.readAsBytes();
+        final base64String = base64Encode(bytes);
+        return 'data:image/jpeg;base64,$base64String';
+      }
+    } catch (e) {
+      debugPrint('[ImageCompressor] Failed to encode image to base64: $e');
+    }
     return filePath;
   }
 }

@@ -1,5 +1,6 @@
 import '../../core/constants/api_endpoints.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/utils/image_compressor.dart';
 import '../../domain/entities/order_entity.dart';
 import '../models/order_model.dart';
 
@@ -149,24 +150,35 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       payload['otp'] = customerOtp;
     }
     if (proofPhotoUrl != null && proofPhotoUrl.isNotEmpty) {
-      payload['proofImage'] = proofPhotoUrl;
+      String? proofPayload = proofPhotoUrl;
+      if (!proofPhotoUrl.startsWith('http') && !proofPhotoUrl.startsWith('data:')) {
+        proofPayload = await ImageCompressor.fileToBase64DataUri(proofPhotoUrl);
+      }
+      payload['proofImage'] = proofPayload;
     }
     if (cancellationReason != null && cancellationReason.isNotEmpty) {
       payload['cancellationReason'] = cancellationReason;
     }
 
+    String? backendProofUrl;
     try {
-      await _dioClient.dio.post(
+      final response = await _dioClient.dio.post(
         ApiEndpoints.updateDeliveryStatus(orderId),
         data: payload,
       );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'];
+        if (data is Map<String, dynamic>) {
+          backendProofUrl = data['deliveryProofImage']?.toString();
+        }
+      }
     } catch (_) {}
 
     final index = _activeOrders.indexWhere((o) => o.id == orderId);
     if (index != -1) {
       final updatedEntity = _activeOrders[index].copyWith(
         status: status,
-        proofPhotoUrl: proofPhotoUrl ?? _activeOrders[index].proofPhotoUrl,
+        proofPhotoUrl: backendProofUrl ?? proofPhotoUrl ?? _activeOrders[index].proofPhotoUrl,
         deliveryOtp: customerOtp ?? _activeOrders[index].deliveryOtp,
       );
       final updated = OrderModel.fromEntity(updatedEntity);
@@ -200,7 +212,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       estimatedDurationMin: 0,
       createdAt: DateTime.now(),
       deliveryOtp: customerOtp ?? '',
-      proofPhotoUrl: proofPhotoUrl,
+      proofPhotoUrl: backendProofUrl ?? proofPhotoUrl,
     );
   }
 
