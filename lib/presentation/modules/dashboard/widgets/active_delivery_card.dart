@@ -12,6 +12,7 @@ import '../../../../domain/entities/order_entity.dart';
 import '../../../routes/app_routes.dart';
 import '../controllers/dashboard_controller.dart';
 import '../../orders/controllers/orders_controller.dart';
+import '../../orders/widgets/milestone_stepper.dart';
 import 'emergency_reassign_dialog.dart';
 
 /// Comprehensive interactive delivery mission cockpit
@@ -102,8 +103,8 @@ class ActiveDeliveryCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Milestone Stepper Pipeline (Section 5.1 & 8)
-                _buildMilestonePipeline(context, order.status),
+                // 5-Step Delivery Milestone Stepper Component (Section 4.4 #2 & Section 5)
+                MilestoneStepper(status: order.status, showLabels: true),
                 const SizedBox(height: 18),
 
                 // Destination and Route Information
@@ -388,103 +389,6 @@ class ActiveDeliveryCard extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  Widget _buildMilestonePipeline(BuildContext context, OrderStatus status) {
-    final steps = [
-      {'name': 'Accepted', 'status': OrderStatus.accepted},
-      {'name': 'At Store', 'status': OrderStatus.atPickup},
-      {'name': 'Picked Up', 'status': OrderStatus.pickedUp},
-      {'name': 'Delivering', 'status': OrderStatus.outForDelivery},
-      {'name': 'Delivered', 'status': OrderStatus.delivered},
-    ];
-
-    final currentIndex = _getStatusIndex(status);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'DELIVERY MILESTONE',
-              style: AppTextStyles.labelSmall(),
-            ),
-            Text(
-              status.stepNumberText,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: List.generate(steps.length, (index) {
-            final isCompleted = index < currentIndex;
-            final isCurrent = index == currentIndex;
-
-            return Expanded(
-              child: Row(
-                children: [
-                  Container(
-                    width: 22,
-                    height: 22,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isCompleted
-                          ? AppColors.success
-                          : (isCurrent ? AppColors.primary : const Color(0xFFE2E8F0)),
-                    ),
-                    child: Center(
-                      child: isCompleted
-                          ? const Icon(Icons.check, size: 13, color: Colors.white)
-                          : Text(
-                              '${index + 1}',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                                color: isCurrent ? Colors.white : Colors.grey.shade600,
-                              ),
-                            ),
-                    ),
-                  ),
-                  if (index < steps.length - 1)
-                    Expanded(
-                      child: Container(
-                        height: 3,
-                        color: index < currentIndex
-                            ? AppColors.success
-                            : const Color(0xFFE2E8F0),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          }),
-        ),
-      ],
-    );
-  }
-
-  int _getStatusIndex(OrderStatus status) {
-    switch (status) {
-      case OrderStatus.accepted:
-        return 0;
-      case OrderStatus.atPickup:
-        return 1;
-      case OrderStatus.pickedUp:
-        return 2;
-      case OrderStatus.outForDelivery:
-        return 3;
-      case OrderStatus.delivered:
-        return 4;
-      default:
-        return 0;
-    }
   }
 
   String _getActionLabel(OrderStatus status) {

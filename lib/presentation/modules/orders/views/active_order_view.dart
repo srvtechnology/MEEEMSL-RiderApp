@@ -10,6 +10,7 @@ import '../../../../core/widgets/status_badge.dart';
 import '../../../../core/widgets/swipe_button.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../controllers/orders_controller.dart';
+import '../widgets/milestone_stepper.dart';
 import '../../../routes/app_routes.dart';
 
 class ActiveOrderView extends GetView<OrdersController> {
@@ -111,54 +112,32 @@ class ActiveOrderView extends GetView<OrdersController> {
 
   Widget _buildStatusProgressCard(OrderEntity order) {
     return CustomCard(
-      backgroundColor: AppColors.primaryContainer,
+      backgroundColor: Colors.white,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                order.status.stepNumberText.toUpperCase(),
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.primary),
-              ),
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   StatusBadge(
-                    text: order.orderNumber,
+                    text: order.orderNumber.startsWith('#') ? order.orderNumber : '#${order.orderNumber}',
                     type: BadgeType.info,
                   ),
                   const SizedBox(width: 8),
                   DeliveryEarningBadge(amount: order.riderEarnings, isCompact: true),
                 ],
               ),
+              StatusBadge(
+                text: order.status.displayName,
+                type: order.status == OrderStatus.delivered ? BadgeType.success : BadgeType.warning,
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            order.status.displayName,
-            style: AppTextStyles.headlineSmall(color: AppColors.primaryDark),
-          ),
-          const SizedBox(height: 8),
-          // Visual Step Progress Bar
-          Row(
-            children: List.generate(5, (index) {
-              final stepIndex = order.status.index - 1;
-              final isPassed = index <= stepIndex;
-
-              return Expanded(
-                child: Container(
-                  height: 4,
-                  margin: const EdgeInsets.symmetric(horizontal: 2),
-                  decoration: BoxDecoration(
-                    color: isPassed ? AppColors.primary : AppColors.lightCardBorder,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              );
-            }),
-          ),
+          const SizedBox(height: 14),
+          MilestoneStepper(status: order.status, showLabels: true),
         ],
       ),
     );
