@@ -14,9 +14,9 @@ class Formatters {
 
   static String formatDistance(double km) {
     if (km < 1.0) {
-      return '\${(km * 1000).toInt()} m';
+      return '${(km * 1000).toInt()} m';
     }
-    return '\${km.toStringAsFixed(1)} km';
+    return '${km.toStringAsFixed(1)} km';
   }
 
   static String formatDuration(int minutes) {

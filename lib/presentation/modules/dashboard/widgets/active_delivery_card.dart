@@ -10,6 +10,7 @@ import '../../../../core/widgets/status_badge.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../../../routes/app_routes.dart';
 import '../controllers/dashboard_controller.dart';
+import '../../orders/controllers/orders_controller.dart';
 import 'emergency_reassign_dialog.dart';
 
 /// Comprehensive interactive delivery mission cockpit
@@ -367,7 +368,12 @@ class ActiveDeliveryCard extends StatelessWidget {
                       ),
                     ),
                     InkWell(
-                      onTap: () => Get.toNamed(AppRoutes.activeOrder),
+                      onTap: () {
+                        if (Get.isRegistered<OrdersController>()) {
+                          Get.find<OrdersController>().selectedOrder.value = order;
+                        }
+                        Get.toNamed(AppRoutes.navigation);
+                      },
                       child: Row(
                         children: [
                           Text(

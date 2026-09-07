@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -15,8 +16,8 @@ class NavigationView extends GetView<NavigationController> {
     return Scaffold(
       body: Stack(
         children: [
-          // Realistic Stylized Vector Map Canvas
-          _buildStylizedMap(context),
+          // Real Google Maps View
+          _buildGoogleMap(context),
 
           // Top Turn Instruction Banner & Destination Header
           SafeArea(
@@ -32,6 +33,34 @@ class NavigationView extends GetView<NavigationController> {
             ),
           ),
 
+          // Floating Map Action Controls (Recenter & Fit Bounds)
+          Positioned(
+            right: 16,
+            bottom: 235,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FloatingActionButton.small(
+                  heroTag: 'nav_fit_bounds_btn',
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  elevation: 4,
+                  onPressed: () => controller.fitRouteBounds(),
+                  child: const Icon(Icons.crop_free_rounded, size: 20),
+                ),
+                const SizedBox(height: 10),
+                FloatingActionButton.small(
+                  heroTag: 'nav_recenter_btn',
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  elevation: 4,
+                  onPressed: () => controller.recenterRider(),
+                  child: const Icon(Icons.my_location_rounded, size: 20),
+                ),
+              ],
+            ),
+          ),
+
           // Bottom Navigation Summary Card
           Positioned(
             left: 0,
@@ -44,84 +73,22 @@ class NavigationView extends GetView<NavigationController> {
     );
   }
 
-  Widget _buildStylizedMap(BuildContext context) {
-    return Container(
-      color: const Color(0xFFE5ECF4),
-      width: double.infinity,
-      height: double.infinity,
-      child: CustomPaint(
-        painter: MapGridPainter(),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Polyline Path Graphic
-            Positioned(
-              top: 250,
-              left: 100,
-              right: 100,
-              child: Transform.rotate(
-                angle: -0.3,
-                child: Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primary.withAlpha(120),
-                        blurRadius: 8,
-                      )
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // Rider Live Marker (Arrow Pulsing)
-            Positioned(
-              top: 360,
-              left: 170,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    )
-                  ],
-                ),
-                child: const Icon(
-                  Icons.navigation,
-                  color: Colors.white,
-                  size: 22,
-                ),
-              ),
-            ),
-            // Destination Pin
-            Positioned(
-              top: 200,
-              right: 80,
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: AppColors.secondary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.location_on, color: Colors.white, size: 20),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget _buildGoogleMap(BuildContext context) {
+    return Obx(() {
+      return GoogleMap(
+        initialCameraPosition: controller.initialCameraPosition,
+        onMapCreated: controller.onMapCreated,
+        markers: controller.markers.toSet(),
+        polylines: controller.polylines.toSet(),
+        myLocationEnabled: true,
+        myLocationButtonEnabled: false,
+        zoomControlsEnabled: false,
+        compassEnabled: true,
+        trafficEnabled: true,
+        mapToolbarEnabled: false,
+        onCameraMoveStarted: controller.onCameraMoveStarted,
+      );
+    });
   }
 
   Widget _buildTurnBanner(BuildContext context) {
@@ -146,7 +113,7 @@ class NavigationView extends GetView<NavigationController> {
               color: Colors.white.withAlpha(40),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.turn_right_rounded, color: Colors.white, size: 28),
+            child: const Icon(Icons.navigation_rounded, color: Colors.white, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -160,10 +127,12 @@ class NavigationView extends GetView<NavigationController> {
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     )),
                 const SizedBox(height: 2),
                 Text(
-                  'Then continue straight for 1.2 km',
+                  'Live turn-by-turn navigation active',
                   style: TextStyle(color: Colors.white.withAlpha(200), fontSize: 12),
                 ),
               ],
@@ -239,35 +208,46 @@ class NavigationView extends GetView<NavigationController> {
           children: [
             // ETA, Remaining Distance & Speed
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Obx(() => Column(
-                      children: [
-                        Text(
-                          '${controller.remainingMinutes.value} mins',
-                          style: AppTextStyles.navigationEta(color: AppColors.primary),
-                        ),
-                        Text('ETA', style: AppTextStyles.labelSmall()),
-                      ],
-                    )),
-                Obx(() => Column(
-                      children: [
-                        Text(
-                          Formatters.formatDistance(controller.remainingDistance.value),
-                          style: AppTextStyles.navigationEta(),
-                        ),
-                        Text('Distance', style: AppTextStyles.labelSmall()),
-                      ],
-                    )),
-                Obx(() => Column(
-                      children: [
-                        Text(
-                          '${controller.currentSpeedKmh.value} km/h',
-                          style: AppTextStyles.navigationEta(),
-                        ),
-                        Text('Speed', style: AppTextStyles.labelSmall()),
-                      ],
-                    )),
+                Expanded(
+                  child: Obx(() => Column(
+                        children: [
+                          Text(
+                            '${controller.remainingMinutes.value} mins',
+                            style: AppTextStyles.navigationEta(color: AppColors.primary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text('ETA', style: AppTextStyles.labelSmall()),
+                        ],
+                      )),
+                ),
+                Expanded(
+                  child: Obx(() => Column(
+                        children: [
+                          Text(
+                            Formatters.formatDistance(controller.remainingDistance.value),
+                            style: AppTextStyles.navigationEta(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text('Distance', style: AppTextStyles.labelSmall()),
+                        ],
+                      )),
+                ),
+                Expanded(
+                  child: Obx(() => Column(
+                        children: [
+                          Text(
+                            '${controller.currentSpeedKmh.value} km/h',
+                            style: AppTextStyles.navigationEta(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text('Speed', style: AppTextStyles.labelSmall()),
+                        ],
+                      )),
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -307,24 +287,4 @@ class NavigationView extends GetView<NavigationController> {
       ),
     );
   }
-}
-
-class MapGridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFFD6E2EE)
-      ..strokeWidth = 1.5;
-
-    // Draw stylized road grid lines
-    for (double i = 0; i < size.width; i += 60) {
-      canvas.drawLine(Offset(i, 0), Offset(i, size.height), paint);
-    }
-    for (double j = 0; j < size.height; j += 60) {
-      canvas.drawLine(Offset(0, j), Offset(size.width, j), paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
