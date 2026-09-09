@@ -609,6 +609,11 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
+    // Part 6: Rider Revenue Endpoint
+    if (path.contains(ApiEndpoints.revenue) || path.endsWith('/revenue')) {
+      return _resolve(handler, _handleRevenueEndpoint(options));
+    }
+
     // Part 2: Delivery Orders (Section 3, 4, 5, 6)
     if (path.contains('/orders')) {
       return _resolve(handler, _handleOrdersEndpoint(options));
@@ -758,6 +763,11 @@ class MockInterceptor extends Interceptor {
       );
     }
 
+    // Part 6: Rider Revenue Endpoint
+    if (path.contains(ApiEndpoints.revenue) || path.endsWith('/revenue')) {
+      return _handleRevenueEndpoint(options);
+    }
+
     // Part 2: Delivery Orders (Section 3, 4, 5, 6)
     if (path.contains('/orders')) {
       return _handleOrdersEndpoint(options);
@@ -870,6 +880,8 @@ class MockInterceptor extends Interceptor {
       if (status == 'DELIVERED') {
         final proofImage = data['proofImage']?.toString() ??
             'https://development.meeemsl.com/delivery-proofs/proof-123.jpg';
+        final otp = data['otp']?.toString() ?? '482910';
+        _markMockRevenueDelivered(assignmentId, proofImage, otp);
         return Response(
           requestOptions: options,
           statusCode: 200,
@@ -1107,5 +1119,243 @@ class MockInterceptor extends Interceptor {
         ],
       },
     };
+  }
+
+  static final List<Map<String, dynamic>> _mockRevenueDeliveries = [
+    {
+      'id': 'cly1234567890',
+      'assignmentId': 'cly1234567890',
+      'orderId': 'order_abc123',
+      'orderNumber': 'meeem00000042',
+      'status': 'DELIVERED',
+      'statusCategory': 'DELIVERED',
+      'isDelivered': true,
+      'offeredAt': DateTime.now().subtract(const Duration(hours: 3)).toUtc().toIso8601String(),
+      'acceptedAt': DateTime.now().subtract(const Duration(hours: 2, minutes: 55)).toUtc().toIso8601String(),
+      'pickedUpAt': DateTime.now().subtract(const Duration(hours: 2, minutes: 30)).toUtc().toIso8601String(),
+      'deliveredAt': DateTime.now().subtract(const Duration(hours: 2)).toUtc().toIso8601String(),
+      'deliveryOtp': '482910',
+      'deliveryProofImage': 'https://development.meeemsl.com/uploads/delivery-proofs/proof-123.jpg',
+      'distanceKm': 4.2,
+      'deliveryCharge': 25000.0,
+      'totalAmount': 25000.0,
+      'store': {
+        'id': 'seller_xyz',
+        'name': 'Kroo Town Electronics',
+        'phone': '+23276112233',
+        'address': '14 Kroo Town Road, Central, Freetown',
+      },
+      'customer': {
+        'id': 'user_cust_01',
+        'name': 'Amadu Kamara',
+        'phone': '+23278990011',
+        'dropAddress': '22 Siaka Stevens Street, Freetown',
+      },
+      'items': [
+        {
+          'id': 'item_line_01',
+          'productId': 'prod_phone_case',
+          'name': 'Heavy Duty Shockproof Case',
+          'variantName': 'Black / iPhone 15 Pro',
+          'quantity': 1,
+          'price': 120000.0,
+          'shippingAmount': 15000.0,
+          'image': 'https://images.unsplash.com/photo-1541807084-5c52b6b3adef?w=300',
+        },
+        {
+          'id': 'item_line_02',
+          'productId': 'prod_screen_guard',
+          'name': '9H Tempered Glass Screen Protector',
+          'variantName': 'Pack of 2',
+          'quantity': 2,
+          'price': 60000.0,
+          'shippingAmount': 10000.0,
+          'image': 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=300',
+        },
+      ],
+      'totalItemsCount': 3,
+    },
+    {
+      'id': 'cly9876543210',
+      'assignmentId': 'cly9876543210',
+      'orderId': 'order_def456',
+      'orderNumber': 'meeem00000045',
+      'status': 'OUT_FOR_DELIVERY',
+      'statusCategory': 'IN_PROGRESS',
+      'isDelivered': false,
+      'offeredAt': DateTime.now().subtract(const Duration(minutes: 45)).toUtc().toIso8601String(),
+      'acceptedAt': DateTime.now().subtract(const Duration(minutes: 40)).toUtc().toIso8601String(),
+      'pickedUpAt': DateTime.now().subtract(const Duration(minutes: 20)).toUtc().toIso8601String(),
+      'deliveredAt': null,
+      'deliveryOtp': null,
+      'deliveryProofImage': null,
+      'distanceKm': 6.1,
+      'deliveryCharge': 35000.0,
+      'totalAmount': null,
+      'store': {
+        'id': 'seller_abc',
+        'name': 'Lumley Fashion Store',
+        'phone': '+23277889900',
+        'address': '55 Lumley Beach Road, Freetown',
+      },
+      'customer': {
+        'id': 'user_cust_02',
+        'name': 'Fatmata Sesay',
+        'phone': '+23276554433',
+        'dropAddress': '12 Wilkinson Road, Freetown',
+      },
+      'items': [
+        {
+          'id': 'item_line_03',
+          'productId': 'prod_dress',
+          'name': 'Summer Floral Midi Dress',
+          'variantName': 'Medium / Yellow',
+          'quantity': 1,
+          'price': 250000.0,
+          'shippingAmount': 35000.0,
+          'image': 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300',
+        },
+      ],
+      'totalItemsCount': 1,
+    },
+    {
+      'id': 'cly5554443322',
+      'assignmentId': 'cly5554443322',
+      'orderId': 'order_ghi789',
+      'orderNumber': 'meeem00000038',
+      'status': 'DELIVERED',
+      'statusCategory': 'DELIVERED',
+      'isDelivered': true,
+      'offeredAt': DateTime.now().subtract(const Duration(days: 1, hours: 4)).toUtc().toIso8601String(),
+      'acceptedAt': DateTime.now().subtract(const Duration(days: 1, hours: 3, minutes: 50)).toUtc().toIso8601String(),
+      'pickedUpAt': DateTime.now().subtract(const Duration(days: 1, hours: 3, minutes: 20)).toUtc().toIso8601String(),
+      'deliveredAt': DateTime.now().subtract(const Duration(days: 1, hours: 2, minutes: 40)).toUtc().toIso8601String(),
+      'deliveryOtp': '639201',
+      'deliveryProofImage': 'https://development.meeemsl.com/uploads/delivery-proofs/proof-120.jpg',
+      'distanceKm': 3.5,
+      'deliveryCharge': 20000.0,
+      'totalAmount': 20000.0,
+      'store': {
+        'id': 'seller_med',
+        'name': 'Wilkinson Health Pharmacy',
+        'phone': '+23278223344',
+        'address': '8 Wilkinson Road, Freetown',
+      },
+      'customer': {
+        'id': 'user_cust_03',
+        'name': 'Mohamed Conteh',
+        'phone': '+23276887766',
+        'dropAddress': '4 Sanders Street, Central Freetown',
+      },
+      'items': [
+        {
+          'id': 'item_line_04',
+          'productId': 'prod_vitamin_c',
+          'name': 'Immune Support Vitamin C 1000mg',
+          'variantName': '60 Tablets',
+          'quantity': 2,
+          'price': 85000.0,
+          'shippingAmount': 20000.0,
+          'image': 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=300',
+        },
+      ],
+      'totalItemsCount': 2,
+    },
+  ];
+
+  static void _markMockRevenueDelivered(String assignmentId, String? proofImage, String? otp) {
+    for (final del in _mockRevenueDeliveries) {
+      if (del['assignmentId'] == assignmentId || del['id'] == assignmentId || del['isDelivered'] == false) {
+        del['status'] = 'DELIVERED';
+        del['statusCategory'] = 'DELIVERED';
+        del['isDelivered'] = true;
+        del['totalAmount'] = del['deliveryCharge'];
+        del['deliveredAt'] = DateTime.now().toUtc().toIso8601String();
+        if (proofImage != null) del['deliveryProofImage'] = proofImage;
+        if (otp != null) del['deliveryOtp'] = otp;
+        break;
+      }
+    }
+  }
+
+  static Response _handleRevenueEndpoint(RequestOptions options) {
+    final statusFilter = options.queryParameters['status']?.toString().toLowerCase() ?? 'all';
+    final periodFilter = options.queryParameters['period']?.toString().toLowerCase() ?? 'all';
+    final searchFilter = options.queryParameters['search']?.toString().toLowerCase().trim() ?? '';
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final weekStart = now.subtract(const Duration(days: 7));
+    final monthStart = now.subtract(const Duration(days: 30));
+
+    final filtered = _mockRevenueDeliveries.where((del) {
+      // 1. Status Filter
+      if (statusFilter == 'delivered' && del['isDelivered'] != true) return false;
+      if (statusFilter == 'inprogress' && del['isDelivered'] == true) return false;
+
+      // 2. Period Filter
+      final dateStr = del['deliveredAt'] ?? del['offeredAt'];
+      final date = dateStr != null ? DateTime.tryParse(dateStr.toString()) : null;
+      if (date != null) {
+        if (periodFilter == 'today' && date.isBefore(todayStart)) return false;
+        if (periodFilter == 'week' && date.isBefore(weekStart)) return false;
+        if (periodFilter == 'month' && date.isBefore(monthStart)) return false;
+      }
+
+      // 3. Search Filter
+      if (searchFilter.isNotEmpty) {
+        final orderNum = del['orderNumber']?.toString().toLowerCase() ?? '';
+        final storeName = del['store']?['name']?.toString().toLowerCase() ?? '';
+        final custName = del['customer']?['name']?.toString().toLowerCase() ?? '';
+        if (!orderNum.contains(searchFilter) &&
+            !storeName.contains(searchFilter) &&
+            !custName.contains(searchFilter)) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    double totalDeliveredRevenue = 0.0;
+    double pendingInProgressRevenue = 0.0;
+    int deliveredCount = 0;
+    int inProgressCount = 0;
+
+    for (final del in _mockRevenueDeliveries) {
+      final charge = (del['deliveryCharge'] as num?)?.toDouble() ?? 0.0;
+      if (del['isDelivered'] == true) {
+        totalDeliveredRevenue += charge;
+        deliveredCount++;
+      } else {
+        pendingInProgressRevenue += charge;
+        inProgressCount++;
+      }
+    }
+
+    return Response(
+      requestOptions: options,
+      statusCode: 200,
+      data: {
+        'success': true,
+        'data': {
+          'summary': {
+            'totalDeliveredRevenue': totalDeliveredRevenue,
+            'pendingInProgressRevenue': pendingInProgressRevenue,
+            'deliveredCount': deliveredCount,
+            'inProgressCount': inProgressCount,
+            'totalDeliveriesCount': _mockRevenueDeliveries.length,
+            'currency': 'NLe',
+          },
+          'filters': {
+            'status': statusFilter,
+            'period': periodFilter,
+            'search': searchFilter,
+          },
+          'count': filtered.length,
+          'deliveries': filtered,
+        },
+      },
+    );
   }
 }

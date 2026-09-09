@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../dashboard/views/dashboard_view.dart';
 import '../../orders/views/order_history_view.dart';
 import '../../earnings/views/earnings_view.dart';
 import '../../profile/views/profile_view.dart';
+import '../../../widgets/rider_drawer.dart';
 import '../controllers/main_layout_controller.dart';
 
 class MainLayoutView extends GetView<MainLayoutController> {
@@ -19,6 +21,7 @@ class MainLayoutView extends GetView<MainLayoutController> {
     ];
 
     return Obx(() => Scaffold(
+          drawer: const RiderDrawer(),
           body: IndexedStack(
             index: controller.currentIndex.value,
             children: pages,
@@ -40,7 +43,7 @@ class MainLayoutView extends GetView<MainLayoutController> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.account_balance_wallet_outlined),
                 activeIcon: Icon(Icons.account_balance_wallet),
-                label: 'Earnings',
+                label: AppStrings.myRevenue,
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outline_rounded),

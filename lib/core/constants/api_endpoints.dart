@@ -36,6 +36,9 @@ class ApiEndpoints {
   static String acceptOrderAssignment(String id) => '/orders/$id/accept';
   static String rejectOrderOffer(String id) => '/orders/$id/reject';
   static String updateDeliveryStatus(String id) => '/orders/$id/status';
+  
+  // Part 6: Rider "My Revenue" & Delivery Earnings Engine
+  static const String revenue = '/revenue';
 
   /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC (Part 1)
   static const Set<String> part1Endpoints = {
@@ -110,9 +113,15 @@ class ApiEndpoints {
     return regExp.hasMatch(cleanPath);
   }
 
-  /// Returns true if [path] is documented in Part 1 or Part 2.
+  /// Returns true if [path] is documented in Part 6 (Rider My Revenue & Delivery Earnings Engine)
+  static bool isPart6Endpoint(String path) {
+    final cleanPath = normalizePath(path);
+    return cleanPath == revenue;
+  }
+
+  /// Returns true if [path] is documented in Part 1, Part 2, or Part 6.
   static bool isDocumentedEndpoint(String path) {
-    return isPart1Endpoint(path) || isPart2Endpoint(path);
+    return isPart1Endpoint(path) || isPart2Endpoint(path) || isPart6Endpoint(path);
   }
 
   // 4. Forgot & Reset Password

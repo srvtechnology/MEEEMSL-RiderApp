@@ -128,6 +128,24 @@ class AppStrings {
 
   // Earnings
   static const String wallet = 'Wallet & Earnings';
+  static const String myRevenue = 'My Revenue';
+  static const String totalDeliveredRevenue = 'Total Delivered Revenue';
+  static const String inProgressPotential = 'In-Progress Potential';
+  static const String activeInTransitDrops = 'Active In-Transit Drops';
+  static const String completedDeliveries = 'Completed Deliveries';
+  static const String pendingUponDelivery = 'Pending (Upon Delivery)';
+  static const String totalEarned = 'Total Earned';
+  static const String deliveryCharge = 'Delivery Charge';
+  static const String itemsInPackage = 'Items in this package';
+  static const String itemDeliveryFee = 'Delivery Fee';
+  static const String allDeliveries = 'All Deliveries';
+  static const String delivered = 'Delivered';
+  static const String inProgress = 'In Progress';
+  static const String allTime = 'All Time';
+  static const String today = 'Today';
+  static const String thisWeek = 'This Week';
+  static const String thisMonth = 'This Month';
+  static const String searchOrdersOrStores = 'Search by Order # or Store name...';
   static const String availableForPayout = 'Available Balance';
   static const String cashOut = 'Cash Out';
   static const String daily = 'Daily';

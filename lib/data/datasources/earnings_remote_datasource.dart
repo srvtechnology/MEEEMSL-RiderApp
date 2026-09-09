@@ -1,12 +1,20 @@
+import 'package:dio/dio.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
 import '../../domain/entities/earnings_entity.dart';
 import '../models/earnings_model.dart';
+import '../models/rider_revenue_model.dart';
 import '../models/transaction_model.dart';
 
 abstract class EarningsRemoteDataSource {
   Future<EarningsModel> getEarnings(String period);
   Future<bool> requestPayout(double amount, String paymentMethod);
+  Future<RiderRevenueDataModel> getRiderRevenue({
+    String status = 'all',
+    String period = 'all',
+    String search = '',
+  });
 }
 
 class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
@@ -130,5 +138,41 @@ class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
   @override
   Future<bool> requestPayout(double amount, String paymentMethod) async {
     return true;
+  }
+
+  @override
+  Future<RiderRevenueDataModel> getRiderRevenue({
+    String status = 'all',
+    String period = 'all',
+    String search = '',
+  }) async {
+    try {
+      final queryParams = <String, dynamic>{
+        'status': status,
+        'period': period,
+        if (search.trim().isNotEmpty) 'search': search.trim(),
+      };
+
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.revenue,
+        queryParameters: queryParams,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        if (data is Map<String, dynamic>) {
+          return RiderRevenueDataModel.fromJson(data);
+        }
+      }
+      throw const ServerException(message: 'Invalid response from revenue API');
+    } on DioException catch (e) {
+      throw ServerException(
+        message: e.response?.data?['message']?.toString() ?? e.message ?? 'Failed to load revenue',
+        statusCode: e.response?.statusCode,
+      );
+    } catch (e) {
+      if (e is ServerException) rethrow;
+      throw ServerException(message: e.toString());
+    }
   }
 }

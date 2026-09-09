@@ -24,6 +24,7 @@ import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_history_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
 import '../../../../domain/usecases/earnings/get_earnings_breakdown_usecase.dart';
+import '../../../../domain/usecases/earnings/get_rider_revenue_usecase.dart';
 import '../../../../domain/usecases/earnings/request_payout_usecase.dart';
 import '../../../../domain/usecases/profile/get_profile_usecase.dart';
 import '../../../../domain/usecases/profile/update_profile_usecase.dart';
@@ -86,6 +87,7 @@ class MainLayoutBinding extends Bindings {
     Get.lazyPut(() => GetOrderDetailsUseCase(Get.find<OrderRepository>()));
 
     Get.lazyPut(() => GetEarningsBreakdownUseCase(Get.find<EarningsRepository>()));
+    Get.lazyPut(() => GetRiderRevenueUseCase(Get.find<EarningsRepository>()));
     Get.lazyPut(() => RequestPayoutUseCase(Get.find<EarningsRepository>()));
 
     Get.lazyPut(() => GetProfileUseCase(Get.find<ProfileRepository>()));
@@ -118,6 +120,7 @@ class MainLayoutBinding extends Bindings {
         ));
 
     Get.lazyPut<EarningsController>(() => EarningsController(
+          getRiderRevenueUseCase: Get.find<GetRiderRevenueUseCase>(),
           getEarningsBreakdownUseCase: Get.find<GetEarningsBreakdownUseCase>(),
           requestPayoutUseCase: Get.find<RequestPayoutUseCase>(),
         ));

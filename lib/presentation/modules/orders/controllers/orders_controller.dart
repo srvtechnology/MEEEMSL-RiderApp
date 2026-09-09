@@ -7,6 +7,8 @@ import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_history_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
 import '../../../../core/services/location_service.dart';
+import '../../dashboard/controllers/dashboard_controller.dart';
+import '../../earnings/controllers/earnings_controller.dart';
 import '../widgets/delivery_proof_dialog.dart';
 import '../../../routes/app_routes.dart';
 
@@ -136,8 +138,18 @@ class OrdersController extends GetxController {
         selectedOrder.value = null;
         _loadActiveOrders();
         _loadHistory();
+
+        // Immediately refresh Rider Revenue & Earnings Engine (Part 6 Section 6 & 8 #8)
+        if (Get.isRegistered<EarningsController>()) {
+          Get.find<EarningsController>().loadRevenue(showLoading: false);
+          Get.find<EarningsController>().loadEarnings();
+        }
+        if (Get.isRegistered<DashboardController>()) {
+          Get.find<DashboardController>().loadDashboardData();
+        }
+
         Get.offNamed(AppRoutes.main);
-        Get.snackbar('🎉 Delivered Successfully!', 'Great job! Earnings have been credited to your wallet.',
+        Get.snackbar('🎉 Delivered Successfully!', 'Great job! Delivery charge credited to your realized revenue.',
             snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
       },
     );

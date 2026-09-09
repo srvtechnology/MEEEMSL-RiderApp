@@ -3,10 +3,11 @@ import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/custom_button.dart';
-import '../../../../core/widgets/custom_card.dart';
+import '../../../../domain/entities/rider_revenue_entity.dart';
 import '../controllers/earnings_controller.dart';
+import '../widgets/revenue_delivery_card.dart';
+import '../widgets/revenue_kpi_card.dart';
 
 class EarningsView extends GetView<EarningsController> {
   const EarningsView({super.key});
@@ -15,39 +16,106 @@ class EarningsView extends GetView<EarningsController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.wallet),
+        title: const Text(AppStrings.myRevenue),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_on_rounded, color: Colors.amber),
+            tooltip: AppStrings.cashOut,
+            onPressed: () => controller.openPayoutModal(),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: () => controller.loadRevenue(),
+          ),
+        ],
       ),
       body: Obx(() {
-        final data = controller.earningsData.value;
-        if (data == null && controller.isLoading.value) {
+        final revenue = controller.revenueData.value;
+        if (revenue == null && controller.isLoading.value) {
           return const Center(child: CircularProgressIndicator());
         }
 
+        final summary = revenue?.summary ??
+            const RiderRevenueSummaryEntity(
+              totalDeliveredRevenue: 0,
+              pendingInProgressRevenue: 0,
+              deliveredCount: 0,
+              inProgressCount: 0,
+              totalDeliveriesCount: 0,
+              currency: 'NLe',
+            );
+
         return RefreshIndicator(
-          onRefresh: () => controller.loadEarnings(),
+          onRefresh: () => controller.loadRevenue(),
           child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Available Balance Card
-                _buildAvailableBalanceCard(data?.availablePayout ?? 642.50),
+                // 1. Top KPI Summary Cards (Section 5.1)
+                RevenueKpiCard.delivered(
+                  amount: summary.totalDeliveredRevenue,
+                  count: summary.deliveredCount,
+                  currency: summary.currency,
+                ),
+                const SizedBox(height: 12),
+                RevenueKpiCard.inProgress(
+                  amount: summary.pendingInProgressRevenue,
+                  count: summary.inProgressCount,
+                  currency: summary.currency,
+                ),
+                const SizedBox(height: 18),
+
+                // 2. Search Bar
+                _buildSearchBar(context),
+                const SizedBox(height: 14),
+
+                // 3. Status Tabs (Section 5.2)
+                _buildStatusTabs(summary),
+                const SizedBox(height: 12),
+
+                // 4. Period Filter Chips (Section 5.2)
+                _buildPeriodFilterChips(),
                 const SizedBox(height: 16),
 
-                // Period Switcher
-                _buildPeriodSelector(),
-                const SizedBox(height: 16),
+                // 5. Deliveries List Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Deliveries & Package Items',
+                      style: AppTextStyles.titleMedium(),
+                    ),
+                    if (controller.isFilterLoading.value)
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    else
+                      Text(
+                        '${revenue?.deliveries.length ?? 0} shown',
+                        style: AppTextStyles.bodySmall(color: AppColors.textSecondaryLight),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
 
-                // Weekly Bar Chart Graphic
-                _buildBarChart(data),
-                const SizedBox(height: 16),
+                // 6. Deliveries Cards
+                _buildDeliveriesList(revenue?.deliveries ?? [], summary.currency),
 
-                // Earnings Breakdown
-                _buildBreakdownCard(data),
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
 
-                // Recent Transactions
-                _buildTransactionsList(data),
+                // 7. Cash Out Action Button
+                CustomButton(
+                  text: 'Request Instant Cash Out',
+                  type: ButtonType.primary,
+                  icon: Icons.account_balance_wallet_outlined,
+                  onPressed: () => controller.openPayoutModal(),
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -56,71 +124,77 @@ class EarningsView extends GetView<EarningsController> {
     );
   }
 
-  Widget _buildAvailableBalanceCard(double balance) {
+  Widget _buildSearchBar(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: AppColors.cardHeaderGradient,
-        borderRadius: BorderRadius.circular(20),
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.lightCardBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: TextField(
+        controller: controller.searchController,
+        onChanged: (val) => controller.setSearchQuery(val),
+        decoration: InputDecoration(
+          hintText: AppStrings.searchOrdersOrStores,
+          hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+          suffixIcon: controller.searchQuery.value.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close_rounded, size: 18),
+                  onPressed: () => controller.clearSearch(),
+                )
+              : null,
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusTabs(RiderRevenueSummaryEntity summary) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.lightSurfaceVariant,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(AppStrings.availableForPayout, style: AppTextStyles.labelMedium(color: Colors.white70)),
-              const Icon(Icons.account_balance_wallet_outlined, color: Colors.white70),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            Formatters.formatCurrency(balance),
-            style: AppTextStyles.earningsAmount(color: Colors.white, fontSize: 34),
-          ),
-          const SizedBox(height: 16),
-          CustomButton(
-            text: AppStrings.cashOut,
-            type: ButtonType.secondary,
-            height: 44,
-            icon: Icons.flash_on_rounded,
-            onPressed: () => controller.openPayoutModal(),
-          ),
+          _buildStatusTabItem('All (${summary.totalDeliveriesCount})', 'all'),
+          _buildStatusTabItem('Delivered (${summary.deliveredCount})', 'delivered'),
+          _buildStatusTabItem('In Progress (${summary.inProgressCount})', 'inprogress'),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodSelector() {
-    return Obx(() => Row(
-          children: [
-            _buildTabChip('Daily', 'daily'),
-            const SizedBox(width: 8),
-            _buildTabChip('Weekly', 'weekly'),
-            const SizedBox(width: 8),
-            _buildTabChip('Monthly', 'monthly'),
-          ],
-        ));
-  }
-
-  Widget _buildTabChip(String label, String value) {
-    final isSelected = controller.selectedPeriod.value == value;
+  Widget _buildStatusTabItem(String label, String statusKey) {
+    final isSelected = controller.selectedStatus.value == statusKey;
     return Expanded(
       child: GestureDetector(
-        onTap: () => controller.changePeriod(value),
+        onTap: () => controller.setStatusFilter(statusKey),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
+          padding: const EdgeInsets.symmetric(vertical: 9),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.primary : AppColors.lightSurfaceVariant,
-            borderRadius: BorderRadius.circular(10),
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withAlpha(60),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
                 color: isSelected ? Colors.white : AppColors.textPrimaryLight,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                fontSize: 12,
               ),
             ),
           ),
@@ -129,122 +203,76 @@ class EarningsView extends GetView<EarningsController> {
     );
   }
 
-  Widget _buildBarChart(dynamic data) {
-    if (data == null) return const SizedBox.shrink();
-
-    return CustomCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Weekly Performance', style: AppTextStyles.titleMedium()),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 140,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: (data.dailyData as List).map<Widget>((item) {
-                final heightFactor = item.amount > 0 ? (item.amount / 200.0).clamp(0.1, 1.0) : 0.05;
-                return Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      item.amount > 0 ? 'Nle ${item.amount.toInt()}' : '',
-                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    Container(
-                      width: 28,
-                      height: (90 * heightFactor).toDouble(),
-                      decoration: BoxDecoration(
-                        color: item.amount > 0 ? AppColors.primary : AppColors.lightCardBorder,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(item.day, style: AppTextStyles.labelSmall()),
-                  ],
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBreakdownCard(dynamic data) {
-    return CustomCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Payout Breakdown', style: AppTextStyles.titleMedium()),
-          const SizedBox(height: 12),
-          _buildBreakdownRow(AppStrings.baseFare, data?.basePay ?? 598.00),
-          _buildBreakdownRow(AppStrings.customerTips, data?.tips ?? 184.20, isHighlight: true),
-          _buildBreakdownRow(AppStrings.surgeBonus, data?.surgeBonuses ?? 110.00),
-          const Divider(height: 20),
-          _buildBreakdownRow('Total Gross', data?.weeklyEarnings ?? 892.20, isTotal: true),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBreakdownRow(String title, double amount, {bool isHighlight = false, bool isTotal = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
+  Widget _buildPeriodFilterChips() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            title,
-            style: isTotal
-                ? const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)
-                : AppTextStyles.bodyMedium(),
-          ),
-          Text(
-            Formatters.formatCurrency(amount),
-            style: TextStyle(
-              fontWeight: isTotal ? FontWeight.w800 : FontWeight.w600,
-              fontSize: isTotal ? 16 : 14,
-              color: isHighlight ? AppColors.successDark : (isTotal ? AppColors.primary : null),
-            ),
-          ),
+          _buildPeriodChip(AppStrings.allTime, 'all'),
+          const SizedBox(width: 8),
+          _buildPeriodChip(AppStrings.today, 'today'),
+          const SizedBox(width: 8),
+          _buildPeriodChip(AppStrings.thisWeek, 'week'),
+          const SizedBox(width: 8),
+          _buildPeriodChip(AppStrings.thisMonth, 'month'),
         ],
       ),
     );
   }
 
-  Widget _buildTransactionsList(dynamic data) {
-    return CustomCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(AppStrings.payoutHistory, style: AppTextStyles.titleMedium()),
-          const SizedBox(height: 12),
-          if (data?.recentTransactions != null)
-            ...((data.recentTransactions as List).map((tx) => ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
-                    backgroundColor: tx.amount > 0 ? AppColors.successLight : AppColors.primaryContainer,
-                    child: Icon(
-                      tx.amount > 0 ? Icons.arrow_downward : Icons.arrow_upward,
-                      color: tx.amount > 0 ? AppColors.successDark : AppColors.primary,
-                      size: 18,
-                    ),
-                  ),
-                  title: Text(tx.orderNumber, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                  subtitle: Text(Formatters.formatShortDate(tx.date), style: AppTextStyles.bodySmall()),
-                  trailing: Text(
-                    Formatters.formatCurrency(tx.amount),
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: tx.amount > 0 ? AppColors.successDark : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                ))),
-        ],
+  Widget _buildPeriodChip(String label, String periodKey) {
+    final isSelected = controller.selectedPeriod.value == periodKey;
+    return FilterChip(
+      label: Text(label),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        color: isSelected ? Colors.white : AppColors.textPrimaryLight,
       ),
+      selected: isSelected,
+      selectedColor: AppColors.primary,
+      backgroundColor: AppColors.lightSurfaceVariant,
+      checkmarkColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      onSelected: (_) => controller.setPeriodFilter(periodKey),
+    );
+  }
+
+  Widget _buildDeliveriesList(List<RiderRevenueDeliveryEntity> deliveries, String currency) {
+    if (deliveries.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: Colors.grey.withAlpha(15),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: const Column(
+          children: [
+            Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey),
+            SizedBox(height: 12),
+            Text(
+              'No Deliveries Found',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'There are no delivery revenue records matching the selected filters.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: deliveries
+          .map((delivery) => RevenueDeliveryCard(
+                delivery: delivery,
+                currency: currency,
+              ))
+          .toList(),
     );
   }
 }

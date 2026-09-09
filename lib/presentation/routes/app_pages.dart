@@ -12,6 +12,7 @@ import '../modules/main_layout/views/main_layout_view.dart';
 import '../modules/orders/views/active_order_view.dart';
 import '../modules/navigation/bindings/navigation_binding.dart';
 import '../modules/navigation/views/navigation_view.dart';
+import '../modules/earnings/bindings/earnings_binding.dart';
 import '../modules/earnings/views/earnings_view.dart';
 import '../modules/profile/bindings/profile_binding.dart';
 import '../modules/profile/views/profile_view.dart';
@@ -80,6 +81,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.earnings,
       page: () => const EarningsView(),
+      binding: EarningsBinding(),
       middlewares: [AuthGuard()],
     ),
     GetPage(
