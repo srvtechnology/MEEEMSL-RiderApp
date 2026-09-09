@@ -216,7 +216,7 @@ void main() {
     // Verify stats
     expect(find.text('45'), findsOneWidget); // totalTrips
     expect(find.text('★ 4.9'), findsOneWidget); // rating
-    expect(find.text('\$120.0'), findsOneWidget); // walletBalance
+    expect(find.text('Nle 120.0'), findsOneWidget); // walletBalance
   });
 
   testWidgets('ProfileView opens edit rider profile bottom sheet with vehicle type choices',

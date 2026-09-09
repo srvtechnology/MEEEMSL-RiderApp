@@ -126,7 +126,7 @@ void main() {
     // Verify Rider Name & Status
     expect(find.text('Ibrahim Koroma'), findsOneWidget);
     expect(find.text("You're Online"), findsOneWidget);
-    expect(find.text('\$148.50'), findsOneWidget);
+    expect(find.text('Nle 148.50'), findsOneWidget);
     expect(find.text('9 Trips Today'), findsOneWidget);
     expect(find.text('5.8 hrs'), findsOneWidget);
   });

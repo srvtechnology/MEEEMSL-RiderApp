@@ -198,5 +198,49 @@ void main() {
       expect(telemetryService.lastSyncTimestamp.value, isNotNull);
       expect(telemetryService.lastSyncError.value, isNull);
     });
+
+    test('1.2 Fallback Telemetry: throttles repeated REST fallback calls within 50s heartbeat', () async {
+      final mockSocket = MockSocketService();
+      final mockAuth = MockAuthLocalDataSource();
+      final mockDio = MockDio();
+
+      when(() => mockSocket.isConnected).thenReturn(false.obs);
+      when(() => mockSocket.connectionState)
+          .thenReturn(SocketConnectionState.disconnected.obs);
+      when(() => mockAuth.getToken()).thenReturn('mock_jwt_token');
+      when(() => mockAuth.getSavedRider()).thenReturn(null);
+      when(() => mockAuth.getSavedUser()).thenReturn(null);
+      when(() => mockAuth.getIsOnline()).thenReturn(true);
+
+      when(() => mockDioClient.dio).thenReturn(mockDio);
+      when(() => mockDio.post(
+            any(),
+            data: any(named: 'data'),
+          )).thenAnswer((_) async => dio.Response(
+            requestOptions: dio.RequestOptions(path: '/location'),
+            statusCode: 200,
+            data: {'success': true},
+          ));
+
+      final telemetryService = LocationService(
+        mockDioClient,
+        mockSocket,
+        mockAuth,
+      );
+      telemetryService.isTrackingActive.value = true;
+
+      // 1st call -> immediate drop / first heartbeat fallback
+      await telemetryService.sendLocationUpdate();
+
+      // 2nd call immediate after (4s simulation) -> should be throttled
+      await telemetryService.sendLocationUpdate();
+      await telemetryService.sendLocationUpdate();
+
+      // Ensure mockDio.post('/location') was only called once, not 3 times
+      verify(() => mockDio.post(
+            '/location',
+            data: any(named: 'data'),
+          )).called(1);
+    });
   });
 }

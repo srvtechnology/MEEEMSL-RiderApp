@@ -6,7 +6,7 @@ class NotificationsController extends GetxController {
     NotificationEntity(
       id: 'notif_1',
       title: '🎉 Payout Transferred',
-      message: 'Your payout request of \$250.00 has been sent to your bank.',
+      message: 'Your payout request of Nle 250.00 has been sent to your bank.',
       type: NotificationType.earnings,
       timestamp: DateTime.now().subtract(const Duration(minutes: 30)),
     ),

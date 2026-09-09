@@ -66,16 +66,17 @@ class SocketService extends GetxService {
       _socket = io.io(
         url,
         io.OptionBuilder()
-            .setTransports(['websocket'])
+            .setTransports(['websocket', 'polling'])
             .setAuth({
-              'riderId': riderId,
               'token': formattedToken,
+              'riderId': riderId,
             })
             .enableAutoConnect()
             .enableReconnection()
             .setReconnectionAttempts(double.infinity)
             .setReconnectionDelay(1000)
             .setReconnectionDelayMax(5000)
+            .setTimeout(6000)
             .build(),
       );
 
@@ -111,6 +112,9 @@ class SocketService extends GetxService {
         debugPrint('[SocketService] Telemetry socket reconnect attempt: $attempt');
         connectionState.value = SocketConnectionState.connecting;
       });
+
+      // Explicitly trigger connection
+      _socket?.connect();
     } catch (e) {
       debugPrint('[SocketService] Error creating socket connection: $e');
       isConnected.value = false;

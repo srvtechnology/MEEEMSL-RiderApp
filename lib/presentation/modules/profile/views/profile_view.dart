@@ -276,7 +276,7 @@ class ProfileView extends GetView<ProfileController> {
                 Column(
                   children: [
                     Text(
-                      '\$${(rider?.walletBalance ?? 0.0).toStringAsFixed(1)}',
+                      'Nle ${(rider?.walletBalance ?? 0.0).toStringAsFixed(1)}',
                       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.successDark),
                     ),
                     Text('Balance', style: AppTextStyles.labelSmall()),

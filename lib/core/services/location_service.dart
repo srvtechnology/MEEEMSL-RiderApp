@@ -48,6 +48,7 @@ class LocationService extends GetxService {
 
   // Telemetry intervals
   static const int telemetryIntervalSeconds = 4; // 3-5 seconds per Section 1.1
+  static const int restFallbackHeartbeatSeconds = 50; // 45-60 seconds REST heartbeat fallback per backend spec
 
   // Reactive state
   final Rx<Position?> currentPosition = Rx<Position?>(defaultFallbackPosition);
@@ -60,6 +61,8 @@ class LocationService extends GetxService {
 
   StreamSubscription<Position>? _positionSubscription;
   Timer? _periodicSyncTimer;
+  DateTime? _lastRestFallbackTimestamp;
+  bool _wasSocketConnected = false;
 
   // Fallback initial location (Downtown Delivery District)
   static final Position defaultFallbackPosition = Position(
@@ -204,11 +207,13 @@ class LocationService extends GetxService {
     _socketService.disconnect();
     isTrackingActive.value = false;
     telemetryMode.value = TelemetryMode.idle;
+    _lastRestFallbackTimestamp = null;
+    _wasSocketConnected = false;
     debugPrint('[LocationService] GPS tracking & telemetry stopped.');
   }
 
   /// Transmits current GPS telemetry via Primary Socket.IO or Fallback REST API.
-  Future<void> sendLocationUpdate() async {
+  Future<void> sendLocationUpdate({bool forceRest = false}) async {
     if (!isTrackingActive.value) return;
 
     final pos = currentPosition.value ?? defaultFallbackPosition;
@@ -232,7 +237,9 @@ class LocationService extends GetxService {
     }
 
     // 1.1 Primary Real-Time Streaming (Socket.IO)
+    // Stream coordinates every 3-5 seconds when socket is connected
     if (_socketService.isConnected.value) {
+      _wasSocketConnected = true;
       final success = _socketService.emitLocationUpdate(
         riderId: riderId,
         orderId: activeOrderId.value,
@@ -253,13 +260,29 @@ class LocationService extends GetxService {
     }
 
     // 1.2 Fallback Background Telemetry (REST API)
-    // Invoked when Socket.IO connection drops or is disconnected
-    await _sendRestFallback(
-      latitude: pos.latitude,
-      longitude: pos.longitude,
-      heading: double.parse(headingDegrees.toStringAsFixed(1)),
-      speed: double.parse(speedInKmH.toStringAsFixed(1)),
-    );
+    // Strictly an Emergency Fallback / Heartbeat:
+    // - One-off immediate call if socket just dropped (_wasSocketConnected was true)
+    // - Slow REST heartbeat once every 45-60 seconds if socket remains disconnected or in background
+    final now = DateTime.now();
+    final bool socketJustDropped = _wasSocketConnected;
+    final bool isHeartbeatDue = _lastRestFallbackTimestamp == null ||
+        now.difference(_lastRestFallbackTimestamp!).inSeconds >=
+            restFallbackHeartbeatSeconds;
+
+    if (forceRest || socketJustDropped || isHeartbeatDue) {
+      _wasSocketConnected = false;
+      _lastRestFallbackTimestamp = now;
+
+      await _sendRestFallback(
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        heading: double.parse(headingDegrees.toStringAsFixed(1)),
+        speed: double.parse(speedInKmH.toStringAsFixed(1)),
+      );
+    } else {
+      debugPrint(
+          '[LocationService] Socket disconnected; REST fallback skipped to prevent flooding (heartbeat due in ${restFallbackHeartbeatSeconds - now.difference(_lastRestFallbackTimestamp!).inSeconds}s)');
+    }
   }
 
   /// REST API Fallback (POST /mobileapi/rider/location)

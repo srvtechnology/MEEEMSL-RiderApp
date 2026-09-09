@@ -5,6 +5,7 @@ class AppStrings {
   // Common
   static const String appName = 'Meeem Rider';
   static const String appTagline = 'Fast, Reliable Partner on the Move';
+  static const String currencySymbol = 'Nle';
   static const String cancel = 'Cancel';
   static const String confirm = 'Confirm';
   static const String submit = 'Submit';

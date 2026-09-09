@@ -67,7 +67,7 @@ class _PayoutRequestBottomSheetState extends State<PayoutRequestBottomSheet> {
             controller: amountController,
             label: 'Amount to Withdraw',
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            prefixIcon: Icons.attach_money,
+            prefixIcon: Icons.payments_outlined,
           ),
           const SizedBox(height: 16),
 

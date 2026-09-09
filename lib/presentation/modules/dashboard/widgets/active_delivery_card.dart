@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
-import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/delivery_earning_badge.dart';

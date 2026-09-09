@@ -60,7 +60,7 @@ class EarningsController extends GetxController {
       (success) {
         Get.back(); // close modal
         loadEarnings();
-        Get.snackbar('Payout Initiated', 'Transfer of \$$amount sent to your bank account',
+        Get.snackbar('Payout Initiated', 'Transfer of Nle $amount sent to your bank account',
             snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
       },
     );

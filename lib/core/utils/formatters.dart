@@ -3,8 +3,10 @@ import 'package:intl/intl.dart';
 class Formatters {
   Formatters._();
 
+  static const String currencySymbol = 'Nle';
+
   static final NumberFormat _currencyFormatter = NumberFormat.currency(
-    symbol: '\$',
+    symbol: 'Nle ',
     decimalDigits: 2,
   );
 

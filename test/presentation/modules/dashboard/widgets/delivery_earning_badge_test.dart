@@ -14,7 +14,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Delivery Earning: \$20.00'), findsOneWidget);
+      expect(find.text('Delivery Earning: Nle 20.00'), findsOneWidget);
       expect(find.byIcon(Icons.payments_rounded), findsOneWidget);
 
       final container = tester.widget<Container>(find.byType(Container).first);
@@ -39,7 +39,7 @@ void main() {
         ),
       );
 
-      expect(find.text('\$14.80'), findsOneWidget);
+      expect(find.text('Nle 14.80'), findsOneWidget);
       expect(find.byIcon(Icons.payments_rounded), findsOneWidget);
     });
   });

@@ -149,7 +149,7 @@ class EarningsView extends GetView<EarningsController> {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      item.amount > 0 ? '\$${item.amount.toInt()}' : '',
+                      item.amount > 0 ? 'Nle ${item.amount.toInt()}' : '',
                       style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600),
                     ),
                     const SizedBox(height: 4),
