@@ -424,11 +424,11 @@ When `order.status === "OUT_FOR_DELIVERY"`:
 --------------------------------------------------------------------------------
 5.2 Live Rider Proximity Tracking Map & WebSocket Endpoints
 --------------------------------------------------------------------------------
-- WebSocket URL: `https://<domain>:3001` (or `wss://<domain>/socket.io`)
-- Socket Health Check: `GET https://<domain>:3001/health`
+- WebSocket URL: `https://socket.meeemsl.com` (Port 443 SSL)
+- Socket Health Check: `GET https://socket.meeemsl.com/health`
   Returns: `{"status": "ok", "service": "meeem-socket-server"}`
   Use for Docker, PM2, and load balancer uptime monitoring.
-- Internal Location Relay: `POST https://<domain>:3001/internal/location`
+- Internal Location Relay: `POST https://socket.meeemsl.com/internal/location`
   Body: `{"riderId": "...", "orderId": "...", "latitude": 12.34, "longitude": 56.78, "heading": 90, "speed": 25}`
   Returns: `{"success": true}`
 - Direct WebSocket Room: Join `order:<orderId>`, listen for `order:rider_moved` events.

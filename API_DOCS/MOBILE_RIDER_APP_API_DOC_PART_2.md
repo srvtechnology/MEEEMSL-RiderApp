@@ -4,7 +4,7 @@ MEEEM DELIVERY NETWORK — RIDER & SELLER MOBILE APP API DOCUMENTATION (PART 2)
 Version: 1.1.0
 Base URL (Rider): https://<domain>/mobileapi/rider
 Base URL (Product Seller): https://<domain>/mobileapi/product-seller
-WebSocket Server: https://<domain>:3001 (or https://<domain>/socket.io)
+WebSocket Server: https://socket.meeemsl.com (Port 443 SSL)
 Authentication Scheme: Bearer Token (JWT)
 Header: Authorization: Bearer <accessToken>
 Target Platforms: Android (Kotlin / Flutter / React Native), iOS (Swift / Flutter / React Native)
@@ -47,7 +47,7 @@ TABLE OF CONTENTS
 When the rider is active or has an ongoing delivery, stream GPS coordinates
 every 3 to 5 seconds over the persistent Socket.IO connection.
 
-Server URL: https://<domain>:3001 // https://www.meeemsl.com:3001
+Server URL: https://socket.meeemsl.com (Port 443 SSL)
 Client Library:
 - Flutter: `socket_io_client`
 - React Native / Kotlin / Swift: Standard Socket.IO client

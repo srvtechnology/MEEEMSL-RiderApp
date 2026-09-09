@@ -81,6 +81,7 @@ class SocketService extends GetxService {
       );
 
       _socket?.onConnect((_) {
+        debugPrint('[Socket] Rider connected: ${_socket?.id}');
         debugPrint('[SocketService] Connected to telemetry socket: $url');
         isConnected.value = true;
         connectionState.value = SocketConnectionState.connected;
@@ -93,6 +94,7 @@ class SocketService extends GetxService {
       });
 
       _socket?.onConnectError((error) {
+        debugPrint('[Socket] Error: $error');
         debugPrint('[SocketService] Telemetry socket connect error: $error');
         isConnected.value = false;
         connectionState.value = SocketConnectionState.error;
@@ -157,8 +159,8 @@ class SocketService extends GetxService {
     String? orderId,
     required double latitude,
     required double longitude,
-    required double heading,
-    required double speed,
+    double? heading,
+    double? speed,
   }) {
     if (_socket == null || !isConnected.value) {
       return false;
@@ -169,8 +171,8 @@ class SocketService extends GetxService {
       'orderId': orderId,
       'latitude': latitude,
       'longitude': longitude,
-      'heading': heading,
-      'speed': speed,
+      'heading': heading ?? 0.0,
+      'speed': speed ?? 0.0,
     };
 
     try {
@@ -178,7 +180,7 @@ class SocketService extends GetxService {
       lastEmittedEvent.value = 'rider:location_update';
       lastEmittedTimestamp.value = DateTime.now();
       debugPrint(
-          '[SocketService] Emitted rider:location_update: lat: $latitude, lng: $longitude, orderId: $orderId, speed: $speed km/h');
+          '[SocketService] Emitted rider:location_update: lat: $latitude, lng: $longitude, orderId: $orderId, heading: ${heading ?? 0.0}, speed: ${speed ?? 0.0} km/h');
       return true;
     } catch (e) {
       debugPrint('[SocketService] Error emitting location update: $e');

@@ -52,15 +52,9 @@ void main() {
       expect(socketService.currentRiderId.value, isNull);
     });
 
-    test('telemetrySocketUrl provides port 3001 server endpoint', () {
-      expect(ApiEndpoints.telemetrySocketUrl.contains(':3001'), isTrue);
-      expect(
-        ApiEndpoints.telemetrySocketUrl ==
-                'https://www.meeemsl.com:3001' ||
-            ApiEndpoints.telemetrySocketUrl ==
-                'https://development.meeemsl.com:3001',
-        isTrue,
-      );
+    test('telemetrySocketUrl points to dedicated SSL socket server without port 3001', () {
+      expect(ApiEndpoints.telemetrySocketUrl, 'https://socket.meeemsl.com');
+      expect(ApiEndpoints.telemetrySocketUrl.contains(':3001'), isFalse);
     });
   });
 }
