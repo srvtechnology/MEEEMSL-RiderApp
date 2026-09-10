@@ -16,6 +16,9 @@ class ApiEndpoints {
   // 1.2 Fallback Background Telemetry (REST API)
   static const String location = '/location';
 
+  // Rider Online / Offline Operational Status & Telemetry Toggle
+  static const String status = '/status';
+
   // 2. Rider Registration & OTP Verification
   static const String register = '/auth/register';
   static const String verifyRegistrationOtp = '/auth/verify-otp';
@@ -33,6 +36,7 @@ class ApiEndpoints {
   static String singleOrder(String id) => '/orders/$id';
   static String acceptOrderAssignment(String id) => '/orders/$id/accept';
   static String rejectOrderOffer(String id) => '/orders/$id/reject';
+  static String declineOrderOffer(String id) => '/orders/$id/decline';
   static String updateDeliveryStatus(String id) => '/orders/$id/status';
   
   // Part 6: Rider "My Revenue" & Delivery Earnings Engine
@@ -42,6 +46,8 @@ class ApiEndpoints {
   static const Set<String> part1Endpoints = {
     // Part 2: 1.2 Telemetry Fallback (also in Part 1)
     location,
+    // Rider Online / Offline Operational Status
+    status,
     // 2. Rider Registration & OTP Verification
     register,
     verifyRegistrationOtp,
@@ -99,6 +105,7 @@ class ApiEndpoints {
   static bool isPart2Endpoint(String path) {
     final cleanPath = normalizePath(path);
     if (cleanPath == location) return true;
+    if (cleanPath == status) return true;
     if (cleanPath == orders) return true;
     const legacySubpaths = {'/active', '/incoming', '/accept', '/decline', '/history', '/status/update'};
     for (final legacy in legacySubpaths) {
@@ -106,8 +113,8 @@ class ApiEndpoints {
         return false;
       }
     }
-    // Part 2 dynamic paths: /orders/:id, /orders/:id/accept, /orders/:id/reject, /orders/:id/status
-    final regExp = RegExp(r'^/orders/[^/]+(/(accept|reject|status))?$');
+    // Part 2 dynamic paths: /orders/:id, /orders/:id/accept, /orders/:id/reject, /orders/:id/decline, /orders/:id/status
+    final regExp = RegExp(r'^/orders/[^/]+(/(accept|reject|decline|status))?$');
     return regExp.hasMatch(cleanPath);
   }
 
@@ -120,7 +127,7 @@ class ApiEndpoints {
   /// Returns true if [path] is documented in Part 8 (Rider Mobile App — Dispatch, Acceptance, Lifecycle & Cancellation API)
   static bool isPart8Endpoint(String path) {
     final cleanPath = normalizePath(path);
-    final regExp = RegExp(r'^/orders/[^/]+/(accept|reject|status)$');
+    final regExp = RegExp(r'^/orders/[^/]+/(accept|reject|decline|status)$');
     return regExp.hasMatch(cleanPath);
   }
 
@@ -163,7 +170,7 @@ class ApiEndpoints {
 
   // Dashboard & Status
   static const String dashboardSummary = '/dashboard/summary';
-  static const String toggleOnline = '/rider/status/toggle';
+  static const String toggleOnline = status;
   static const String updateLocation = '/rider/location/update';
 
   // Orders

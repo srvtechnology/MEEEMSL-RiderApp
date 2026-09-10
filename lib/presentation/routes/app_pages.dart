@@ -11,6 +11,7 @@ import '../modules/auth/bindings/pending_approval_binding.dart';
 import '../modules/auth/views/forgot_password_view.dart';
 import '../modules/main_layout/bindings/main_layout_binding.dart';
 import '../modules/main_layout/views/main_layout_view.dart';
+import '../modules/orders/bindings/orders_binding.dart';
 import '../modules/orders/views/active_order_view.dart';
 import '../modules/navigation/bindings/navigation_binding.dart';
 import '../modules/navigation/views/navigation_view.dart';
@@ -77,6 +78,7 @@ class AppPages {
     GetPage(
       name: AppRoutes.activeOrder,
       page: () => const ActiveOrderView(),
+      binding: OrdersBinding(),
       middlewares: [AuthGuard()],
     ),
     GetPage(

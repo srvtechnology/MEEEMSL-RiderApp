@@ -28,6 +28,20 @@ class DashboardRepositoryImpl implements DashboardRepository {
   }
 
   @override
+  Future<Either<Failure, Map<String, dynamic>>> getRiderStatus() async {
+    try {
+      final statusData = await remoteDataSource.getRiderStatus();
+      final isOnline = statusData['isOnline'] as bool? ?? false;
+      await localDataSource.setIsOnline(isOnline);
+      return Right(statusData);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, Map<String, dynamic>>> getDashboardSummary() async {
     try {
       final summary = await remoteDataSource.getSummary();

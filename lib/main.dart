@@ -5,6 +5,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'app.dart';
+import 'core/constants/app_constants.dart';
 import 'core/network/api_client.dart';
 import 'core/network/dio_client.dart';
 import 'core/network/logger/api_logger.dart';
@@ -42,6 +43,8 @@ void main() async {
 
   // Global Core Dependency Registrations
   final storage = GetStorage();
+  // Ensure default status is offline on app start or reload
+  storage.write(AppConstants.isOnlineKey, false);
   Get.put<GetStorage>(storage, permanent: true);
   Get.put<DeviceInfoService>(DeviceInfoService(storage), permanent: true);
   Get.put<AsyncApiLogger>(AsyncApiLogger.instance, permanent: true);

@@ -26,6 +26,10 @@ import '../../../../domain/usecases/profile/get_settings_usecase.dart';
 import '../../../../domain/usecases/profile/update_settings_usecase.dart';
 import '../../../../domain/entities/rider_settings_entity.dart';
 import '../../../../domain/usecases/auth/unregister_device_token_usecase.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/dio_client.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../core/services/socket_service.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/device_info_service.dart';
 import '../../../routes/app_routes.dart';
@@ -565,11 +569,31 @@ class ProfileController extends GetxController {
       confirmTextColor: Colors.white,
       buttonColor: AppColors.error,
       onConfirm: () async {
+        // Checklist Point 4: Stop GPS tracking and disconnect socket
+        if (Get.isRegistered<LocationService>()) {
+          Get.find<LocationService>().stopTracking();
+        }
+        if (Get.isRegistered<SocketService>()) {
+          Get.find<SocketService>().disconnect();
+        }
+
+        // Checklist Point 4: Mark rider offline in backend BEFORE clearing tokens
+        try {
+          if (Get.isRegistered<DioClient>()) {
+            await Get.find<DioClient>().dio.post(
+                  ApiEndpoints.status,
+                  data: {'isOnline': false},
+                );
+          }
+        } catch (_) {}
+
         // Section 9.2: Unregister Device Token
         if (Get.isRegistered<NotificationService>()) {
           await Get.find<NotificationService>().unregisterCurrentDeviceToken();
         }
         final storage = GetStorage();
+        storage.write(AppConstants.isOnlineKey, false);
+        storage.remove('online_since_timestamp');
         storage.remove(AppConstants.tokenKey);
         storage.remove(AppConstants.refreshTokenKey);
         storage.remove(AppConstants.riderProfileKey);

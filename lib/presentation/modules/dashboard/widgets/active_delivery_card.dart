@@ -52,50 +52,66 @@ class ActiveDeliveryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Top Header Banner
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer.withAlpha(120),
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          order.orderNumber.startsWith('#')
-                              ? order.orderNumber
-                              : '#${order.orderNumber}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.3,
+          InkWell(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+            onTap: () {
+              if (Get.isRegistered<OrdersController>()) {
+                Get.find<OrdersController>().setActiveOrder(order);
+              }
+              Get.toNamed(AppRoutes.activeOrder);
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.primaryContainer.withAlpha(120),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Flexible(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            order.orderNumber.startsWith('#')
+                                ? order.orderNumber
+                                : '#${order.orderNumber}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.3,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    StatusBadge(
-                      text: order.status.displayName.toUpperCase(),
-                      type: BadgeType.info,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                DeliveryEarningBadge(amount: order.riderEarnings),
-              ],
+                      const SizedBox(width: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          StatusBadge(
+                            text: order.status.displayName.toUpperCase(),
+                            type: BadgeType.info,
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.primary),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  DeliveryEarningBadge(amount: order.riderEarnings),
+                ],
+              ),
             ),
           ),
 

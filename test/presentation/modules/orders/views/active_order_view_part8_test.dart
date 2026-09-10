@@ -12,6 +12,12 @@ import 'package:meeem_rider/domain/usecases/orders/update_order_status_usecase.d
 import 'package:meeem_rider/presentation/modules/orders/controllers/orders_controller.dart';
 import 'package:meeem_rider/presentation/modules/orders/views/active_order_view.dart';
 import 'package:meeem_rider/presentation/modules/orders/widgets/cancel_delivery_dialog.dart';
+import 'package:meeem_rider/domain/usecases/dashboard/get_dashboard_summary_usecase.dart';
+import 'package:meeem_rider/domain/usecases/dashboard/toggle_online_status_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/accept_order_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/decline_order_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/get_incoming_order_usecase.dart';
+import 'package:meeem_rider/presentation/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:meeem_rider/presentation/routes/app_routes.dart';
 
 class MockGetActiveOrdersUseCase extends Mock implements GetActiveOrdersUseCase {}
@@ -19,6 +25,11 @@ class MockUpdateOrderStatusUseCase extends Mock implements UpdateOrderStatusUseC
 class MockCancelTripUseCase extends Mock implements CancelTripUseCase {}
 class MockGetOrderHistoryUseCase extends Mock implements GetOrderHistoryUseCase {}
 class MockGetOrderDetailsUseCase extends Mock implements GetOrderDetailsUseCase {}
+class MockToggleOnlineStatusUseCase extends Mock implements ToggleOnlineStatusUseCase {}
+class MockGetDashboardSummaryUseCase extends Mock implements GetDashboardSummaryUseCase {}
+class MockGetIncomingOrderUseCase extends Mock implements GetIncomingOrderUseCase {}
+class MockAcceptOrderUseCase extends Mock implements AcceptOrderUseCase {}
+class MockDeclineOrderUseCase extends Mock implements DeclineOrderUseCase {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -183,6 +194,73 @@ void main() {
 
       verify(() => mockCancelTrip(order.id, 'Vehicle breakdown')).called(1);
       expect(controller.selectedOrder.value, isNull);
+    });
+
+    testWidgets('ActiveOrderView falls back to DashboardController.activeOrder when selectedOrder is null', (tester) async {
+      controller.selectedOrder.value = null;
+
+      final mockToggleOnline = MockToggleOnlineStatusUseCase();
+      final mockGetSummary = MockGetDashboardSummaryUseCase();
+      final mockGetIncomingOrder = MockGetIncomingOrderUseCase();
+      final mockAcceptOrder = MockAcceptOrderUseCase();
+      final mockDeclineOrder = MockDeclineOrderUseCase();
+
+      when(() => mockGetSummary()).thenAnswer((_) async => const Right({}));
+      final dashController = DashboardController(
+        toggleOnlineStatusUseCase: mockToggleOnline,
+        getDashboardSummaryUseCase: mockGetSummary,
+        getActiveOrdersUseCase: mockGetActiveOrders,
+        getIncomingOrderUseCase: mockGetIncomingOrder,
+        acceptOrderUseCase: mockAcceptOrder,
+        declineOrderUseCase: mockDeclineOrder,
+      );
+      final activeOrder = buildOrderWithStatus(OrderStatus.accepted);
+      dashController.activeOrder.value = activeOrder;
+      Get.put<DashboardController>(dashController);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: ActiveOrderView(),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('No active delivery order'), findsNothing);
+      expect(find.text('MEEEM Super Store'), findsOneWidget);
+      expect(find.byKey(const Key('active_order_cancel_button')), findsOneWidget);
+    });
+
+    testWidgets('acceptIncomingOrder sets OrdersController.selectedOrder and navigates', (tester) async {
+      final mockToggleOnline = MockToggleOnlineStatusUseCase();
+      final mockGetSummary = MockGetDashboardSummaryUseCase();
+      final mockGetIncomingOrder = MockGetIncomingOrderUseCase();
+      final mockAcceptOrder = MockAcceptOrderUseCase();
+      final mockDeclineOrder = MockDeclineOrderUseCase();
+
+      when(() => mockGetSummary()).thenAnswer((_) async => const Right({}));
+      final dashController = DashboardController(
+        toggleOnlineStatusUseCase: mockToggleOnline,
+        getDashboardSummaryUseCase: mockGetSummary,
+        getActiveOrdersUseCase: mockGetActiveOrders,
+        getIncomingOrderUseCase: mockGetIncomingOrder,
+        acceptOrderUseCase: mockAcceptOrder,
+        declineOrderUseCase: mockDeclineOrder,
+      );
+      Get.put<DashboardController>(dashController);
+
+      final incoming = buildOrderWithStatus(OrderStatus.pending).copyWith(id: 'order_inc_123', assignmentId: 'asgn_123');
+      dashController.incomingOrder.value = incoming;
+
+      final accepted = incoming.copyWith(status: OrderStatus.accepted);
+      when(() => mockAcceptOrder('asgn_123')).thenAnswer((_) async => Right(accepted));
+
+      expect(controller.selectedOrder.value, isNull);
+
+      await dashController.acceptIncomingOrder();
+
+      expect(controller.selectedOrder.value, isNotNull);
+      expect(controller.selectedOrder.value?.id, 'order_inc_123');
+      expect(controller.selectedOrder.value?.status, OrderStatus.accepted);
     });
   });
 }

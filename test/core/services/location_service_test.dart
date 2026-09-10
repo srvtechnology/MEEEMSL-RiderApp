@@ -116,6 +116,7 @@ void main() {
       when(() => mockAuth.getToken()).thenReturn('mock_jwt_token');
       when(() => mockAuth.getSavedRider()).thenReturn(null);
       when(() => mockAuth.getSavedUser()).thenReturn(null);
+      when(() => mockAuth.getIsOnline()).thenReturn(true);
       when(() => mockSocket.emitLocationUpdate(
             riderId: any(named: 'riderId'),
             orderId: any(named: 'orderId'),
@@ -123,6 +124,7 @@ void main() {
             longitude: any(named: 'longitude'),
             heading: any(named: 'heading'),
             speed: any(named: 'speed'),
+            isOnline: any(named: 'isOnline'),
           )).thenReturn(true);
 
       final telemetryService = LocationService(
@@ -142,6 +144,7 @@ void main() {
             longitude: any(named: 'longitude'),
             heading: any(named: 'heading'),
             speed: any(named: 'speed'),
+            isOnline: any(named: 'isOnline'),
           )).called(1);
 
       expect(telemetryService.telemetryMode.value,

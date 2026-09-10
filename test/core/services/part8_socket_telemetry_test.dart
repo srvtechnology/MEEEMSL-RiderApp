@@ -1,10 +1,12 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meeem_rider/core/constants/api_endpoints.dart';
+import 'package:meeem_rider/core/network/dio_client.dart';
 import 'package:meeem_rider/core/services/location_service.dart';
 import 'package:meeem_rider/core/services/socket_service.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockSocketService extends Mock implements SocketService {}
+class MockDioClient extends Mock implements DioClient {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -37,10 +39,11 @@ void main() {
 
     test('LocationService.setActiveOrderId calls joinOrder and leaveOrder appropriately', () {
       final mockSocket = MockSocketService();
+      final mockDioClient = MockDioClient();
       when(() => mockSocket.joinOrder(any())).thenReturn(true);
       when(() => mockSocket.leaveOrder(any())).thenReturn(true);
 
-      final locationService = LocationService(null, mockSocket);
+      final locationService = LocationService(mockDioClient, mockSocket);
 
       // Set first active order
       locationService.setActiveOrderId('cuid_order_1');
@@ -57,6 +60,24 @@ void main() {
       locationService.setActiveOrderId(null);
       expect(locationService.activeOrderId.value, isNull);
       verify(() => mockSocket.leaveOrder('cuid_order_2')).called(1);
+    });
+
+    test('emitStatusUpdate returns false when disconnected', () {
+      final result = socketService.emitStatusUpdate(
+        riderId: 'cuid_rider_1',
+        isOnline: false,
+      );
+      expect(result, isFalse);
+    });
+
+    test('emitLocationUpdate accepts isOnline and returns false when disconnected', () {
+      final result = socketService.emitLocationUpdate(
+        riderId: 'cuid_rider_1',
+        latitude: 8.484245,
+        longitude: -13.234125,
+        isOnline: true,
+      );
+      expect(result, isFalse);
     });
   });
 }

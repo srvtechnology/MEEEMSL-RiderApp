@@ -17,6 +17,7 @@ void main() {
     tearDown(() {
       NotificationService.onNewOffer = null;
       NotificationService.onDirectAssignment = null;
+      NotificationService.onAssignmentRevoked = null;
       Get.reset();
     });
 
@@ -106,6 +107,53 @@ void main() {
 
       expect(directAssignmentFired, isTrue);
       expect(receivedData?['orderId'], 'order_999');
+    });
+
+    test('handleFcmPayload with ASSIGNMENT_REVOKED triggers revocation callback', () {
+      bool revocationFired = false;
+      Map<String, dynamic>? receivedData;
+
+      NotificationService.onAssignmentRevoked = (data) {
+        revocationFired = true;
+        receivedData = data;
+      };
+
+      notificationService.handleFcmPayload({
+        'type': 'ASSIGNMENT_REVOKED',
+        'orderId': 'cmtv4o81a0002ibrgfc87dn0r',
+        'orderNumber': 'meeem00000060',
+      });
+
+      expect(revocationFired, isTrue);
+      expect(receivedData?['orderId'], 'cmtv4o81a0002ibrgfc87dn0r');
+      expect(receivedData?['orderNumber'], 'meeem00000060');
+    });
+
+    test('handleFcmPayload with dynamic NEW_OFFER includes delivery earning in alert', () {
+      bool offerFired = false;
+      Map<String, dynamic>? receivedData;
+
+      NotificationService.onNewOffer = (data, {title, body}) {
+        offerFired = true;
+        receivedData = data;
+      };
+
+      notificationService.handleFcmPayload({
+        'type': 'NEW_OFFER',
+        'orderId': 'cmtv4o81a0002ibrgfc87dn0r',
+        'orderNumber': 'meeem00000060',
+        'deliveryFee': '150.00',
+        'deliveryEarning': '150.00',
+        'shopName': 'Freetown Fresh Foods',
+        'customerName': 'Amadu Bah',
+        'customerAddress': '12 Aberdeen Road',
+        'timeout': '60',
+      });
+
+      expect(offerFired, isTrue);
+      expect(receivedData?['deliveryFee'], '150.00');
+      expect(receivedData?['shopName'], 'Freetown Fresh Foods');
+      expect(receivedData?['customerName'], 'Amadu Bah');
     });
 
     testWidgets('Tapping View Order button executes onTap and dismisses notification',

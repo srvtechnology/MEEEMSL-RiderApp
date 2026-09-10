@@ -14,6 +14,7 @@ import '../../../../domain/repositories/order_repository.dart';
 import '../../../../domain/repositories/earnings_repository.dart';
 import '../../../../domain/repositories/profile_repository.dart';
 import '../../../../domain/usecases/dashboard/toggle_online_status_usecase.dart';
+import '../../../../domain/usecases/dashboard/get_rider_status_usecase.dart';
 import '../../../../domain/usecases/dashboard/get_dashboard_summary_usecase.dart';
 import '../../../../domain/usecases/dashboard/update_live_location_usecase.dart';
 import '../../../../domain/usecases/orders/get_active_orders_usecase.dart';
@@ -76,6 +77,7 @@ class MainLayoutBinding extends Bindings {
 
     // UseCases
     Get.lazyPut(() => ToggleOnlineStatusUseCase(Get.find<DashboardRepository>()));
+    Get.lazyPut(() => GetRiderStatusUseCase(Get.find<DashboardRepository>()));
     Get.lazyPut(() => GetDashboardSummaryUseCase(Get.find<DashboardRepository>()));
     Get.lazyPut(() => UpdateLiveLocationUseCase(Get.find<DashboardRepository>()));
 

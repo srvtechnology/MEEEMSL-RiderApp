@@ -85,7 +85,16 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         final data = response.data['data'];
         final deliveryOtp = data?['deliveryOtp']?.toString() ?? '582910';
 
-        final existingIdx = _activeOrders.indexWhere((o) => o.id == orderId);
+        // 1. If backend returns full order data in response
+        if (data is Map<String, dynamic> && data['order'] != null) {
+          final acceptedOrder = OrderModel.fromJson(data);
+          _activeOrders.removeWhere((o) => o.id == acceptedOrder.id || (acceptedOrder.assignmentId != null && o.assignmentId == acceptedOrder.assignmentId));
+          _activeOrders.insert(0, acceptedOrder);
+          return acceptedOrder;
+        }
+
+        // 2. Check if already cached in _activeOrders
+        final existingIdx = _activeOrders.indexWhere((o) => o.id == orderId || (o.assignmentId != null && o.assignmentId == orderId));
         if (existingIdx != -1) {
           final updated = OrderModel.fromEntity(
             _activeOrders[existingIdx].copyWith(
@@ -96,6 +105,35 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
           _activeOrders[existingIdx] = updated;
           return updated;
         }
+
+        // 3. Freshly query active orders from the backend
+        try {
+          final activeList = await getActiveOrders();
+          if (activeList.isNotEmpty) {
+            final matched = activeList.firstWhere(
+              (o) => o.id == orderId || (o.assignmentId != null && o.assignmentId == orderId) || (data is Map && o.id == data['orderId']),
+              orElse: () => activeList.first,
+            );
+            return matched;
+          }
+        } catch (_) {}
+
+        // 4. Try getOrderDetails for orderId or data['orderId']
+        try {
+          final realOrderId = (data is Map && data['orderId'] != null)
+              ? data['orderId'].toString()
+              : orderId;
+          final details = await getOrderDetails(realOrderId);
+          final updated = OrderModel.fromEntity(
+            details.copyWith(
+              status: OrderStatus.accepted,
+              deliveryOtp: deliveryOtp,
+            ),
+          );
+          _activeOrders.removeWhere((o) => o.id == updated.id || (updated.assignmentId != null && o.assignmentId == updated.assignmentId));
+          _activeOrders.insert(0, updated);
+          return updated;
+        } catch (_) {}
       }
     } on DioException catch (e) {
       if (e.response != null && e.response?.statusCode != null && e.response!.statusCode! >= 400) {
@@ -105,7 +143,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       }
     } catch (_) {}
 
-    final index = _activeOrders.indexWhere((o) => o.id == orderId);
+    final index = _activeOrders.indexWhere((o) => o.id == orderId || (o.assignmentId != null && o.assignmentId == orderId));
     if (index != -1) {
       final updatedEntity = _activeOrders[index].copyWith(status: OrderStatus.accepted);
       final updated = OrderModel.fromEntity(updatedEntity);
@@ -130,14 +168,25 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     return newOrder;
   }
 
-  // Section 4.2 & Part 8 Section 2.2: POST /mobileapi/rider/orders/:id/reject
+  // Section 4.2 & Part 8 Section 2.2: POST /mobileapi/rider/orders/:id/decline (with /reject fallback)
   @override
   Future<bool> declineOrder(String orderId, String reason) async {
     try {
-      await _dioClient.dio.post(
-        ApiEndpoints.rejectOrderOffer(orderId),
-        data: {'reason': reason},
-      );
+      try {
+        await _dioClient.dio.post(
+          ApiEndpoints.declineOrderOffer(orderId),
+          data: {'reason': reason},
+        );
+      } on DioException catch (e) {
+        if (e.response?.statusCode == 404) {
+          await _dioClient.dio.post(
+            ApiEndpoints.rejectOrderOffer(orderId),
+            data: {'reason': reason},
+          );
+        } else {
+          rethrow;
+        }
+      }
     } on DioException catch (e) {
       if (e.response != null && e.response?.statusCode != null && e.response!.statusCode! >= 400) {
         final respData = e.response?.data is Map ? e.response!.data as Map : {};

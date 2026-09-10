@@ -1,10 +1,13 @@
+import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import '../../core/constants/api_endpoints.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/services/device_info_service.dart';
 
 abstract class DashboardRemoteDataSource {
-  Future<bool> toggleOnline(bool isOnline);
+  Future<bool> toggleOnline(bool isOnline, {String? deviceId, String? deviceModel});
+  Future<Map<String, dynamic>> getRiderStatus();
   Future<Map<String, dynamic>> getSummary();
   Future<void> updateLocation(double lat, double lng);
 }
@@ -16,7 +19,47 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
   DashboardRemoteDataSourceImpl(this._dioClient);
 
   @override
-  Future<bool> toggleOnline(bool isOnline) async {
+  Future<bool> toggleOnline(bool isOnline, {String? deviceId, String? deviceModel}) async {
+    try {
+      var resolvedDeviceId = deviceId ?? _storage.read<String>(AppConstants.registeredDeviceIdKey);
+      var resolvedDeviceModel = deviceModel;
+
+      if (Get.isRegistered<DeviceInfoService>()) {
+        final infoService = Get.find<DeviceInfoService>();
+        resolvedDeviceId ??= await infoService.getDeviceId();
+        if (isOnline && (resolvedDeviceModel == null || resolvedDeviceModel.isEmpty)) {
+          resolvedDeviceModel = await infoService.getDeviceModel();
+        }
+      }
+
+      final payload = <String, dynamic>{
+        'isOnline': isOnline,
+        if (resolvedDeviceId != null && resolvedDeviceId.isNotEmpty)
+          'deviceId': resolvedDeviceId,
+        if (isOnline && resolvedDeviceModel != null && resolvedDeviceModel.isNotEmpty)
+          'deviceModel': resolvedDeviceModel,
+      };
+
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.status,
+        data: payload,
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = response.data;
+        final resData = (data is Map) ? (data['data'] ?? data) : null;
+        final actualOnline = (resData is Map && resData['isOnline'] != null)
+            ? (resData['isOnline'] as bool)
+            : isOnline;
+        await _storage.write(AppConstants.isOnlineKey, actualOnline);
+        if (actualOnline) {
+          await _storage.write('online_since_timestamp', DateTime.now().toIso8601String());
+        } else {
+          await _storage.remove('online_since_timestamp');
+        }
+        return actualOnline;
+      }
+    } catch (_) {}
+
     await _storage.write(AppConstants.isOnlineKey, isOnline);
     if (isOnline) {
       await _storage.write('online_since_timestamp', DateTime.now().toIso8601String());
@@ -27,8 +70,33 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
   }
 
   @override
+  Future<Map<String, dynamic>> getRiderStatus() async {
+    try {
+      final response = await _dioClient.dio.get(ApiEndpoints.status);
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        if (data is Map<String, dynamic>) {
+          final isOnline = data['isOnline'] as bool? ?? false;
+          await _storage.write(AppConstants.isOnlineKey, isOnline);
+          if (isOnline) {
+            await _storage.write('online_since_timestamp', DateTime.now().toIso8601String());
+          } else {
+            await _storage.remove('online_since_timestamp');
+          }
+          return data;
+        }
+      }
+    } catch (_) {}
+    final localOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? false;
+    return {
+      'isOnline': localOnline,
+      'operationalStatus': localOnline ? 'ONLINE' : 'OFFLINE',
+    };
+  }
+
+  @override
   Future<Map<String, dynamic>> getSummary() async {
-    final isOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? true;
+    final isOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? false;
     double todayEarnings = 0.0;
     int todayDeliveries = 0;
     int totalDeliveries = 0;
@@ -142,7 +210,7 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
   @override
   Future<void> updateLocation(double lat, double lng) async {
     // Part 2: 1.2 Fallback Background Telemetry (REST API)
-    final isOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? true;
+    final isOnline = _storage.read<bool>(AppConstants.isOnlineKey) ?? false;
     try {
       await _dioClient.dio.post(
         ApiEndpoints.location,

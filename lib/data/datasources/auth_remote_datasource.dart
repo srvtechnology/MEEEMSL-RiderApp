@@ -600,8 +600,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<void> logout() async {
-    // Note: /auth/logout is not part of MOBILE_RIDER_APP_API_DOC_PART_1.md.
-    // Unregistering device token is done via unregisterDeviceToken (DELETE /device-token).
+    // Checklist Point 4: Mark rider offline before clearing auth session
+    try {
+      await _dioClient.dio.post(
+        ApiEndpoints.status,
+        data: {'isOnline': false},
+      );
+    } catch (_) {}
   }
 
   @override

@@ -86,6 +86,7 @@ extension OrderStatusX on OrderStatus {
 
 class OrderEntity extends Equatable {
   final String id;
+  final String? assignmentId;
   final String orderNumber;
   final OrderStatus status;
   final String customerName;
@@ -108,9 +109,12 @@ class OrderEntity extends Equatable {
   final String notes;
   final String deliveryOtp;
   final String? proofPhotoUrl;
+  final int? cycle;
+  final int? riderAttempt;
 
   const OrderEntity({
     required this.id,
+    this.assignmentId,
     required this.orderNumber,
     required this.status,
     required this.customerName,
@@ -133,10 +137,13 @@ class OrderEntity extends Equatable {
     this.notes = '',
     this.deliveryOtp = '',
     this.proofPhotoUrl,
+    this.cycle,
+    this.riderAttempt,
   });
 
   OrderEntity copyWith({
     String? id,
+    String? assignmentId,
     String? orderNumber,
     OrderStatus? status,
     String? customerName,
@@ -159,9 +166,12 @@ class OrderEntity extends Equatable {
     String? notes,
     String? deliveryOtp,
     String? proofPhotoUrl,
+    int? cycle,
+    int? riderAttempt,
   }) {
     return OrderEntity(
       id: id ?? this.id,
+      assignmentId: assignmentId ?? this.assignmentId,
       orderNumber: orderNumber ?? this.orderNumber,
       status: status ?? this.status,
       customerName: customerName ?? this.customerName,
@@ -184,12 +194,15 @@ class OrderEntity extends Equatable {
       notes: notes ?? this.notes,
       deliveryOtp: deliveryOtp ?? this.deliveryOtp,
       proofPhotoUrl: proofPhotoUrl ?? this.proofPhotoUrl,
+      cycle: cycle ?? this.cycle,
+      riderAttempt: riderAttempt ?? this.riderAttempt,
     );
   }
 
   @override
   List<Object?> get props => [
         id,
+        assignmentId,
         orderNumber,
         status,
         customerName,
@@ -198,5 +211,7 @@ class OrderEntity extends Equatable {
         dropoffAddress,
         riderEarnings,
         distanceKm,
+        cycle,
+        riderAttempt,
       ];
 }

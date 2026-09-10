@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import '../constants/api_endpoints.dart';
+import '../constants/app_constants.dart';
 import '../network/dio_client.dart';
 import '../../data/datasources/auth_local_datasource.dart';
+import '../../presentation/modules/dashboard/controllers/dashboard_controller.dart';
+import 'device_info_service.dart';
 import 'socket_service.dart';
 
 /// Active telemetry streaming method
@@ -48,7 +53,7 @@ class LocationService extends GetxService {
 
   // Telemetry intervals
   static const int telemetryIntervalSeconds = 4; // 3-5 seconds per Section 1.1
-  static const int restFallbackHeartbeatSeconds = 50; // 45-60 seconds REST heartbeat fallback per backend spec
+  static const int restFallbackHeartbeatSeconds = 20; // 15-30s heartbeat window per Checklist Point 2
 
   // Reactive state
   final Rx<Position?> currentPosition = Rx<Position?>(defaultFallbackPosition);
@@ -174,11 +179,36 @@ class LocationService extends GetxService {
     // Connect to Socket.IO
     _connectSocketIfPossible();
 
-    // Listen to real-time device GPS position stream
-    const locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: 5, // update when moved 5 meters
-    );
+    // Listen to real-time device GPS position stream with foreground notification on Android (Point 3)
+    late final LocationSettings locationSettings;
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      locationSettings = AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5, // update when moved 5 meters
+        forceLocationManager: true,
+        intervalDuration: const Duration(seconds: telemetryIntervalSeconds),
+        foregroundNotificationConfig: const ForegroundNotificationConfig(
+          notificationTitle: 'Meeem Delivery Rider Active',
+          notificationText: 'Online & streaming GPS • Ready for delivery assignments',
+          enableWakeLock: true,
+          setOngoing: true,
+        ),
+      );
+    } else if (defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      locationSettings = AppleSettings(
+        accuracy: LocationAccuracy.high,
+        activityType: ActivityType.automotiveNavigation,
+        distanceFilter: 5,
+        pauseLocationUpdatesAutomatically: false,
+        showBackgroundLocationIndicator: true,
+      );
+    } else {
+      locationSettings = const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 5,
+      );
+    }
 
     try {
       _positionSubscription =
@@ -212,12 +242,65 @@ class LocationService extends GetxService {
     _positionSubscription = null;
     _periodicSyncTimer?.cancel();
     _periodicSyncTimer = null;
+
+    final rider = _authLocalDataSource?.getSavedRider();
+    final riderId = rider?.id ??
+        _authLocalDataSource?.getSavedUser()?.id ??
+        'cuid_rider_id';
+
+    if (_socketService.isConnected.value) {
+      _socketService.emitStatusUpdate(riderId: riderId, isOnline: false);
+    }
+
     _socketService.disconnect();
     isTrackingActive.value = false;
     telemetryMode.value = TelemetryMode.idle;
     _lastRestFallbackTimestamp = null;
     _wasSocketConnected = false;
     debugPrint('[LocationService] GPS tracking & telemetry stopped.');
+  }
+
+  /// Cross-device switch alert callback
+  static void Function(String message)? onDeviceSwitchedAlert;
+
+  /// Handles Single Active Driving Device conflict (Checklist Point 3).
+  void handleDeviceSwitched([String? message]) {
+    final alertMsg = message ??
+        'You have switched to another device. Tracking stopped on this device.';
+    stopTracking();
+    _authLocalDataSource?.setIsOnline(false);
+    if (Get.isRegistered<GetStorage>()) {
+      try {
+        final storage = Get.find<GetStorage>();
+        storage.write(AppConstants.isOnlineKey, false);
+        storage.remove('online_since_timestamp');
+      } catch (_) {}
+    }
+
+    if (Get.isRegistered<DashboardController>()) {
+      Get.find<DashboardController>().isOnline.value = false;
+    }
+    onDeviceSwitchedAlert?.call(alertMsg);
+    showDeviceSwitchedDialog(alertMsg);
+  }
+
+  /// Displays alert dialog notifying rider that another device became active.
+  static void showDeviceSwitchedDialog([String? customMessage]) {
+    final msg = customMessage ??
+        'You have switched to another device. Tracking stopped on this device.';
+    if (Get.overlayContext == null) return;
+    if (Get.isDialogOpen == true) {
+      Get.back();
+    }
+    Get.defaultDialog(
+      title: 'Device Switched',
+      titleStyle: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFE53E3E)),
+      middleText: msg,
+      textConfirm: 'OK',
+      confirmTextColor: Colors.white,
+      buttonColor: const Color(0xFFE53E3E),
+      onConfirm: () => Get.back(),
+    );
   }
 
   /// Transmits current GPS telemetry via Primary Socket.IO or Fallback REST API.
@@ -230,6 +313,19 @@ class LocationService extends GetxService {
     final riderId = rider?.id ??
         _authLocalDataSource?.getSavedUser()?.id ??
         'cuid_rider_id';
+    final isOnline = _authLocalDataSource?.getIsOnline() ?? true;
+
+    // Resolve hardware deviceId for Single Active Driving Device tracking
+    String? deviceId = Get.isRegistered<DeviceInfoService>()
+        ? Get.find<DeviceInfoService>().cachedDeviceId
+        : null;
+    if (deviceId == null || deviceId.isEmpty) {
+      if (Get.isRegistered<GetStorage>()) {
+        try {
+          deviceId = Get.find<GetStorage>().read<String>(AppConstants.registeredDeviceIdKey);
+        } catch (_) {}
+      }
+    }
 
     // Convert speed: Geolocator gives m/s -> multiply by 3.6 for km/h
     final double speedInKmH = pos.speed < 0 ? 0.0 : (pos.speed * 3.6);
@@ -255,6 +351,8 @@ class LocationService extends GetxService {
         longitude: pos.longitude,
         heading: double.parse(headingDegrees.toStringAsFixed(1)),
         speed: double.parse(speedInKmH.toStringAsFixed(1)),
+        isOnline: isOnline,
+        deviceId: deviceId,
       );
 
       if (success) {
@@ -262,7 +360,7 @@ class LocationService extends GetxService {
         lastSyncTimestamp.value = DateTime.now();
         lastSyncError.value = null;
         debugPrint(
-            '[LocationService] Streamed GPS via Socket.IO: (${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}) heading: ${headingDegrees.toStringAsFixed(1)}° speed: ${speedInKmH.toStringAsFixed(1)} km/h, order: ${activeOrderId.value}');
+            '[LocationService] Streamed GPS via Socket.IO: (${pos.latitude.toStringAsFixed(5)}, ${pos.longitude.toStringAsFixed(5)}) heading: ${headingDegrees.toStringAsFixed(1)}° speed: ${speedInKmH.toStringAsFixed(1)} km/h, isOnline: $isOnline, deviceId: $deviceId, order: ${activeOrderId.value}');
         return;
       }
     }
@@ -270,7 +368,7 @@ class LocationService extends GetxService {
     // 1.2 Fallback Background Telemetry (REST API)
     // Strictly an Emergency Fallback / Heartbeat:
     // - One-off immediate call if socket just dropped (_wasSocketConnected was true)
-    // - Slow REST heartbeat once every 45-60 seconds if socket remains disconnected or in background
+    // - Periodic REST heartbeat once every 15-30 seconds if socket remains disconnected or in background
     final now = DateTime.now();
     final bool socketJustDropped = _wasSocketConnected;
     final bool isHeartbeatDue = _lastRestFallbackTimestamp == null ||
@@ -286,6 +384,7 @@ class LocationService extends GetxService {
         longitude: pos.longitude,
         heading: double.parse(headingDegrees.toStringAsFixed(1)),
         speed: double.parse(speedInKmH.toStringAsFixed(1)),
+        deviceId: deviceId,
       );
     } else {
       debugPrint(
@@ -299,6 +398,7 @@ class LocationService extends GetxService {
     required double longitude,
     required double heading,
     required double speed,
+    String? deviceId,
   }) async {
     final payload = <String, dynamic>{
       'latitude': latitude,
@@ -306,6 +406,7 @@ class LocationService extends GetxService {
       'heading': heading,
       'speed': speed,
       'isOnline': _authLocalDataSource?.getIsOnline() ?? true,
+      if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
     };
 
     try {
@@ -325,6 +426,22 @@ class LocationService extends GetxService {
         debugPrint(
             '[LocationService] Fallback REST telemetry failed with status: ${response.statusCode}');
       }
+    } on DioException catch (e) {
+      // Checklist Point 3: Single Active Driving Device HTTP 409 Conflict Handling
+      if (e.response?.statusCode == 409 ||
+          e.response?.data is Map &&
+              (e.response?.data['error'] == 'DEVICE_SWITCHED' ||
+                  e.response?.data['shouldStopTracking'] == true)) {
+        final serverMessage = (e.response?.data is Map && e.response?.data['message'] != null)
+            ? e.response?.data['message'].toString()
+            : 'You have switched to another device. Tracking stopped on this device.';
+        debugPrint('[LocationService] HTTP 409 Conflict: $serverMessage');
+        handleDeviceSwitched(serverMessage);
+        return;
+      }
+      telemetryMode.value = TelemetryMode.error;
+      lastSyncError.value = e.toString();
+      debugPrint('[LocationService] Fallback REST telemetry exception: $e');
     } catch (e) {
       telemetryMode.value = TelemetryMode.error;
       lastSyncError.value = e.toString();

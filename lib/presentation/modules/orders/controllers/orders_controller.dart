@@ -47,6 +47,20 @@ class OrdersController extends GetxController {
     loadOrders();
   }
 
+  void setActiveOrder(OrderEntity order) {
+    selectedOrder.value = order;
+    final index = activeOrders.indexWhere((o) =>
+        o.id == order.id ||
+        (order.assignmentId != null &&
+            order.assignmentId!.isNotEmpty &&
+            o.assignmentId == order.assignmentId));
+    if (index != -1) {
+      activeOrders[index] = order;
+    } else {
+      activeOrders.insert(0, order);
+    }
+  }
+
   Future<void> loadOrders() async {
     isLoading.value = true;
     await Future.wait([
@@ -61,9 +75,33 @@ class OrdersController extends GetxController {
     result.fold(
       (failure) => null,
       (orders) {
-        activeOrders.assignAll(orders);
         if (orders.isNotEmpty) {
-          selectedOrder.value = orders.first;
+          activeOrders.assignAll(orders);
+          if (selectedOrder.value == null ||
+              selectedOrder.value!.status == OrderStatus.delivered ||
+              selectedOrder.value!.status == OrderStatus.cancelled) {
+            selectedOrder.value = orders.first;
+          } else {
+            final currentId = selectedOrder.value!.id;
+            final currentAssignmentId = selectedOrder.value!.assignmentId;
+            final matching = orders.where((o) =>
+                o.id == currentId ||
+                (currentAssignmentId != null &&
+                    currentAssignmentId.isNotEmpty &&
+                    o.assignmentId == currentAssignmentId)).firstOrNull;
+            if (matching != null) {
+              selectedOrder.value = matching;
+            }
+          }
+        } else {
+          if (selectedOrder.value != null &&
+              selectedOrder.value!.status != OrderStatus.delivered &&
+              selectedOrder.value!.status != OrderStatus.cancelled) {
+            // Keep current in-memory active order so transient network states don't wipe active order
+          } else {
+            activeOrders.clear();
+            selectedOrder.value = null;
+          }
         }
       },
     );
@@ -120,6 +158,9 @@ class OrdersController extends GetxController {
       (updated) {
         selectedOrder.value = updated;
         _loadActiveOrders();
+        if (Get.isRegistered<DashboardController>()) {
+          Get.find<DashboardController>().activeOrder.value = updated;
+        }
         Get.snackbar('Status Updated', '${updated.status.stepNumberText}: ${updated.status.displayName}',
             snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
       },

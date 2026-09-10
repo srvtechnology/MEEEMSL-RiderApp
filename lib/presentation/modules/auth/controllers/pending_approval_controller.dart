@@ -4,7 +4,11 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/network/dio_client.dart';
+import '../../../../core/services/location_service.dart';
+import '../../../../core/services/socket_service.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/models/rider_model.dart';
@@ -127,9 +131,29 @@ class PendingApprovalController extends GetxController {
       confirmTextColor: Colors.white,
       buttonColor: AppColors.error,
       onConfirm: () async {
+        // Checklist Point 4: Stop GPS tracking and disconnect socket
+        if (Get.isRegistered<LocationService>()) {
+          Get.find<LocationService>().stopTracking();
+        }
+        if (Get.isRegistered<SocketService>()) {
+          Get.find<SocketService>().disconnect();
+        }
+
+        // Checklist Point 4: Mark rider offline in backend BEFORE clearing tokens
+        try {
+          if (Get.isRegistered<DioClient>()) {
+            await Get.find<DioClient>().dio.post(
+                  ApiEndpoints.status,
+                  data: {'isOnline': false},
+                );
+          }
+        } catch (_) {}
+
         if (Get.isRegistered<NotificationService>()) {
           await Get.find<NotificationService>().unregisterCurrentDeviceToken();
         }
+        _storage.write(AppConstants.isOnlineKey, false);
+        _storage.remove('online_since_timestamp');
         _storage.remove(AppConstants.tokenKey);
         _storage.remove(AppConstants.refreshTokenKey);
         _storage.remove(AppConstants.riderProfileKey);

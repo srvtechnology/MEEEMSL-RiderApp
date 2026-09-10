@@ -82,7 +82,7 @@ class MilestoneStepper extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
 
         // Stepper Visual Row
         Row(
@@ -97,8 +97,8 @@ class MilestoneStepper extends StatelessWidget {
                   // Step Indicator Circle
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 250),
-                    width: 26,
-                    height: 26,
+                    width: 24,
+                    height: 24,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isCompleted
@@ -151,7 +151,7 @@ class MilestoneStepper extends StatelessWidget {
 
         // Step Label Row (when showLabels is true)
         if (showLabels) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 5),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: List.generate(stepTitles.length, (index) {
@@ -167,7 +167,7 @@ class MilestoneStepper extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 9.5,
+                      fontSize: 8.5,
                       fontWeight: isCurrent ? FontWeight.w800 : (isCompleted ? FontWeight.w600 : FontWeight.w500),
                       color: isCurrent
                           ? AppColors.primary

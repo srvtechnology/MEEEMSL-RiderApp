@@ -7,7 +7,9 @@ import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
 import '../../domain/usecases/auth/register_device_token_usecase.dart';
 import '../../domain/usecases/auth/unregister_device_token_usecase.dart';
+import '../../presentation/modules/dashboard/controllers/dashboard_controller.dart';
 import 'device_info_service.dart';
+import 'location_service.dart';
 
 /// NotificationService handles FCM Push Notifications, Multi-device Token Registration,
 /// Dispatch Assignment Sound Alerts, and In-app Notification Heads-up Popups.
@@ -55,6 +57,24 @@ class NotificationService extends GetxService {
         final body = message.notification?.body;
         handleFcmPayload(message.data, title: title, body: body);
       });
+
+      // Handle notification opened when app is in background
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        final title = message.notification?.title;
+        final body = message.notification?.body;
+        handleFcmPayload(message.data, title: title, body: body);
+      });
+
+      // Handle notification opened when app was terminated
+      FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+        if (message != null) {
+          handleFcmPayload(
+            message.data,
+            title: message.notification?.title,
+            body: message.notification?.body,
+          );
+        }
+      });
     } catch (_) {
       // Fallback if running on simulator or without Google Play Services
       const fallbackToken = 'fcm_mock_device_token_2026';
@@ -67,19 +87,77 @@ class NotificationService extends GetxService {
   /// Callbacks for active dashboard handling
   static void Function(Map<String, dynamic> data, {String? title, String? body})? onNewOffer;
   static void Function(Map<String, dynamic> data)? onDirectAssignment;
+  static void Function(Map<String, dynamic> data)? onAssignmentRevoked;
 
   /// Handles FCM data payload conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md Section 2:
   /// - 2.1: type == "NEW_OFFER" (Automated Waterfall Offer with 60s countdown)
   /// - 2.2: type == "MANUAL_ASSIGN" (Direct Admin/Seller Assignment)
+  /// - 2.3: type == "ASSIGNMENT_REVOKED" (Offer/Assignment Cancelled or Reassigned)
   void handleFcmPayload(Map<String, dynamic> data, {String? title, String? body}) {
     final type = data['type']?.toString().toUpperCase();
     playOrderAlertFeedback();
 
+    // Checklist Point 5: Single Active Driving Device FCM Push
+    if (type == 'DEVICE_SWITCHED') {
+      String? localDeviceId = Get.isRegistered<DeviceInfoService>()
+          ? Get.find<DeviceInfoService>().cachedDeviceId
+          : null;
+      if (localDeviceId == null || localDeviceId.isEmpty) {
+        if (Get.isRegistered<GetStorage>()) {
+          try {
+            localDeviceId = Get.find<GetStorage>().read<String>(AppConstants.registeredDeviceIdKey);
+          } catch (_) {}
+        }
+      }
+
+      final activeDeviceId = data['activeDeviceId']?.toString();
+      if (activeDeviceId != null &&
+          localDeviceId != null &&
+          activeDeviceId.isNotEmpty &&
+          localDeviceId.isNotEmpty &&
+          activeDeviceId == localDeviceId) {
+        return;
+      }
+
+      final alertMessage = body ??
+          (data['body']?.toString() ??
+              (data['message']?.toString() ??
+                  'You have switched to another device. Tracking stopped on this device.'));
+
+      if (Get.isRegistered<LocationService>()) {
+        Get.find<LocationService>().handleDeviceSwitched(alertMessage);
+      } else {
+        if (Get.isRegistered<GetStorage>()) {
+          try {
+            final storage = Get.find<GetStorage>();
+            storage.write(AppConstants.isOnlineKey, false);
+            storage.remove('online_since_timestamp');
+          } catch (_) {}
+        }
+        if (Get.isRegistered<DashboardController>()) {
+          Get.find<DashboardController>().isOnline.value = false;
+        }
+        LocationService.showDeviceSwitchedDialog(alertMessage);
+      }
+      return;
+    }
+
+    final earning = (data['deliveryFee'] ?? data['deliveryEarning'] ?? data['earning'] ?? data['amount'] ?? '').toString();
+    final shopName = (data['shopName'] ?? data['pickupName'] ?? '').toString();
+    final customerName = (data['customerName'] ?? '').toString();
+
     if (type == 'NEW_OFFER') {
       onNewOffer?.call(data, title: title, body: body);
+      final earningStr = earning.isNotEmpty ? earning : '0.00';
+      final earningBadgeText = 'Delivery Earning: NLe $earningStr';
+      final defaultTitle = '📦 New Delivery Offer ($earningBadgeText)';
+      final defaultMsg = shopName.isNotEmpty
+          ? '$earningBadgeText\nPickup from $shopName${customerName.isNotEmpty ? ' for $customerName' : ''}. Tap to accept within 60s!'
+          : '$earningBadgeText. Tap to accept within 60s!';
+
       showOrderDispatchAlert(
-        title: title ?? '📦 New Delivery Assignment Offer!',
-        message: body ?? 'Pickup offer received. Tap to accept within 60s!',
+        title: title ?? defaultTitle,
+        message: body ?? defaultMsg,
         duration: const Duration(minutes: 1),
         onTap: () {
           if (Get.currentRoute != '/dashboard') {
@@ -94,9 +172,12 @@ class NotificationService extends GetxService {
       if (onDirectAssignment != null) {
         onDirectAssignment!(data);
       } else {
+        final displayEarning = earning.isNotEmpty ? ' (Earning: NLe $earning)' : '';
         showOrderDispatchAlert(
-          title: title ?? '🛵 Direct Delivery Assignment',
-          message: body ?? 'You have been directly assigned a new delivery order.',
+          title: title ?? '🛵 Direct Delivery Assignment$displayEarning',
+          message: body ?? (shopName.isNotEmpty
+              ? 'You have been assigned order from $shopName${customerName.isNotEmpty ? ' for $customerName' : ''}.'
+              : 'You have been directly assigned a new delivery order.'),
           duration: const Duration(minutes: 1),
           onTap: () {
             final orderId = data['orderId']?.toString();
@@ -108,6 +189,18 @@ class NotificationService extends GetxService {
           },
         );
       }
+      return;
+    }
+
+    if (type == 'ASSIGNMENT_REVOKED') {
+      onAssignmentRevoked?.call(data);
+      final orderNumber = data['orderNumber']?.toString() ?? '';
+      showInfoNotification(
+        title: title ?? 'Offer Revoked',
+        message: body ?? (orderNumber.isNotEmpty
+            ? 'Delivery assignment for Order #$orderNumber was reassigned or cancelled.'
+            : 'Delivery assignment was reassigned or cancelled.'),
+      );
       return;
     }
 

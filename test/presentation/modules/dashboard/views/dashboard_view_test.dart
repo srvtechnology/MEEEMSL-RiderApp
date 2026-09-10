@@ -111,7 +111,25 @@ void main() {
     Get.reset();
   });
 
-  testWidgets('DashboardView renders header, earnings, and metrics',
+  testWidgets('DashboardView defaults to offline state on load/start',
+      (WidgetTester tester) async {
+    expect(controller.isOnline.value, isFalse);
+
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: DashboardView(),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text("You're Offline"), findsOneWidget);
+    expect(find.text('Shift is Currently Paused'), findsOneWidget);
+    expect(find.text('Offline'), findsOneWidget);
+    expect(find.byType(TelemetryRadarCard), findsNothing);
+  });
+
+  testWidgets('DashboardView renders header and status strip without earnings/metrics components',
       (WidgetTester tester) async {
     controller.isOnline.value = true;
 
@@ -126,9 +144,11 @@ void main() {
     // Verify Rider Name & Status
     expect(find.text('Ibrahim Koroma'), findsOneWidget);
     expect(find.text("You're Online"), findsOneWidget);
-    expect(find.text('Nle 148.50'), findsOneWidget);
-    expect(find.text('9 Trips Today'), findsOneWidget);
-    expect(find.text('5.8 hrs'), findsOneWidget);
+    // Verify earnings card and metrics grid have been removed
+    expect(find.text("Today's Earnings"), findsNothing);
+    expect(find.text('Total Lifetime Earnings'), findsNothing);
+    expect(find.text('Trips Today'), findsNothing);
+    expect(find.text('Online Hours'), findsNothing);
   });
 
   testWidgets(

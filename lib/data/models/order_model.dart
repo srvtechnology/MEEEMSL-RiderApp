@@ -4,6 +4,7 @@ import 'order_item_model.dart';
 class OrderModel extends OrderEntity {
   const OrderModel({
     required super.id,
+    super.assignmentId,
     required super.orderNumber,
     required super.status,
     required super.customerName,
@@ -26,6 +27,8 @@ class OrderModel extends OrderEntity {
     super.notes = '',
     super.deliveryOtp = '',
     super.proofPhotoUrl,
+    super.cycle,
+    super.riderAttempt,
   });
 
   static OrderStatus _parseStatus(String? statusStr) {
@@ -65,30 +68,34 @@ class OrderModel extends OrderEntity {
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
     final orderMap = json['order'] as Map<String, dynamic>?;
-    final sellerMap = orderMap?['seller'] as Map<String, dynamic>?;
+    final sellerMap = orderMap?['seller'] as Map<String, dynamic>? ??
+        json['seller'] as Map<String, dynamic>?;
     final businessInfo = sellerMap?['businessInfo'] as Map<String, dynamic>?;
     final store = sellerMap?['store'] as Map<String, dynamic>?;
 
     final customerName = orderMap?['shippingFullName'] as String? ??
+        json['shippingFullName'] as String? ??
         json['customerName'] as String? ??
         'Customer';
 
     final customerPhone = orderMap?['shippingPhone'] as String? ??
+        json['shippingPhone'] as String? ??
         json['customerPhone'] as String? ??
         '';
 
     final dropoffParts = [
-      orderMap?['shippingAddressLine1'],
-      orderMap?['shippingAddressLine2'],
-      orderMap?['shippingCity'],
+      orderMap?['shippingAddressLine1'] ?? json['shippingAddressLine1'],
+      orderMap?['shippingAddressLine2'] ?? json['shippingAddressLine2'],
+      orderMap?['shippingCity'] ?? json['shippingCity'],
     ].where((s) => s != null && s.toString().trim().isNotEmpty).toList();
 
     final dropoffAddress = dropoffParts.isNotEmpty
         ? dropoffParts.join(', ')
-        : (json['dropoffAddress'] as String? ?? '');
+        : (json['customerAddress'] as String? ?? json['dropoffAddress'] as String? ?? '');
 
     final pickupName = store?['name'] as String? ??
         businessInfo?['businessName'] as String? ??
+        json['shopName'] as String? ??
         json['pickupName'] as String? ??
         'Store / Vendor';
 
@@ -99,9 +106,10 @@ class OrderModel extends OrderEntity {
 
     final pickupAddress = pickupParts.isNotEmpty
         ? pickupParts.join(', ')
-        : (json['pickupAddress'] as String? ?? '');
+        : (json['shopAddress'] as String? ?? json['pickupAddress'] as String? ?? '');
 
     final pickupPhone = businessInfo?['pocContact'] as String? ??
+        json['customerPhone'] as String? ??
         json['pickupPhone'] as String? ??
         '';
 
@@ -142,16 +150,37 @@ class OrderModel extends OrderEntity {
       }
     }
 
-    final earnings = (json['riderEarnings'] as num?)?.toDouble() ??
-        (orderMap?['shipping'] as num?)?.toDouble() ??
-        (orderMap?['shippingAmount'] as num?)?.toDouble() ??
-        (itemsShippingSum > 0.0 ? itemsShippingSum : 14.80);
+    double? parseDouble(dynamic val) {
+      if (val == null) return null;
+      if (val is num) return val.toDouble();
+      return double.tryParse(val.toString().trim());
+    }
 
-    final distanceKm = (json['distanceKm'] as num?)?.toDouble() ?? 2.1;
+    // Section 5: deliveryFee, deliveryEarning, earning alongside earningForThisDelivery
+    final earnings = parseDouble(json['deliveryFee']) ??
+        parseDouble(json['deliveryEarning']) ??
+        parseDouble(json['earning']) ??
+        parseDouble(json['earningForThisDelivery']) ??
+        parseDouble(orderMap?['deliveryFee']) ??
+        parseDouble(orderMap?['deliveryEarning']) ??
+        parseDouble(orderMap?['earning']) ??
+        parseDouble(orderMap?['earningForThisDelivery']) ??
+        parseDouble(json['riderEarnings']) ??
+        parseDouble(orderMap?['riderEarnings']) ??
+        parseDouble(orderMap?['shipping']) ??
+        parseDouble(orderMap?['shippingAmount']) ??
+        (itemsShippingSum > 0.0 ? itemsShippingSum : 0.0);
+
+    final distanceKm = parseDouble(json['distanceKm']) ?? parseDouble(orderMap?['distanceKm']) ?? 2.1;
     final estimatedDuration = (json['estimatedDurationMin'] as num?)?.toInt() ?? 15;
+
+    final assignmentId = json['assignmentId']?.toString() ?? orderMap?['assignmentId']?.toString();
+    final cycle = int.tryParse(json['cycle']?.toString() ?? '') ?? int.tryParse(orderMap?['cycle']?.toString() ?? '');
+    final riderAttempt = int.tryParse(json['riderAttempt']?.toString() ?? '') ?? int.tryParse(orderMap?['riderAttempt']?.toString() ?? '');
 
     return OrderModel(
       id: json['id'] as String? ?? orderMap?['id'] as String? ?? '',
+      assignmentId: assignmentId,
       orderNumber: orderNumber,
       status: _parseStatus(json['status'] as String?),
       customerName: customerName,
@@ -178,6 +207,8 @@ class OrderModel extends OrderEntity {
       notes: json['notes'] as String? ?? '',
       deliveryOtp: deliveryOtp,
       proofPhotoUrl: (json['proofPhotoUrl'] ?? json['deliveryProofImage']) as String?,
+      cycle: cycle,
+      riderAttempt: riderAttempt,
     );
   }
 
@@ -214,6 +245,7 @@ class OrderModel extends OrderEntity {
   factory OrderModel.fromEntity(OrderEntity entity) {
     return OrderModel(
       id: entity.id,
+      assignmentId: entity.assignmentId,
       orderNumber: entity.orderNumber,
       status: entity.status,
       customerName: entity.customerName,
@@ -236,6 +268,8 @@ class OrderModel extends OrderEntity {
       notes: entity.notes,
       deliveryOtp: entity.deliveryOtp,
       proofPhotoUrl: entity.proofPhotoUrl,
+      cycle: entity.cycle,
+      riderAttempt: entity.riderAttempt,
     );
   }
 }

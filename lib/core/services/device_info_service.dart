@@ -19,6 +19,9 @@ class DeviceInfoService {
 
   DeviceInfoService(this._storage);
 
+  String? get cachedDeviceId => _cachedDeviceId ?? _storage.read<String>(AppConstants.registeredDeviceIdKey);
+  String? get cachedDeviceModel => _cachedDeviceModel;
+
   /// Returns a persistent unique device hardware ID (UUID / hardware ID).
   Future<String> getDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;

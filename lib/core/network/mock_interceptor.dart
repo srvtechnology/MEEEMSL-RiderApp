@@ -1,11 +1,16 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:get_storage/get_storage.dart';
 import '../constants/api_endpoints.dart';
+import '../constants/app_constants.dart';
 
 /// MockInterceptor intercepts Dio HTTP calls in demo/mock mode
 /// to return realistic mock JSON responses conforming to
 /// MEEEM Delivery Network — Rider Mobile App API Doc (Part 1).
 class MockInterceptor extends Interceptor {
+  /// Test flag to simulate Single Active Driving Device 409 Conflict
+  static bool simulateDeviceSwitchedConflict = false;
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     // Add artificial network latency for realistic feel (250ms)
@@ -574,8 +579,29 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
-    if (path.contains(ApiEndpoints.toggleOnline)) {
-      final isOnline = options.data?['isOnline'] ?? true;
+    if (path.endsWith(ApiEndpoints.status) ||
+        path.endsWith('/mobileapi/rider/status') ||
+        path.contains('/rider/status/toggle')) {
+      if (options.method.toUpperCase() == 'GET') {
+        bool isOnline = false;
+        try {
+          isOnline = GetStorage().read<bool>(AppConstants.isOnlineKey) ?? false;
+        } catch (_) {}
+        return _resolve(handler, Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'data': {
+              'riderId': 'cmtu3d10r000ab484p4rvanb8',
+              'isOnline': isOnline,
+              'operationalStatus': isOnline ? 'ONLINE' : 'OFFLINE',
+              'lastLocationUpdate': DateTime.now().toUtc().toIso8601String(),
+            },
+          },
+        ));
+      }
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? false) : false;
       return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
@@ -583,15 +609,37 @@ class MockInterceptor extends Interceptor {
           'success': true,
           'isOnline': isOnline,
           'message': isOnline ? 'You are now online' : 'You are now offline',
+          'data': {
+            'riderId': 'cmtu3d10r000ab484p4rvanb8',
+            'isOnline': isOnline,
+            'operationalStatus': isOnline ? 'ONLINE' : 'OFFLINE',
+            'lastLocationUpdate': DateTime.now().toUtc().toIso8601String(),
+          },
         },
       ));
     }
 
     // Part 2: 1.2 Fallback Background Telemetry (REST API)
     if (path.endsWith(ApiEndpoints.location) || path.endsWith('/mobileapi/rider/location')) {
+      if (simulateDeviceSwitchedConflict) {
+        return handler.reject(DioException(
+          requestOptions: options,
+          response: Response(
+            requestOptions: options,
+            statusCode: 409,
+            data: {
+              'success': false,
+              'error': 'DEVICE_SWITCHED',
+              'message': 'You have switched to another device. Tracking stopped on this device.',
+              'shouldStopTracking': true,
+            },
+          ),
+          type: DioExceptionType.badResponse,
+        ), true);
+      }
       final lat = options.data is Map ? (options.data['latitude'] ?? 8.484245) : 8.484245;
       final lng = options.data is Map ? (options.data['longitude'] ?? -13.234125) : -13.234125;
-      final isOnline = options.data is Map ? (options.data['isOnline'] ?? true) : true;
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? false) : false;
       return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
@@ -750,8 +798,29 @@ class MockInterceptor extends Interceptor {
       );
     }
 
-    if (path.contains(ApiEndpoints.toggleOnline)) {
-      final isOnline = options.data is Map ? (options.data['isOnline'] ?? true) : true;
+    if (path.endsWith(ApiEndpoints.status) ||
+        path.endsWith('/mobileapi/rider/status') ||
+        path.contains('/rider/status/toggle')) {
+      if (options.method.toUpperCase() == 'GET') {
+        bool isOnline = false;
+        try {
+          isOnline = GetStorage().read<bool>(AppConstants.isOnlineKey) ?? false;
+        } catch (_) {}
+        return Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'data': {
+              'riderId': 'cmtu3d10r000ab484p4rvanb8',
+              'isOnline': isOnline,
+              'operationalStatus': isOnline ? 'ONLINE' : 'OFFLINE',
+              'lastLocationUpdate': DateTime.now().toUtc().toIso8601String(),
+            },
+          },
+        );
+      }
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? false) : false;
       return Response(
         requestOptions: options,
         statusCode: 200,
@@ -759,6 +828,12 @@ class MockInterceptor extends Interceptor {
           'success': true,
           'isOnline': isOnline,
           'message': isOnline ? 'You are now online' : 'You are now offline',
+          'data': {
+            'riderId': 'cmtu3d10r000ab484p4rvanb8',
+            'isOnline': isOnline,
+            'operationalStatus': isOnline ? 'ONLINE' : 'OFFLINE',
+            'lastLocationUpdate': DateTime.now().toUtc().toIso8601String(),
+          },
         },
       );
     }
@@ -775,9 +850,21 @@ class MockInterceptor extends Interceptor {
 
     // Part 2: 1.2 Fallback Background Telemetry (REST API)
     if (path.endsWith(ApiEndpoints.location) || path.endsWith('/mobileapi/rider/location')) {
+      if (simulateDeviceSwitchedConflict) {
+        return Response(
+          requestOptions: options,
+          statusCode: 409,
+          data: {
+            'success': false,
+            'error': 'DEVICE_SWITCHED',
+            'message': 'You have switched to another device. Tracking stopped on this device.',
+            'shouldStopTracking': true,
+          },
+        );
+      }
       final lat = options.data is Map ? (options.data['latitude'] ?? 8.484245) : 8.484245;
       final lng = options.data is Map ? (options.data['longitude'] ?? -13.234125) : -13.234125;
-      final isOnline = options.data is Map ? (options.data['isOnline'] ?? true) : true;
+      final isOnline = options.data is Map ? (options.data['isOnline'] ?? false) : false;
       return Response(
         requestOptions: options,
         statusCode: 200,
@@ -847,14 +934,14 @@ class MockInterceptor extends Interceptor {
       );
     }
 
-    // 4.2 Decline Delivery Offer: POST /orders/:id/reject
-    if (path.endsWith('/reject')) {
+    // 4.2 Decline Delivery Offer: POST /orders/:id/reject or /decline
+    if (path.endsWith('/reject') || path.endsWith('/decline')) {
       return Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'message': 'Offer rejected. Cascaded to next available rider.',
+          'message': 'Offer declined. Cascaded to next available rider.',
         },
       );
     }
@@ -1086,6 +1173,10 @@ class MockInterceptor extends Interceptor {
       'acceptedAt': DateTime.now().subtract(const Duration(minutes: 4)).toUtc().toIso8601String(),
       'deliveryOtp': deliveryOtp,
       'riderEarnings': riderEarnings,
+      'deliveryFee': riderEarnings,
+      'deliveryEarning': riderEarnings,
+      'earning': riderEarnings,
+      'earningForThisDelivery': riderEarnings,
       'estimatedDurationMin': 15,
       'order': {
         'id': 'order_$id',

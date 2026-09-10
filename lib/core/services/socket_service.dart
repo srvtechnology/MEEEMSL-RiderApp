@@ -26,6 +26,10 @@ class SocketService extends GetxService {
   final RxnString lastEmittedEvent = RxnString();
   final Rxn<DateTime> lastEmittedTimestamp = Rxn<DateTime>();
 
+  // Cross-device sync callbacks (Checklist Point 4)
+  static void Function(bool isOnline)? onRiderStatusChanged;
+  static void Function(Map<String, dynamic> data)? onActiveDeviceChanged;
+
   io.Socket? get socket => _socket;
 
   /// Connects to the WebSocket server with JWT Bearer authentication.
@@ -85,6 +89,22 @@ class SocketService extends GetxService {
         debugPrint('[SocketService] Connected to telemetry socket: $url');
         isConnected.value = true;
         connectionState.value = SocketConnectionState.connected;
+
+        // Checklist Point 4: Socket.IO Real-Time Cross-Device Sync
+        _socket?.on('rider:status_changed', (data) {
+          debugPrint('[SocketService] Received rider:status_changed: $data');
+          final isOnline = (data is Map && data['isOnline'] != null)
+              ? (data['isOnline'] as bool)
+              : false;
+          onRiderStatusChanged?.call(isOnline);
+        });
+
+        _socket?.on('rider:active_device_changed', (data) {
+          debugPrint('[SocketService] Received rider:active_device_changed: $data');
+          if (data is Map) {
+            onActiveDeviceChanged?.call(Map<String, dynamic>.from(data));
+          }
+        });
       });
 
       _socket?.onDisconnect((reason) {
@@ -193,6 +213,8 @@ class SocketService extends GetxService {
     required double longitude,
     double? heading,
     double? speed,
+    bool isOnline = true,
+    String? deviceId,
   }) {
     if (_socket == null || !isConnected.value) {
       return false;
@@ -205,20 +227,54 @@ class SocketService extends GetxService {
       'longitude': longitude,
       'heading': heading ?? 0.0,
       'speed': speed ?? 0.0,
+      'isOnline': isOnline,
+      if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
     };
 
     try {
       // Part 8 Section 5: emit 'rider_location_update'
       _socket?.emit('rider_location_update', payload);
-      // Legacy compatibility: emit 'rider:location_update'
+      // Checklist Point 2: emit 'rider:location_update'
       _socket?.emit('rider:location_update', payload);
-      lastEmittedEvent.value = 'rider_location_update';
+      lastEmittedEvent.value = 'rider:location_update';
       lastEmittedTimestamp.value = DateTime.now();
       debugPrint(
-          '[SocketService] Emitted rider_location_update: lat: $latitude, lng: $longitude, orderId: $orderId, heading: ${heading ?? 0.0}, speed: ${speed ?? 0.0} km/h');
+          '[SocketService] Emitted rider:location_update: lat: $latitude, lng: $longitude, isOnline: $isOnline, deviceId: $deviceId, orderId: $orderId, heading: ${heading ?? 0.0}, speed: ${speed ?? 0.0} km/h');
       return true;
     } catch (e) {
       debugPrint('[SocketService] Error emitting location update: $e');
+      return false;
+    }
+  }
+
+  /// Emits real-time Online/Offline status update (Checklist Point 1).
+  /// Event: "rider:status_update" with payload: { "riderId": "...", "isOnline": true/false, "deviceId": "..." }
+  bool emitStatusUpdate({
+    required String riderId,
+    required bool isOnline,
+    String? deviceId,
+    String? deviceModel,
+  }) {
+    if (_socket == null || !isConnected.value) {
+      return false;
+    }
+
+    final payload = <String, dynamic>{
+      'riderId': riderId,
+      'isOnline': isOnline,
+      if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+      if (isOnline && deviceModel != null && deviceModel.isNotEmpty) 'deviceModel': deviceModel,
+    };
+
+    try {
+      _socket?.emit('rider:status_update', payload);
+      _socket?.emit('rider_status_update', payload);
+      lastEmittedEvent.value = 'rider:status_update';
+      lastEmittedTimestamp.value = DateTime.now();
+      debugPrint('[SocketService] Emitted rider:status_update: $payload');
+      return true;
+    } catch (e) {
+      debugPrint('[SocketService] Error emitting status update: $e');
       return false;
     }
   }

@@ -1,11 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/device_info_service.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/socket_service.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../../../../domain/usecases/dashboard/toggle_online_status_usecase.dart';
+import '../../../../domain/usecases/dashboard/get_rider_status_usecase.dart';
 import '../../../../domain/usecases/dashboard/get_dashboard_summary_usecase.dart';
 import '../../../../domain/usecases/orders/get_active_orders_usecase.dart';
 import '../../../../domain/usecases/orders/get_incoming_order_usecase.dart';
@@ -15,9 +19,11 @@ import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
 import '../../../../data/datasources/auth_local_datasource.dart';
 import '../widgets/incoming_order_modal.dart';
 import '../../../routes/app_routes.dart';
+import '../../orders/controllers/orders_controller.dart';
 
 class DashboardController extends GetxController {
   final ToggleOnlineStatusUseCase toggleOnlineStatusUseCase;
+  final GetRiderStatusUseCase? getRiderStatusUseCase;
   final GetDashboardSummaryUseCase getDashboardSummaryUseCase;
   final GetActiveOrdersUseCase getActiveOrdersUseCase;
   final GetIncomingOrderUseCase getIncomingOrderUseCase;
@@ -27,6 +33,7 @@ class DashboardController extends GetxController {
 
   DashboardController({
     required this.toggleOnlineStatusUseCase,
+    this.getRiderStatusUseCase,
     required this.getDashboardSummaryUseCase,
     required this.getActiveOrdersUseCase,
     required this.getIncomingOrderUseCase,
@@ -34,6 +41,12 @@ class DashboardController extends GetxController {
     required this.declineOrderUseCase,
     this.updateOrderStatusUseCase,
   });
+
+  GetRiderStatusUseCase? get _riderStatusUseCase =>
+      getRiderStatusUseCase ??
+      (Get.isRegistered<GetRiderStatusUseCase>()
+          ? Get.find<GetRiderStatusUseCase>()
+          : null);
 
   UpdateOrderStatusUseCase? get _orderStatusUseCase =>
       updateOrderStatusUseCase ??
@@ -87,7 +100,7 @@ class DashboardController extends GetxController {
   LocationService? get locationService => _locationService;
 
   // State Observables
-  final isOnline = true.obs;
+  final isOnline = false.obs;
   final isLoading = false.obs;
   final todayEarnings = 0.0.obs;
   final todayDeliveries = 0.obs;
@@ -112,6 +125,59 @@ class DashboardController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    final initialOnline = _authLocalDataSource?.getIsOnline() ?? false;
+    isOnline.value = initialOnline;
+    if (initialOnline) {
+      _locationService?.startTracking();
+    } else {
+      _locationService?.stopTracking();
+    }
+
+    // Checklist Point 4: Cross-Device Socket Sync (Single Active Driving Device policy)
+    SocketService.onRiderStatusChanged = (bool isServerOnline) {
+      if (!isServerOnline) {
+        isOnline.value = false;
+        _authLocalDataSource?.setIsOnline(false);
+        _locationService?.stopTracking();
+      }
+    };
+
+    SocketService.onActiveDeviceChanged = (Map<String, dynamic> data) {
+      String? localDeviceId = Get.isRegistered<DeviceInfoService>()
+          ? Get.find<DeviceInfoService>().cachedDeviceId
+          : null;
+      if (localDeviceId == null || localDeviceId.isEmpty) {
+        if (Get.isRegistered<GetStorage>()) {
+          try {
+            localDeviceId = Get.find<GetStorage>().read<String>(AppConstants.registeredDeviceIdKey);
+          } catch (_) {}
+        }
+      }
+
+      final activeDeviceId = data['activeDeviceId']?.toString();
+      if (activeDeviceId != null &&
+          localDeviceId != null &&
+          activeDeviceId.isNotEmpty &&
+          localDeviceId.isNotEmpty &&
+          activeDeviceId != localDeviceId) {
+        const alertMsg = 'You have switched to another device. Tracking stopped on this device.';
+        isOnline.value = false;
+        _authLocalDataSource?.setIsOnline(false);
+        if (Get.isRegistered<GetStorage>()) {
+          try {
+            final storage = Get.find<GetStorage>();
+            storage.write(AppConstants.isOnlineKey, false);
+            storage.remove('online_since_timestamp');
+          } catch (_) {}
+        }
+        if (_locationService != null) {
+          _locationService?.handleDeviceSwitched(alertMsg);
+        } else {
+          LocationService.showDeviceSwitchedDialog(alertMsg);
+        }
+      }
+    };
+
     ever(activeOrder, (OrderEntity? order) {
       _locationService?.setActiveOrderId(order?.id);
     });
@@ -119,22 +185,43 @@ class DashboardController extends GetxController {
       handleIncomingOfferPush(data, fallbackTitle: title, fallbackBody: body);
     };
     NotificationService.onDirectAssignment = handleDirectAssignmentPush;
+    NotificationService.onAssignmentRevoked = handleAssignmentRevokedPush;
     loadDashboardData();
-    if (isOnline.value) {
-      _locationService?.startTracking();
-    }
   }
 
   @override
   void onClose() {
     NotificationService.onNewOffer = null;
     NotificationService.onDirectAssignment = null;
+    NotificationService.onAssignmentRevoked = null;
+    SocketService.onRiderStatusChanged = null;
+    SocketService.onActiveDeviceChanged = null;
     _countdownTimer?.cancel();
     super.onClose();
   }
 
   Future<void> loadDashboardData() async {
     isLoading.value = true;
+
+    // Checklist Point 4: Sync database rider status via GET /mobileapi/rider/status on app open/restart
+    final riderStatusUseCase = _riderStatusUseCase;
+    if (riderStatusUseCase != null) {
+      final statusResult = await riderStatusUseCase();
+      statusResult.fold(
+        (failure) => null,
+        (data) {
+          final backendOnline = data['isOnline'] as bool? ?? false;
+          isOnline.value = backendOnline;
+          _authLocalDataSource?.setIsOnline(backendOnline);
+          if (backendOnline) {
+            _locationService?.startTracking();
+          } else {
+            _locationService?.stopTracking();
+          }
+        },
+      );
+    }
+
     final summaryResult = await getDashboardSummaryUseCase();
     summaryResult.fold(
       (failure) => null,
@@ -156,8 +243,18 @@ class DashboardController extends GetxController {
       (orders) {
         if (orders.isNotEmpty) {
           activeOrder.value = orders.first;
+          if (Get.isRegistered<OrdersController>()) {
+            final ordersCtrl = Get.find<OrdersController>();
+            if (ordersCtrl.selectedOrder.value == null) {
+              ordersCtrl.setActiveOrder(orders.first);
+            }
+          }
         } else {
-          activeOrder.value = null;
+          if (activeOrder.value == null ||
+              activeOrder.value!.status == OrderStatus.delivered ||
+              activeOrder.value!.status == OrderStatus.cancelled) {
+            activeOrder.value = null;
+          }
         }
       },
     );
@@ -166,6 +263,12 @@ class DashboardController extends GetxController {
 
   Future<void> toggleOnline() async {
     final newStatus = !isOnline.value;
+
+    // If attempting to go online, verify/request location permissions first
+    if (newStatus) {
+      await _locationService?.checkAndRequestPermissions();
+    }
+
     final result = await toggleOnlineStatusUseCase(newStatus);
     result.fold(
       (failure) => Get.snackbar('Error', failure.message),
@@ -173,6 +276,8 @@ class DashboardController extends GetxController {
         isOnline.value = status;
         if (status) {
           _locationService?.startTracking();
+          // Checklist Point 1: Stream initial GPS coordinates with isOnline: true immediately
+          _locationService?.sendLocationUpdate(forceRest: true);
         } else {
           _locationService?.stopTracking();
         }
@@ -248,14 +353,57 @@ class DashboardController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await acceptOrderUseCase(order.id);
+    final targetId = (order.assignmentId != null && order.assignmentId!.isNotEmpty)
+        ? order.assignmentId!
+        : order.id;
+    final result = await acceptOrderUseCase(targetId);
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message),
+      (failure) {
+        if (Get.overlayContext != null) {
+          Get.snackbar('Error', failure.message);
+        }
+      },
       (accepted) {
-        activeOrder.value = accepted;
+        final finalOrder = OrderEntity(
+          id: (accepted.id.isNotEmpty && accepted.id != 'meeem00000042') ? accepted.id : order.id,
+          assignmentId: accepted.assignmentId ?? order.assignmentId,
+          orderNumber: (accepted.orderNumber.isNotEmpty && accepted.orderNumber != 'meeem00000042') ? accepted.orderNumber : order.orderNumber,
+          status: OrderStatus.accepted,
+          deliveryOtp: accepted.deliveryOtp.isNotEmpty ? accepted.deliveryOtp : (order.deliveryOtp.isNotEmpty ? order.deliveryOtp : '582910'),
+          customerName: accepted.customerName != 'Customer' && accepted.customerName.isNotEmpty ? accepted.customerName : order.customerName,
+          customerPhone: accepted.customerPhone.isNotEmpty ? accepted.customerPhone : order.customerPhone,
+          customerAvatar: accepted.customerAvatar.isNotEmpty ? accepted.customerAvatar : order.customerAvatar,
+          pickupName: accepted.pickupName != 'Store / Vendor' && accepted.pickupName.isNotEmpty ? accepted.pickupName : order.pickupName,
+          pickupAddress: accepted.pickupAddress.isNotEmpty ? accepted.pickupAddress : order.pickupAddress,
+          pickupPhone: accepted.pickupPhone.isNotEmpty ? accepted.pickupPhone : order.pickupPhone,
+          dropoffAddress: accepted.dropoffAddress.isNotEmpty ? accepted.dropoffAddress : order.dropoffAddress,
+          pickupLat: accepted.pickupLat != 8.484 ? accepted.pickupLat : order.pickupLat,
+          pickupLng: accepted.pickupLng != -13.234 ? accepted.pickupLng : order.pickupLng,
+          dropoffLat: accepted.dropoffLat != 8.460 ? accepted.dropoffLat : order.dropoffLat,
+          dropoffLng: accepted.dropoffLng != -13.250 ? accepted.dropoffLng : order.dropoffLng,
+          items: accepted.items.isNotEmpty ? accepted.items : order.items,
+          subtotal: accepted.subtotal > 0 ? accepted.subtotal : order.subtotal,
+          riderEarnings: accepted.riderEarnings > 0 ? accepted.riderEarnings : order.riderEarnings,
+          distanceKm: accepted.distanceKm > 0 ? accepted.distanceKm : order.distanceKm,
+          estimatedDurationMin: accepted.estimatedDurationMin > 0 ? accepted.estimatedDurationMin : order.estimatedDurationMin,
+          createdAt: accepted.createdAt,
+          notes: accepted.notes.isNotEmpty ? accepted.notes : order.notes,
+          proofPhotoUrl: accepted.proofPhotoUrl,
+          cycle: accepted.cycle ?? order.cycle,
+          riderAttempt: accepted.riderAttempt ?? order.riderAttempt,
+        );
+
+        activeOrder.value = finalOrder;
         incomingOrder.value = null;
+
+        // Synchronize with OrdersController so ActiveOrderView immediately has the order
+        if (Get.isRegistered<OrdersController>()) {
+          final ordersCtrl = Get.find<OrdersController>();
+          ordersCtrl.setActiveOrder(finalOrder);
+        }
+
         Get.toNamed(AppRoutes.activeOrder);
       },
     );
@@ -273,9 +421,14 @@ class DashboardController extends GetxController {
       Get.back();
     }
 
-    await declineOrderUseCase(order.id, reason);
+    final targetId = (order.assignmentId != null && order.assignmentId!.isNotEmpty)
+        ? order.assignmentId!
+        : order.id;
+    await declineOrderUseCase(targetId, reason);
     incomingOrder.value = null;
-    Get.snackbar('Declined', 'Order declined ($reason)', snackPosition: SnackPosition.BOTTOM);
+    if (Get.overlayContext != null) {
+      Get.snackbar('Declined', 'Order declined ($reason)', snackPosition: SnackPosition.BOTTOM);
+    }
   }
 
   /// Advances the status of the active delivery order per Section 5.1
@@ -285,12 +438,18 @@ class DashboardController extends GetxController {
 
     if (current.status == OrderStatus.outForDelivery) {
       // Step 5 requires customer OTP handover verification in active order view
+      if (Get.isRegistered<OrdersController>()) {
+        Get.find<OrdersController>().setActiveOrder(current);
+      }
       Get.toNamed(AppRoutes.activeOrder);
       return;
     }
 
     final useCase = _orderStatusUseCase;
     if (useCase == null) {
+      if (Get.isRegistered<OrdersController>()) {
+        Get.find<OrdersController>().setActiveOrder(current);
+      }
       Get.toNamed(AppRoutes.activeOrder);
       return;
     }
@@ -319,6 +478,9 @@ class DashboardController extends GetxController {
           snackPosition: SnackPosition.TOP),
       (updated) {
         activeOrder.value = updated;
+        if (Get.isRegistered<OrdersController>()) {
+          Get.find<OrdersController>().setActiveOrder(updated);
+        }
         Get.snackbar(
           'Milestone Updated',
           '${updated.status.stepNumberText}: ${updated.status.displayName}',
@@ -362,27 +524,44 @@ class DashboardController extends GetxController {
     final orderNumber = data['orderNumber']?.toString() ?? 'meeem00000042';
     final timeout = int.tryParse(data['timeout']?.toString() ?? '60') ?? 60;
 
+    final assignmentId = data['assignmentId']?.toString();
+    final cycle = int.tryParse(data['cycle']?.toString() ?? '');
+    final riderAttempt = int.tryParse(data['riderAttempt']?.toString() ?? '');
+
+    // Read dynamic earning and customer/store keys directly from message.data
+    final earningRaw = (data['deliveryFee'] ?? data['deliveryEarning'] ?? data['earning'] ?? data['amount'] ?? '0.00').toString();
+    final earning = double.tryParse(earningRaw) ?? 0.00;
+    final shopName = (data['shopName'] ?? data['pickupName'] ?? 'Store').toString();
+    final shopAddress = (data['shopAddress'] ?? data['pickupAddress'] ?? '').toString();
+    final customerName = (data['customerName'] ?? 'Customer').toString();
+    final customerAddress = (data['customerAddress'] ?? data['dropoffAddress'] ?? '').toString();
+    final customerPhone = (data['customerPhone'] ?? '').toString();
+    final distanceKm = double.tryParse(data['distanceKm']?.toString() ?? '2.1') ?? 2.1;
+
     final offer = OrderEntity(
       id: orderId,
+      assignmentId: assignmentId,
       orderNumber: orderNumber,
       status: OrderStatus.pending,
-      customerName: 'Fatmata Koroma',
-      customerPhone: '+23276123456',
+      customerName: customerName,
+      customerPhone: customerPhone,
       customerAvatar: '',
-      pickupName: 'Electronics Hub',
-      pickupAddress: '25 Siaka Stevens St, Freetown',
-      pickupPhone: '+23277987654',
-      dropoffAddress: '14 Wilkinson Road, Freetown',
-      pickupLat: 8.484,
-      pickupLng: -13.234,
-      dropoffLat: 8.460,
-      dropoffLng: -13.250,
+      pickupName: shopName,
+      pickupAddress: shopAddress,
+      pickupPhone: (data['pickupPhone'] ?? '').toString(),
+      dropoffAddress: customerAddress,
+      pickupLat: double.tryParse(data['pickupLat']?.toString() ?? '') ?? 8.484,
+      pickupLng: double.tryParse(data['pickupLng']?.toString() ?? '') ?? -13.234,
+      dropoffLat: double.tryParse(data['dropoffLat']?.toString() ?? '') ?? 8.460,
+      dropoffLng: double.tryParse(data['dropoffLng']?.toString() ?? '') ?? -13.250,
       items: const [],
-      subtotal: 450000,
-      riderEarnings: 18.50,
-      distanceKm: 2.1,
-      estimatedDurationMin: 15,
+      subtotal: double.tryParse(data['subtotal']?.toString() ?? '') ?? 0.0,
+      riderEarnings: earning,
+      distanceKm: distanceKm,
+      estimatedDurationMin: (distanceKm * 7).ceil().clamp(5, 60),
       createdAt: DateTime.now(),
+      cycle: cycle,
+      riderAttempt: riderAttempt,
     );
 
     incomingOrder.value = offer;
@@ -395,14 +574,74 @@ class DashboardController extends GetxController {
   void handleDirectAssignmentPush(Map<String, dynamic> data) {
     loadDashboardData();
     final orderNumber = data['orderNumber']?.toString() ?? 'meeem00000042';
+    final earning = data['deliveryFee'] ?? data['deliveryEarning'] ?? data['earning'] ?? data['amount'];
+    final earningText = earning != null ? ' (Earning: NLe $earning)' : '';
     Get.snackbar(
       '🛵 Direct Delivery Assignment',
-      'You have been directly assigned delivery for Order #$orderNumber.',
+      'You have been directly assigned delivery for Order #$orderNumber$earningText.',
       snackPosition: SnackPosition.TOP,
       backgroundColor: const Color(0xFFE8F8EE),
       colorText: const Color(0xFF009624),
       duration: const Duration(minutes: 1),
     );
+  }
+
+  /// Handles revocation of offer or assignment when reassigned/cancelled (Section 2.3)
+  void handleAssignmentRevokedPush(Map<String, dynamic> data) {
+    final revokedOrderId = data['orderId']?.toString();
+    final revokedOrderNumber = data['orderNumber']?.toString();
+
+    _countdownTimer?.cancel();
+
+    // Immediately dismiss offer popup / card / bottom sheet if open on screen
+    if (Get.isBottomSheetOpen == true) {
+      Get.back();
+    }
+    if (Get.isDialogOpen == true) {
+      Get.back();
+    }
+    if (Get.isSnackbarOpen == true) {
+      Get.closeCurrentSnackbar();
+    }
+
+    if (incomingOrder.value != null) {
+      incomingOrder.value = null;
+    }
+
+    // If active assigned order was revoked by admin/seller
+    if (activeOrder.value != null &&
+        (revokedOrderId == null ||
+         revokedOrderId.isEmpty ||
+         activeOrder.value?.id == revokedOrderId ||
+         activeOrder.value?.orderNumber == revokedOrderNumber)) {
+      activeOrder.value = null;
+      _locationService?.setActiveOrderId(null);
+      loadDashboardData();
+      if (Get.isRegistered<OrdersController>()) {
+        Get.find<OrdersController>().loadOrders();
+      }
+      if (Get.currentRoute == AppRoutes.activeOrder) {
+        Get.until((route) => Get.currentRoute == AppRoutes.dashboard);
+      }
+    }
+
+    if (Get.overlayContext != null) {
+      Get.snackbar(
+        'Offer Revoked',
+        revokedOrderNumber != null && revokedOrderNumber.isNotEmpty
+            ? 'Delivery assignment for Order #$revokedOrderNumber was reassigned or cancelled.'
+            : 'The delivery assignment offer was revoked.',
+        snackPosition: SnackPosition.TOP,
+        backgroundColor: const Color(0xFFFEE2E2),
+        colorText: const Color(0xFFB91C1C),
+        duration: const Duration(seconds: 4),
+      );
+    }
+  }
+
+  void cancelCountdownTimer() {
+    _countdownTimer?.cancel();
+    _countdownTimer = null;
   }
 
   void _startCountdownTimer() {
