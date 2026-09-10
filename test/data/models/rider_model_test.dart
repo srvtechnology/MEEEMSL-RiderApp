@@ -88,5 +88,34 @@ void main() {
       expect(rider.vehicleName, 'Honda CB Shine 125');
       expect(rider.vehicleNumber, 'SL-AA-9988');
     });
+
+    test('correctly parses isApproved: false, status: "PENDING", and adminFeedback', () {
+      final json = {
+        "id": "cmtu3d10r000ab484p4rvanb8",
+        "userId": "cmtu3d10r0009b484ibbjbsag",
+        "isApproved": false,
+        "isSuspended": false,
+        "status": "PENDING",
+        "createdByAdmin": false,
+        "onboardingCompleted": true,
+        "isFirstLogin": false,
+        "adminFeedback": "Please re-upload clearer driving license",
+        "vehicleTypes": ["2_WHEELER"],
+        "vehicleName": "Honda Cbz",
+        "vehicleNumber": "SL-5373828",
+        "drivingLicenseNo": "DL - 467737",
+      };
+
+      final rider = RiderModel.fromJson(json);
+
+      expect(rider.id, "cmtu3d10r000ab484p4rvanb8");
+      expect(rider.isApproved, false);
+      expect(rider.status, "PENDING");
+      expect(rider.onboardingCompleted, true);
+      expect(rider.isFirstLogin, false);
+      expect(rider.adminFeedback, "Please re-upload clearer driving license");
+      expect(rider.vehicleName, "Honda Cbz");
+      expect(rider.vehicleNumber, "SL-5373828");
+    });
   });
 }

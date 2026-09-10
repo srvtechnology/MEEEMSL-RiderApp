@@ -19,6 +19,7 @@ class RiderModel extends RiderEntity {
     super.status,
     super.onboardingCompleted,
     super.isFirstLogin,
+    super.adminFeedback,
     super.vehicleTypes,
     super.vehicleType,
     super.vehicleName,
@@ -118,6 +119,7 @@ class RiderModel extends RiderEntity {
       status: statusStr,
       onboardingCompleted: onboardingCompletedVal,
       isFirstLogin: isFirstLoginVal,
+      adminFeedback: rider['adminFeedback'] as String? ?? json['adminFeedback'] as String?,
       vehicleTypes: ((rider['vehicleTypes'] ?? json['vehicleTypes']) as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -180,6 +182,7 @@ class RiderModel extends RiderEntity {
       'status': status,
       'onboardingCompleted': onboardingCompleted,
       'isFirstLogin': isFirstLogin,
+      'adminFeedback': adminFeedback,
       'vehicleTypes': vehicleTypes,
       'vehicleType': vehicleType,
       'vehicleName': vehicleName,
@@ -216,6 +219,7 @@ class RiderModel extends RiderEntity {
       status: entity.status,
       onboardingCompleted: entity.onboardingCompleted,
       isFirstLogin: entity.isFirstLogin,
+      adminFeedback: entity.adminFeedback,
       vehicleTypes: entity.vehicleTypes,
       vehicleType: entity.vehicleType,
       vehicleName: entity.vehicleName,

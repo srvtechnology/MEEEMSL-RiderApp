@@ -25,6 +25,10 @@ class SplashController extends GetxController {
             Get.offAllNamed(AppRoutes.onboarding);
             return;
           }
+          if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
+            Get.offAllNamed(AppRoutes.pendingApproval);
+            return;
+          }
         } catch (_) {}
       }
       Get.offAllNamed(AppRoutes.main);

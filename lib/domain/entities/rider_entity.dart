@@ -32,6 +32,8 @@ class RiderEntity extends Equatable {
   final List<String> selectedZones;
   final List<String> selectedLocations;
 
+  final String? adminFeedback;
+
   final VehicleEntity? vehicle;
   final PayoutInfoEntity? payoutInfo;
   final List<String> operatingZones;
@@ -52,6 +54,7 @@ class RiderEntity extends Equatable {
     this.status = 'APPROVED',
     this.onboardingCompleted = false,
     this.isFirstLogin = false,
+    this.adminFeedback,
     this.vehicleTypes = const ['2_WHEELER'],
     this.vehicleType = '2_WHEELER',
     this.vehicleName,
@@ -84,6 +87,7 @@ class RiderEntity extends Equatable {
     String? status,
     bool? onboardingCompleted,
     bool? isFirstLogin,
+    String? adminFeedback,
     List<String>? vehicleTypes,
     String? vehicleType,
     String? vehicleName,
@@ -115,6 +119,7 @@ class RiderEntity extends Equatable {
       status: status ?? this.status,
       onboardingCompleted: onboardingCompleted ?? this.onboardingCompleted,
       isFirstLogin: isFirstLogin ?? this.isFirstLogin,
+      adminFeedback: adminFeedback ?? this.adminFeedback,
       vehicleTypes: vehicleTypes ?? this.vehicleTypes,
       vehicleType: vehicleType ?? this.vehicleType,
       vehicleName: vehicleName ?? this.vehicleName,
@@ -149,6 +154,7 @@ class RiderEntity extends Equatable {
         status,
         onboardingCompleted,
         isFirstLogin,
+        adminFeedback,
         vehicleTypes,
         vehicleType,
         vehicleName,

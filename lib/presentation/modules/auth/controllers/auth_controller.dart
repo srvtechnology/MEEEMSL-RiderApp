@@ -330,6 +330,11 @@ class AuthController extends GetxController {
       return;
     }
 
+    if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
+      Get.offAllNamed(AppRoutes.pendingApproval);
+      return;
+    }
+
     Get.snackbar(
       'Welcome Back!',
       'Signed in as ${user.name.isNotEmpty ? user.name : rider.name}',
@@ -973,14 +978,25 @@ class AuthController extends GetxController {
     result.fold(
       (failure) => Get.snackbar('Onboarding Submission Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
       (rider) {
-        Get.snackbar(
-          '🎉 Onboarding Completed!',
-          'Rider onboarding submitted successfully! Your account status is ${rider.status}.',
-          snackPosition: SnackPosition.TOP,
-          backgroundColor: const Color(0xFFE8F8EE),
-          duration: const Duration(seconds: 4),
-        );
-        Get.offAllNamed(AppRoutes.main);
+        if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
+          Get.snackbar(
+            '🎉 Onboarding Submitted!',
+            'Rider onboarding submitted successfully! Your account status is PENDING review.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFFFFBEB),
+            duration: const Duration(seconds: 4),
+          );
+          Get.offAllNamed(AppRoutes.pendingApproval);
+        } else {
+          Get.snackbar(
+            '🎉 Onboarding Completed!',
+            'Rider onboarding submitted successfully! Your account status is ${rider.status}.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+            duration: const Duration(seconds: 4),
+          );
+          Get.offAllNamed(AppRoutes.main);
+        }
       },
     );
   }
