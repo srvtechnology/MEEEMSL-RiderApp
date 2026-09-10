@@ -184,13 +184,18 @@ class OrdersController extends GetxController {
         _loadActiveOrders();
         _loadHistory();
 
+        // Immediately clear dashboard active order so card vanishes at once
+        // (without waiting for loadDashboardData async round-trip)
+        if (Get.isRegistered<DashboardController>()) {
+          final dash = Get.find<DashboardController>();
+          dash.activeOrder.value = null;
+          dash.loadDashboardData();
+        }
+
         // Immediately refresh Rider Revenue & Earnings Engine (Part 6 Section 6 & 8 #8)
         if (Get.isRegistered<EarningsController>()) {
           Get.find<EarningsController>().loadRevenue(showLoading: false);
           Get.find<EarningsController>().loadEarnings();
-        }
-        if (Get.isRegistered<DashboardController>()) {
-          Get.find<DashboardController>().loadDashboardData();
         }
 
         Get.offNamed(AppRoutes.main);

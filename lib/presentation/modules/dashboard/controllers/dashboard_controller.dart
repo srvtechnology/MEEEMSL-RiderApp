@@ -250,10 +250,19 @@ class DashboardController extends GetxController {
             }
           }
         } else {
-          if (activeOrder.value == null ||
-              activeOrder.value!.status == OrderStatus.delivered ||
-              activeOrder.value!.status == OrderStatus.cancelled) {
-            activeOrder.value = null;
+          // Backend returned no active orders — always clear local state.
+          // The previous guard (checking for delivered/cancelled) was wrong:
+          // after OTP completion the local value is still outForDelivery,
+          // so the card would persist on dashboard even after delivery.
+          activeOrder.value = null;
+          _locationService?.setActiveOrderId(null);
+          if (Get.isRegistered<OrdersController>()) {
+            final ordersCtrl = Get.find<OrdersController>();
+            if (ordersCtrl.selectedOrder.value != null &&
+                (ordersCtrl.selectedOrder.value!.status == OrderStatus.delivered ||
+                 ordersCtrl.selectedOrder.value!.status == OrderStatus.cancelled)) {
+              ordersCtrl.selectedOrder.value = null;
+            }
           }
         }
       },
