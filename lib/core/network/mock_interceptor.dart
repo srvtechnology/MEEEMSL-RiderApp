@@ -872,7 +872,12 @@ class MockInterceptor extends Interceptor {
           data: {
             'success': true,
             'cancelled': true,
-            'message': 'Delivery cancelled and auto-reassigned to nearest available rider.',
+            'message': 'Delivery status updated to CANCELLED_BY_RIDER',
+            'data': {
+              'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
+              'status': 'CANCELLED_BY_RIDER',
+              'cancelledAt': DateTime.now().toUtc().toIso8601String(),
+            },
           },
         );
       }

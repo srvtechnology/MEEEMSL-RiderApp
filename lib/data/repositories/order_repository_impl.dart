@@ -83,6 +83,18 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
+  Future<Either<Failure, OrderEntity>> cancelTrip(String orderId, String cancellationReason) async {
+    try {
+      final order = await remoteDataSource.cancelTrip(orderId, cancellationReason);
+      return Right(order);
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
   Future<Either<Failure, List<OrderEntity>>> getOrderHistory({String? statusFilter}) async {
     try {
       final history = await remoteDataSource.getOrderHistory(statusFilter: statusFilter);

@@ -111,6 +111,8 @@ void main() {
       when(() => mockSocket.isConnected).thenReturn(true.obs);
       when(() => mockSocket.connectionState)
           .thenReturn(SocketConnectionState.connected.obs);
+      when(() => mockSocket.joinOrder(any())).thenReturn(true);
+      when(() => mockSocket.leaveOrder(any())).thenReturn(true);
       when(() => mockAuth.getToken()).thenReturn('mock_jwt_token');
       when(() => mockAuth.getSavedRider()).thenReturn(null);
       when(() => mockAuth.getSavedUser()).thenReturn(null);

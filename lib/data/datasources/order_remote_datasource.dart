@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
 import '../../core/utils/image_compressor.dart';
 import '../../domain/entities/order_entity.dart';
@@ -16,6 +18,7 @@ abstract class OrderRemoteDataSource {
     String? customerOtp,
     String? cancellationReason,
   });
+  Future<OrderModel> cancelTrip(String orderId, String cancellationReason);
   Future<List<OrderModel>> getOrderHistory({String? statusFilter});
   Future<OrderModel> getOrderDetails(String orderId);
 }
@@ -71,7 +74,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     return null;
   }
 
-  // Section 4.1: POST /mobileapi/rider/orders/:id/accept
+  // Section 4.1 & Part 8 Section 2.1: POST /mobileapi/rider/orders/:id/accept
   @override
   Future<OrderModel> acceptOrder(String orderId) async {
     try {
@@ -93,6 +96,12 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
           _activeOrders[existingIdx] = updated;
           return updated;
         }
+      }
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.statusCode != null && e.response!.statusCode! >= 400) {
+        final respData = e.response?.data is Map ? e.response!.data as Map : {};
+        final msg = respData['error'] ?? respData['message'] ?? 'Offer has expired or is no longer available';
+        throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
       }
     } catch (_) {}
 
@@ -121,7 +130,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     return newOrder;
   }
 
-  // Section 4.2: POST /mobileapi/rider/orders/:id/reject
+  // Section 4.2 & Part 8 Section 2.2: POST /mobileapi/rider/orders/:id/reject
   @override
   Future<bool> declineOrder(String orderId, String reason) async {
     try {
@@ -129,12 +138,18 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         ApiEndpoints.rejectOrderOffer(orderId),
         data: {'reason': reason},
       );
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.statusCode != null && e.response!.statusCode! >= 400) {
+        final respData = e.response?.data is Map ? e.response!.data as Map : {};
+        final msg = respData['error'] ?? respData['message'] ?? 'Failed to decline offer';
+        throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      }
     } catch (_) {}
     _activeOrders.removeWhere((o) => o.id == orderId);
     return true;
   }
 
-  // Section 5.1, 5.2, 6.1: POST /mobileapi/rider/orders/:id/status
+  // Section 5.1, 5.2, 6.1 & Part 8 Section 3 & 4: POST /mobileapi/rider/orders/:id/status
   @override
   Future<OrderModel> updateOrderStatus(
     String orderId,
@@ -171,6 +186,12 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         if (data is Map<String, dynamic>) {
           backendProofUrl = data['deliveryProofImage']?.toString();
         }
+      }
+    } on DioException catch (e) {
+      if (e.response != null && e.response?.statusCode != null && e.response!.statusCode! >= 400) {
+        final respData = e.response?.data is Map ? e.response!.data as Map : {};
+        final msg = respData['error'] ?? respData['message'] ?? 'Failed to update order status';
+        throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
       }
     } catch (_) {}
 
@@ -213,6 +234,16 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       createdAt: DateTime.now(),
       deliveryOtp: customerOtp ?? '',
       proofPhotoUrl: backendProofUrl ?? proofPhotoUrl,
+    );
+  }
+
+  // Part 8 Section 4.2: POST /mobileapi/rider/orders/:id/status (CANCELLED_BY_RIDER)
+  @override
+  Future<OrderModel> cancelTrip(String orderId, String cancellationReason) {
+    return updateOrderStatus(
+      orderId,
+      OrderStatus.cancelled,
+      cancellationReason: cancellationReason,
     );
   }
 

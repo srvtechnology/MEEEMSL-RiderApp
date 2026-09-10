@@ -20,12 +20,12 @@ class EmergencyReassignDialog extends StatefulWidget {
 
 class _EmergencyReassignDialogState extends State<EmergencyReassignDialog> {
   final List<String> reasons = [
+    'Vehicle breakdown',
+    'Personal emergency',
+    'Store was closed',
+    'Severe weather / impassable road',
     'Motorbike tire puncture',
-    'Mechanical / engine breakdown',
-    'Traffic accident / emergency',
-    'Severe weather / road blocked',
     'Order package damaged at store',
-    'Personal medical emergency',
   ];
 
   late String selectedReason;

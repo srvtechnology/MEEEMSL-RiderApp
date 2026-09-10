@@ -117,9 +117,16 @@ class ApiEndpoints {
     return cleanPath == revenue;
   }
 
-  /// Returns true if [path] is documented in Part 1, Part 2, or Part 6.
+  /// Returns true if [path] is documented in Part 8 (Rider Mobile App — Dispatch, Acceptance, Lifecycle & Cancellation API)
+  static bool isPart8Endpoint(String path) {
+    final cleanPath = normalizePath(path);
+    final regExp = RegExp(r'^/orders/[^/]+/(accept|reject|status)$');
+    return regExp.hasMatch(cleanPath);
+  }
+
+  /// Returns true if [path] is documented in Part 1, Part 2, Part 6, or Part 8.
   static bool isDocumentedEndpoint(String path) {
-    return isPart1Endpoint(path) || isPart2Endpoint(path) || isPart6Endpoint(path);
+    return isPart1Endpoint(path) || isPart2Endpoint(path) || isPart6Endpoint(path) || isPart8Endpoint(path);
   }
 
   // 4. Forgot & Reset Password

@@ -141,7 +141,39 @@ class SocketService extends GetxService {
     currentRiderId.value = null;
   }
 
-  /// Emits real-time GPS telemetry to the server via the "rider:location_update" event.
+  /// Joins the order room for real-time tracking (MOBILE_RIDER_DISPATCH_AND_TRIP_CANCELLATION_API_DOC_PART_8 Section 5).
+  bool joinOrder(String orderId) {
+    if (_socket == null || !isConnected.value) {
+      return false;
+    }
+    try {
+      _socket?.emit('join_order', {'orderId': orderId});
+      debugPrint('[SocketService] Emitted join_order for order: $orderId');
+      return true;
+    } catch (e) {
+      debugPrint('[SocketService] Error emitting join_order: $e');
+      return false;
+    }
+  }
+
+  /// Leaves the order room for real-time tracking (Part 8 Section 5).
+  bool leaveOrder(String orderId) {
+    if (_socket == null || !isConnected.value) {
+      return false;
+    }
+    try {
+      _socket?.emit('leave_order', {'orderId': orderId});
+      debugPrint('[SocketService] Emitted leave_order for order: $orderId');
+      return true;
+    } catch (e) {
+      debugPrint('[SocketService] Error emitting leave_order: $e');
+      return false;
+    }
+  }
+
+  /// Emits real-time GPS telemetry to the server via the "rider_location_update" event.
+  ///
+  /// Conforms to MOBILE_RIDER_DISPATCH_AND_TRIP_CANCELLATION_API_DOC_PART_8 (Section 5).
   ///
   /// Payload schema:
   /// ```json
@@ -176,11 +208,14 @@ class SocketService extends GetxService {
     };
 
     try {
+      // Part 8 Section 5: emit 'rider_location_update'
+      _socket?.emit('rider_location_update', payload);
+      // Legacy compatibility: emit 'rider:location_update'
       _socket?.emit('rider:location_update', payload);
-      lastEmittedEvent.value = 'rider:location_update';
+      lastEmittedEvent.value = 'rider_location_update';
       lastEmittedTimestamp.value = DateTime.now();
       debugPrint(
-          '[SocketService] Emitted rider:location_update: lat: $latitude, lng: $longitude, orderId: $orderId, heading: ${heading ?? 0.0}, speed: ${speed ?? 0.0} km/h');
+          '[SocketService] Emitted rider_location_update: lat: $latitude, lng: $longitude, orderId: $orderId, heading: ${heading ?? 0.0}, speed: ${speed ?? 0.0} km/h');
       return true;
     } catch (e) {
       debugPrint('[SocketService] Error emitting location update: $e');

@@ -91,9 +91,17 @@ class LocationService extends GetxService {
   }
 
   /// Sets or clears the active delivery order ID for real-time telemetry streaming.
+  /// Joins/leaves the Socket.IO order room per MOBILE_RIDER_DISPATCH_AND_TRIP_CANCELLATION_API_DOC_PART_8 Section 5.
   /// Pass null if the rider is roaming/idle.
   void setActiveOrderId(String? orderId) {
+    final oldOrderId = activeOrderId.value;
+    if (oldOrderId != null && oldOrderId != orderId) {
+      _socketService.leaveOrder(oldOrderId);
+    }
     activeOrderId.value = orderId;
+    if (orderId != null) {
+      _socketService.joinOrder(orderId);
+    }
     debugPrint(
         '[LocationService] Active order ID updated for telemetry: $orderId');
   }

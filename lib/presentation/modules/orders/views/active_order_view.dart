@@ -83,7 +83,7 @@ class ActiveOrderView extends GetView<OrdersController> {
               ),
             ),
 
-            // Bottom Swipe Confirmation Bar
+            // Bottom Action Bar: Swipe button + Red outline Cancel Delivery button (Part 8 Section 4.3)
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -97,10 +97,42 @@ class ActiveOrderView extends GetView<OrdersController> {
                 ],
               ),
               child: SafeArea(
-                child: SwipeButton(
-                  text: order.status.nextStepActionTitle,
-                  activeColor: AppColors.primary,
-                  onSwiped: () => controller.advanceActiveOrderStatus(),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwipeButton(
+                      text: order.status.nextStepActionTitle,
+                      activeColor: AppColors.primary,
+                      onSwiped: () => controller.advanceActiveOrderStatus(),
+                    ),
+                    if (order.status == OrderStatus.accepted ||
+                        order.status == OrderStatus.atPickup) ...[
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          key: const Key('active_order_cancel_button'),
+                          icon: const Icon(Icons.cancel_outlined,
+                              color: AppColors.error, size: 18),
+                          label: const Text(
+                            'Cancel Delivery',
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.error, width: 1.5),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          onPressed: () => controller.showCancelDeliveryDialog(),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),

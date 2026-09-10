@@ -21,6 +21,7 @@ import '../../../../domain/usecases/orders/get_incoming_order_usecase.dart';
 import '../../../../domain/usecases/orders/accept_order_usecase.dart';
 import '../../../../domain/usecases/orders/decline_order_usecase.dart';
 import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
+import '../../../../domain/usecases/orders/cancel_trip_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_history_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
 import '../../../../domain/usecases/earnings/get_earnings_breakdown_usecase.dart';
@@ -83,6 +84,7 @@ class MainLayoutBinding extends Bindings {
     Get.lazyPut(() => AcceptOrderUseCase(Get.find<OrderRepository>()));
     Get.lazyPut(() => DeclineOrderUseCase(Get.find<OrderRepository>()));
     Get.lazyPut(() => UpdateOrderStatusUseCase(Get.find<OrderRepository>()));
+    Get.lazyPut(() => CancelTripUseCase(Get.find<OrderRepository>()));
     Get.lazyPut(() => GetOrderHistoryUseCase(Get.find<OrderRepository>()));
     Get.lazyPut(() => GetOrderDetailsUseCase(Get.find<OrderRepository>()));
 
@@ -115,6 +117,7 @@ class MainLayoutBinding extends Bindings {
     Get.lazyPut<OrdersController>(() => OrdersController(
           getActiveOrdersUseCase: Get.find<GetActiveOrdersUseCase>(),
           updateOrderStatusUseCase: Get.find<UpdateOrderStatusUseCase>(),
+          cancelTripUseCase: Get.find<CancelTripUseCase>(),
           getOrderHistoryUseCase: Get.find<GetOrderHistoryUseCase>(),
           getOrderDetailsUseCase: Get.find<GetOrderDetailsUseCase>(),
         ));

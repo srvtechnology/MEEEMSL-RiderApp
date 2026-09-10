@@ -343,33 +343,36 @@ class ActiveDeliveryCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Flexible(
-                      child: InkWell(
-                        onTap: () => Get.dialog(
-                          EmergencyReassignDialog(order: order),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.warning_amber_rounded,
-                                size: 14, color: AppColors.error),
-                            SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                'Emergency Reassign',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.error,
-                                  fontWeight: FontWeight.w600,
+                    if (isHeadingToStore)
+                      Flexible(
+                        child: InkWell(
+                          onTap: () => Get.dialog(
+                            EmergencyReassignDialog(order: order),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.warning_amber_rounded,
+                                  size: 14, color: AppColors.error),
+                              SizedBox(width: 4),
+                              Flexible(
+                                child: Text(
+                                  'Emergency Cancel',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.error,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ),
+                      )
+                    else
+                      const SizedBox.shrink(),
                     const SizedBox(width: 8),
                     Flexible(
                       child: InkWell(

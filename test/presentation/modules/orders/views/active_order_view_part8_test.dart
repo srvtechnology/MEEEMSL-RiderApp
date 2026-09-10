@@ -1,0 +1,188 @@
+import 'package:dartz/dartz.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:get/get.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:meeem_rider/domain/entities/order_entity.dart';
+import 'package:meeem_rider/domain/usecases/orders/cancel_trip_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/get_active_orders_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/get_order_details_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/get_order_history_usecase.dart';
+import 'package:meeem_rider/domain/usecases/orders/update_order_status_usecase.dart';
+import 'package:meeem_rider/presentation/modules/orders/controllers/orders_controller.dart';
+import 'package:meeem_rider/presentation/modules/orders/views/active_order_view.dart';
+import 'package:meeem_rider/presentation/modules/orders/widgets/cancel_delivery_dialog.dart';
+import 'package:meeem_rider/presentation/routes/app_routes.dart';
+
+class MockGetActiveOrdersUseCase extends Mock implements GetActiveOrdersUseCase {}
+class MockUpdateOrderStatusUseCase extends Mock implements UpdateOrderStatusUseCase {}
+class MockCancelTripUseCase extends Mock implements CancelTripUseCase {}
+class MockGetOrderHistoryUseCase extends Mock implements GetOrderHistoryUseCase {}
+class MockGetOrderDetailsUseCase extends Mock implements GetOrderDetailsUseCase {}
+
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late MockGetActiveOrdersUseCase mockGetActiveOrders;
+  late MockUpdateOrderStatusUseCase mockUpdateStatus;
+  late MockCancelTripUseCase mockCancelTrip;
+  late MockGetOrderHistoryUseCase mockGetHistory;
+  late MockGetOrderDetailsUseCase mockGetDetails;
+  late OrdersController controller;
+
+  OrderEntity buildOrderWithStatus(OrderStatus status) {
+    return OrderEntity(
+      id: 'order_test_42',
+      orderNumber: 'meeem00000042',
+      status: status,
+      customerName: 'Fatmata Koroma',
+      customerPhone: '+232 76 998877',
+      customerAvatar: '',
+      pickupName: 'MEEEM Super Store',
+      pickupAddress: '25 Siaka Stevens St',
+      pickupPhone: '+232 76 112233',
+      dropoffAddress: '14 Wilkinson Road',
+      pickupLat: 8.484,
+      pickupLng: -13.234,
+      dropoffLat: 8.460,
+      dropoffLng: -13.250,
+      items: const [],
+      subtotal: 450000.0,
+      riderEarnings: 14.80,
+      distanceKm: 2.1,
+      estimatedDurationMin: 15,
+      createdAt: DateTime.now(),
+    );
+  }
+
+  setUp(() {
+    Get.reset();
+    Get.testMode = true;
+    mockGetActiveOrders = MockGetActiveOrdersUseCase();
+    mockUpdateStatus = MockUpdateOrderStatusUseCase();
+    mockCancelTrip = MockCancelTripUseCase();
+    mockGetHistory = MockGetOrderHistoryUseCase();
+    mockGetDetails = MockGetOrderDetailsUseCase();
+
+    when(() => mockGetActiveOrders()).thenAnswer((_) async => const Right([]));
+    when(() => mockGetHistory(statusFilter: any(named: 'statusFilter')))
+        .thenAnswer((_) async => const Right([]));
+
+    controller = OrdersController(
+      getActiveOrdersUseCase: mockGetActiveOrders,
+      updateOrderStatusUseCase: mockUpdateStatus,
+      cancelTripUseCase: mockCancelTrip,
+      getOrderHistoryUseCase: mockGetHistory,
+      getOrderDetailsUseCase: mockGetDetails,
+    );
+    Get.put<OrdersController>(controller);
+  });
+
+  tearDown(() {
+    Get.reset();
+  });
+
+  group('ActiveOrderView Part 8 Cancellation UI Tests', () {
+    testWidgets('renders Cancel Delivery button when status is ACCEPTED', (tester) async {
+      controller.selectedOrder.value = buildOrderWithStatus(OrderStatus.accepted);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: ActiveOrderView(),
+        ),
+      );
+
+      expect(find.byKey(const Key('active_order_cancel_button')), findsOneWidget);
+      expect(find.text('Cancel Delivery'), findsOneWidget);
+    });
+
+    testWidgets('renders Cancel Delivery button when status is AT_PICKUP', (tester) async {
+      controller.selectedOrder.value = buildOrderWithStatus(OrderStatus.atPickup);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: ActiveOrderView(),
+        ),
+      );
+
+      expect(find.byKey(const Key('active_order_cancel_button')), findsOneWidget);
+      expect(find.text('Cancel Delivery'), findsOneWidget);
+    });
+
+    testWidgets('HIDES Cancel Delivery button when status is PICKED_UP (Possession Security Rule)', (tester) async {
+      controller.selectedOrder.value = buildOrderWithStatus(OrderStatus.pickedUp);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: ActiveOrderView(),
+        ),
+      );
+
+      expect(find.byKey(const Key('active_order_cancel_button')), findsNothing);
+      expect(find.text('Cancel Delivery'), findsNothing);
+    });
+
+    testWidgets('HIDES Cancel Delivery button when status is OUT_FOR_DELIVERY', (tester) async {
+      controller.selectedOrder.value = buildOrderWithStatus(OrderStatus.outForDelivery);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: ActiveOrderView(),
+        ),
+      );
+
+      expect(find.byKey(const Key('active_order_cancel_button')), findsNothing);
+      expect(find.text('Cancel Delivery'), findsNothing);
+    });
+
+    testWidgets('tapping Cancel Delivery button opens CancelDeliveryDialog', (tester) async {
+      controller.selectedOrder.value = buildOrderWithStatus(OrderStatus.accepted);
+
+      await tester.pumpWidget(
+        const GetMaterialApp(
+          home: ActiveOrderView(),
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('active_order_cancel_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(CancelDeliveryDialog), findsOneWidget);
+      expect(find.text('Cancel Delivery'), findsWidgets);
+      expect(find.text('Vehicle breakdown'), findsOneWidget);
+    });
+
+    testWidgets('OrdersController.cancelTrip calls CancelTripUseCase and clears active order', (tester) async {
+      final order = buildOrderWithStatus(OrderStatus.accepted);
+      controller.selectedOrder.value = order;
+
+      final cancelledOrder = order.copyWith(status: OrderStatus.cancelled);
+      when(() => mockCancelTrip(order.id, 'Vehicle breakdown'))
+          .thenAnswer((_) async => Right(cancelledOrder));
+
+      await tester.pumpWidget(
+        GetMaterialApp(
+          initialRoute: '/test',
+          getPages: [
+            GetPage(
+              name: '/test',
+              page: () => const Scaffold(body: Text('Test Screen')),
+            ),
+            GetPage(
+              name: AppRoutes.main,
+              page: () => const Scaffold(body: Text('Main Screen')),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await controller.cancelTrip('Vehicle breakdown');
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+
+      verify(() => mockCancelTrip(order.id, 'Vehicle breakdown')).called(1);
+      expect(controller.selectedOrder.value, isNull);
+    });
+  });
+}

@@ -14,6 +14,7 @@ abstract class OrderRepository {
     String? customerOtp,
     String? cancellationReason,
   });
+  Future<Either<Failure, OrderEntity>> cancelTrip(String orderId, String cancellationReason);
   Future<Either<Failure, List<OrderEntity>>> getOrderHistory({String? statusFilter});
   Future<Either<Failure, OrderEntity>> getOrderDetails(String orderId);
 }

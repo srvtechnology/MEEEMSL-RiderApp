@@ -17,6 +17,7 @@ dependencies:
 
   # Networking & HTTP
   dio: ^5.7.0
+  http: ^1.2.2
 
   # Functional Programming & Result Types
   dartz: ^0.10.1
