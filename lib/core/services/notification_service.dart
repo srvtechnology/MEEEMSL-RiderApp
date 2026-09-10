@@ -64,6 +64,10 @@ class NotificationService extends GetxService {
     }
   }
 
+  /// Callbacks for active dashboard handling
+  static void Function(Map<String, dynamic> data, {String? title, String? body})? onNewOffer;
+  static void Function(Map<String, dynamic> data)? onDirectAssignment;
+
   /// Handles FCM data payload conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md Section 2:
   /// - 2.1: type == "NEW_OFFER" (Automated Waterfall Offer with 60s countdown)
   /// - 2.2: type == "MANUAL_ASSIGN" (Direct Admin/Seller Assignment)
@@ -72,24 +76,38 @@ class NotificationService extends GetxService {
     playOrderAlertFeedback();
 
     if (type == 'NEW_OFFER') {
+      onNewOffer?.call(data, title: title, body: body);
       showOrderDispatchAlert(
         title: title ?? '📦 New Delivery Assignment Offer!',
         message: body ?? 'Pickup offer received. Tap to accept within 60s!',
+        duration: const Duration(minutes: 1),
         onTap: () {
-          // Navigate to dashboard
+          if (Get.currentRoute != '/dashboard') {
+            Get.toNamed('/dashboard');
+          }
         },
       );
       return;
     }
 
     if (type == 'MANUAL_ASSIGN') {
-      showOrderDispatchAlert(
-        title: title ?? '🛵 Direct Delivery Assignment',
-        message: body ?? 'You have been directly assigned a new delivery order.',
-        onTap: () {
-          // Navigate to active order
-        },
-      );
+      if (onDirectAssignment != null) {
+        onDirectAssignment!(data);
+      } else {
+        showOrderDispatchAlert(
+          title: title ?? '🛵 Direct Delivery Assignment',
+          message: body ?? 'You have been directly assigned a new delivery order.',
+          duration: const Duration(minutes: 1),
+          onTap: () {
+            final orderId = data['orderId']?.toString();
+            if (orderId != null && orderId.isNotEmpty) {
+              Get.toNamed('/orders/$orderId', arguments: {'orderId': orderId});
+            } else if (Get.currentRoute != '/dashboard') {
+              Get.toNamed('/dashboard');
+            }
+          },
+        );
+      }
       return;
     }
 
@@ -155,12 +173,16 @@ class NotificationService extends GetxService {
   }
 
   /// Displays an in-app heads-up pop-up alert for urgent delivery dispatch assignments.
+  /// Defaults to staying on screen for 1 minute (60 seconds).
   void showOrderDispatchAlert({
     required String title,
     required String message,
     required VoidCallback onTap,
+    Duration duration = const Duration(minutes: 1),
   }) {
     playOrderAlertFeedback();
+
+    if (Get.overlayContext == null) return;
 
     Get.snackbar(
       title,
@@ -169,7 +191,7 @@ class NotificationService extends GetxService {
       backgroundColor: AppColors.secondary,
       colorText: Colors.white,
       icon: const Icon(Icons.delivery_dining_rounded, color: Colors.white, size: 28),
-      duration: const Duration(seconds: 5),
+      duration: duration,
       margin: const EdgeInsets.all(12),
       borderRadius: 16,
       mainButton: TextButton(
@@ -190,6 +212,7 @@ class NotificationService extends GetxService {
 
   /// Displays general notification snackbar.
   void showInfoNotification({required String title, required String message}) {
+    if (Get.overlayContext == null) return;
     Get.snackbar(
       title,
       message,

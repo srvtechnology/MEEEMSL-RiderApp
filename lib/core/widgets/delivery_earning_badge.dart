@@ -50,13 +50,17 @@ class DeliveryEarningBadge extends StatelessWidget {
             color: emeraldIcon,
           ),
           const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: isCompact ? 11.5 : 12.5,
-              fontWeight: FontWeight.w800,
-              color: emeraldText,
-              letterSpacing: 0.2,
+          Flexible(
+            child: Text(
+              text,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: isCompact ? 11.5 : 12.5,
+                fontWeight: FontWeight.w800,
+                color: emeraldText,
+                letterSpacing: 0.2,
+              ),
             ),
           ),
         ],

@@ -53,17 +53,19 @@ class ActiveDeliveryCard extends StatelessWidget {
         children: [
           // Top Header Banner
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: AppColors.primaryContainer.withAlpha(120),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      Container(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Flexible(
+                      child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
@@ -73,6 +75,8 @@ class ActiveDeliveryCard extends StatelessWidget {
                           order.orderNumber.startsWith('#')
                               ? order.orderNumber
                               : '#${order.orderNumber}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 12,
@@ -81,17 +85,15 @@ class ActiveDeliveryCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: StatusBadge(
-                          text: order.status.displayName.toUpperCase(),
-                          type: BadgeType.info,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(width: 8),
+                    StatusBadge(
+                      text: order.status.displayName.toUpperCase(),
+                      type: BadgeType.info,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(height: 8),
                 DeliveryEarningBadge(amount: order.riderEarnings),
               ],
             ),
@@ -341,43 +343,58 @@ class ActiveDeliveryCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    InkWell(
-                      onTap: () => Get.dialog(
-                        EmergencyReassignDialog(order: order),
-                      ),
-                      child: Row(
-                        children: const [
-                          Icon(Icons.warning_amber_rounded,
-                              size: 14, color: AppColors.error),
-                          SizedBox(width: 4),
-                          Text(
-                            'Emergency Reassign',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.error,
-                              fontWeight: FontWeight.w600,
+                    Flexible(
+                      child: InkWell(
+                        onTap: () => Get.dialog(
+                          EmergencyReassignDialog(order: order),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.warning_amber_rounded,
+                                size: 14, color: AppColors.error),
+                            SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                'Emergency Reassign',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
-                    InkWell(
-                      onTap: () {
-                        if (Get.isRegistered<OrdersController>()) {
-                          Get.find<OrdersController>().selectedOrder.value = order;
-                        }
-                        Get.toNamed(AppRoutes.navigation);
-                      },
-                      child: Row(
-                        children: [
-                          Text(
-                            'Open Turn-by-Turn',
-                            style: AppTextStyles.labelSmall(
-                                color: AppColors.primary),
-                          ),
-                          const Icon(Icons.chevron_right_rounded,
-                              size: 16, color: AppColors.primary),
-                        ],
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: InkWell(
+                        onTap: () {
+                          if (Get.isRegistered<OrdersController>()) {
+                            Get.find<OrdersController>().selectedOrder.value = order;
+                          }
+                          Get.toNamed(AppRoutes.navigation);
+                        },
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Open Turn-by-Turn',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTextStyles.labelSmall(
+                                    color: AppColors.primary),
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded,
+                                size: 16, color: AppColors.primary),
+                          ],
+                        ),
                       ),
                     ),
                   ],

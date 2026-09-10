@@ -115,6 +115,10 @@ class DashboardController extends GetxController {
     ever(activeOrder, (OrderEntity? order) {
       _locationService?.setActiveOrderId(order?.id);
     });
+    NotificationService.onNewOffer = (data, {title, body}) {
+      handleIncomingOfferPush(data, fallbackTitle: title, fallbackBody: body);
+    };
+    NotificationService.onDirectAssignment = handleDirectAssignmentPush;
     loadDashboardData();
     if (isOnline.value) {
       _locationService?.startTracking();
@@ -123,6 +127,8 @@ class DashboardController extends GetxController {
 
   @override
   void onClose() {
+    NotificationService.onNewOffer = null;
+    NotificationService.onDirectAssignment = null;
     _countdownTimer?.cancel();
     super.onClose();
   }
@@ -210,6 +216,9 @@ class DashboardController extends GetxController {
         countdownSeconds.value--;
       } else {
         timer.cancel();
+        if (Get.isSnackbarOpen == true) {
+          Get.closeCurrentSnackbar();
+        }
         if (Get.isBottomSheetOpen == true) {
           Get.back(); // close modal
         }
@@ -231,6 +240,9 @@ class DashboardController extends GetxController {
     if (order == null) return;
 
     _countdownTimer?.cancel();
+    if (Get.isSnackbarOpen == true) {
+      Get.closeCurrentSnackbar();
+    }
     if (Get.isBottomSheetOpen == true) {
       Get.back(); // close bottom sheet
     }
@@ -254,6 +266,9 @@ class DashboardController extends GetxController {
     if (order == null) return;
 
     _countdownTimer?.cancel();
+    if (Get.isSnackbarOpen == true) {
+      Get.closeCurrentSnackbar();
+    }
     if (Get.isBottomSheetOpen == true) {
       Get.back();
     }
@@ -386,7 +401,7 @@ class DashboardController extends GetxController {
       snackPosition: SnackPosition.TOP,
       backgroundColor: const Color(0xFFE8F8EE),
       colorText: const Color(0xFF009624),
-      duration: const Duration(seconds: 4),
+      duration: const Duration(minutes: 1),
     );
   }
 
@@ -397,6 +412,9 @@ class DashboardController extends GetxController {
         countdownSeconds.value--;
       } else {
         timer.cancel();
+        if (Get.isSnackbarOpen == true) {
+          Get.closeCurrentSnackbar();
+        }
         if (Get.isBottomSheetOpen == true) {
           Get.back();
         }

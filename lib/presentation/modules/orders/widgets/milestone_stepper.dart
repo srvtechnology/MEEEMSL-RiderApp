@@ -56,10 +56,15 @@ class MilestoneStepper extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'DELIVERY MILESTONES (5 STEPS)',
-              style: AppTextStyles.labelSmall(color: AppColors.textSecondaryLight),
+            Flexible(
+              child: Text(
+                'DELIVERY MILESTONES (5 STEPS)',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextStyles.labelSmall(color: AppColors.textSecondaryLight),
+              ),
             ),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(

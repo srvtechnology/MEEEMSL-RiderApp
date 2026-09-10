@@ -119,23 +119,21 @@ class ActiveOrderView extends GetView<OrdersController> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  StatusBadge(
-                    text: order.orderNumber.startsWith('#') ? order.orderNumber : '#${order.orderNumber}',
-                    type: BadgeType.info,
-                  ),
-                  const SizedBox(width: 8),
-                  DeliveryEarningBadge(amount: order.riderEarnings, isCompact: true),
-                ],
+              Flexible(
+                child: StatusBadge(
+                  text: order.orderNumber.startsWith('#') ? order.orderNumber : '#${order.orderNumber}',
+                  type: BadgeType.info,
+                ),
               ),
+              const SizedBox(width: 8),
               StatusBadge(
                 text: order.status.displayName,
                 type: order.status == OrderStatus.delivered ? BadgeType.success : BadgeType.warning,
               ),
             ],
           ),
+          const SizedBox(height: 8),
+          DeliveryEarningBadge(amount: order.riderEarnings, isCompact: true),
           const SizedBox(height: 14),
           MilestoneStepper(status: order.status, showLabels: true),
         ],
