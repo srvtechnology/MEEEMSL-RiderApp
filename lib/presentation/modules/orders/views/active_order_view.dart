@@ -139,7 +139,9 @@ class ActiveOrderView extends GetView<OrdersController> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SwipeButton(
+                        key: ValueKey('swipe_step_${order.id}_${order.status}'),
                         text: order.status.nextStepActionTitle,
+                        isLoading: controller.isLoading.value,
                         activeColor: AppColors.primary,
                         onSwiped: () => controller.advanceActiveOrderStatus(),
                       ),

@@ -16,7 +16,9 @@ import '../../../../domain/usecases/orders/get_incoming_order_usecase.dart';
 import '../../../../domain/usecases/orders/accept_order_usecase.dart';
 import '../../../../domain/usecases/orders/decline_order_usecase.dart';
 import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
+import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
 import '../../../../data/datasources/auth_local_datasource.dart';
+import '../../../../data/models/order_model.dart';
 import '../widgets/incoming_order_modal.dart';
 import '../../../routes/app_routes.dart';
 import '../../orders/controllers/orders_controller.dart';
@@ -30,6 +32,7 @@ class DashboardController extends GetxController {
   final AcceptOrderUseCase acceptOrderUseCase;
   final DeclineOrderUseCase declineOrderUseCase;
   final UpdateOrderStatusUseCase? updateOrderStatusUseCase;
+  final GetOrderDetailsUseCase? getOrderDetailsUseCase;
 
   DashboardController({
     required this.toggleOnlineStatusUseCase,
@@ -40,12 +43,19 @@ class DashboardController extends GetxController {
     required this.acceptOrderUseCase,
     required this.declineOrderUseCase,
     this.updateOrderStatusUseCase,
+    this.getOrderDetailsUseCase,
   });
 
   GetRiderStatusUseCase? get _riderStatusUseCase =>
       getRiderStatusUseCase ??
       (Get.isRegistered<GetRiderStatusUseCase>()
           ? Get.find<GetRiderStatusUseCase>()
+          : null);
+
+  GetOrderDetailsUseCase? get _orderDetailsUseCase =>
+      getOrderDetailsUseCase ??
+      (Get.isRegistered<GetOrderDetailsUseCase>()
+          ? Get.find<GetOrderDetailsUseCase>()
           : null);
 
   UpdateOrderStatusUseCase? get _orderStatusUseCase =>
@@ -117,6 +127,10 @@ class DashboardController extends GetxController {
   final countdownSeconds = AppConstants.incomingOrderTimeoutSeconds.obs;
   Timer? _countdownTimer;
 
+  // Guard against duplicate accept calls (double-tap or multi-path race)
+  bool _isAcceptingOrder = false;
+  String? _lastAcceptedOrderId;
+
   LocationService? get _locationService =>
       Get.isRegistered<LocationService>() ? Get.find<LocationService>() : null;
   NotificationService? get _notificationService =>
@@ -131,6 +145,23 @@ class DashboardController extends GetxController {
       _locationService?.startTracking();
     } else {
       _locationService?.stopTracking();
+    }
+
+    // Step 1: Immediately restore cached active order from GetStorage so there is NO radar flicker
+    final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
+    if (storage != null) {
+      try {
+        final raw = storage.read(AppConstants.activeOrderKey);
+        if (raw != null && raw is Map) {
+          final cached = OrderModel.fromJson(Map<String, dynamic>.from(raw));
+          if (cached.status != OrderStatus.delivered && cached.status != OrderStatus.cancelled) {
+            activeOrder.value = cached;
+            debugPrint('[DashboardController] onInit: Restored cached active order ${cached.id} (assignment: ${cached.assignmentId}, status: ${cached.status.name})');
+          }
+        }
+      } catch (e) {
+        debugPrint('[DashboardController] onInit: Error restoring cached order: $e');
+      }
     }
 
     // Checklist Point 4: Cross-Device Socket Sync (Single Active Driving Device policy)
@@ -180,6 +211,16 @@ class DashboardController extends GetxController {
 
     ever(activeOrder, (OrderEntity? order) {
       _locationService?.setActiveOrderId(order?.id);
+      final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
+      if (storage != null) {
+        try {
+          if (order != null && order.status != OrderStatus.delivered && order.status != OrderStatus.cancelled) {
+            storage.write(AppConstants.activeOrderKey, OrderModel.fromEntity(order).toJson());
+          } else {
+            storage.remove(AppConstants.activeOrderKey);
+          }
+        } catch (_) {}
+      }
     });
     NotificationService.onNewOffer = (data, {title, body}) {
       handleIncomingOfferPush(data, fallbackTitle: title, fallbackBody: body);
@@ -205,6 +246,8 @@ class DashboardController extends GetxController {
 
     // Checklist Point 4: Sync database rider status via GET /mobileapi/rider/status on app open/restart
     final riderStatusUseCase = _riderStatusUseCase;
+    String? activeAssignmentIdFromStatus;
+    String? operationalStatusFromStatus;
     if (riderStatusUseCase != null) {
       final statusResult = await riderStatusUseCase();
       statusResult.fold(
@@ -218,6 +261,8 @@ class DashboardController extends GetxController {
           } else {
             _locationService?.stopTracking();
           }
+          activeAssignmentIdFromStatus = data['activeAssignmentId']?.toString();
+          operationalStatusFromStatus = data['operationalStatus']?.toString();
         },
       );
     }
@@ -238,22 +283,81 @@ class DashboardController extends GetxController {
     );
 
     final activeResult = await getActiveOrdersUseCase();
+    List<OrderEntity> orders = [];
     activeResult.fold(
-      (failure) => null,
-      (orders) {
-        if (orders.isNotEmpty) {
-          activeOrder.value = orders.first;
-          if (Get.isRegistered<OrdersController>()) {
-            final ordersCtrl = Get.find<OrdersController>();
-            if (ordersCtrl.selectedOrder.value == null) {
-              ordersCtrl.setActiveOrder(orders.first);
+      (failure) {
+        debugPrint('[DashboardController] getActiveOrdersUseCase failure: ${failure.message}');
+      },
+      (data) {
+        orders = List.from(data);
+      },
+    );
+
+    // If activeResult returned empty, but status reports activeAssignmentId or ON_DELIVERY, attempt single order fetch
+    if (orders.isEmpty && (activeAssignmentIdFromStatus != null || operationalStatusFromStatus == 'ON_DELIVERY')) {
+      final idToFetch = activeAssignmentIdFromStatus ?? activeOrder.value?.assignmentId ?? activeOrder.value?.id;
+      if (idToFetch != null && idToFetch.isNotEmpty && _orderDetailsUseCase != null) {
+        final detailsResult = await _orderDetailsUseCase!(idToFetch);
+        detailsResult.fold(
+          (failure) => null,
+          (fetchedOrder) {
+            if (fetchedOrder.status != OrderStatus.delivered && fetchedOrder.status != OrderStatus.cancelled) {
+              orders = [fetchedOrder];
             }
+          },
+        );
+      }
+    }
+
+    debugPrint('[DashboardController] getActiveOrders resolved ${orders.length} orders. Current activeOrder: ${activeOrder.value?.id} (${activeOrder.value?.status})');
+    if (orders.isNotEmpty) {
+      final fetched = orders.first;
+      if (activeOrder.value != null &&
+          (activeOrder.value!.id == fetched.id ||
+              (activeOrder.value!.assignmentId != null &&
+                  activeOrder.value!.assignmentId == fetched.assignmentId))) {
+        if (fetched.status.index >= activeOrder.value!.status.index) {
+          activeOrder.value = fetched;
+        } else {
+          // Preserve active status from local progression
+          activeOrder.value = fetched.copyWith(status: activeOrder.value!.status);
+        }
+      } else {
+        activeOrder.value = fetched;
+      }
+      if (Get.isRegistered<OrdersController>()) {
+        final ordersCtrl = Get.find<OrdersController>();
+        ordersCtrl.setActiveOrder(activeOrder.value!);
+      }
+    } else {
+      if (activeOrder.value != null &&
+          activeOrder.value!.status != OrderStatus.delivered &&
+          activeOrder.value!.status != OrderStatus.cancelled) {
+        // Keep current in-memory active order so transient network states or empty responses don't wipe active order
+        debugPrint('[DashboardController] orders empty, retaining activeOrder ${activeOrder.value!.id} (${activeOrder.value!.status.name})');
+        if (Get.isRegistered<OrdersController>()) {
+          final ordersCtrl = Get.find<OrdersController>();
+          ordersCtrl.setActiveOrder(activeOrder.value!);
+        }
+      } else {
+        // Check local storage one last time before clearing
+        final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
+        OrderModel? cached;
+        if (storage != null) {
+          try {
+            final raw = storage.read(AppConstants.activeOrderKey);
+            if (raw != null && raw is Map) {
+              cached = OrderModel.fromJson(Map<String, dynamic>.from(raw));
+            }
+          } catch (_) {}
+        }
+
+        if (cached != null && cached.status != OrderStatus.delivered && cached.status != OrderStatus.cancelled) {
+          activeOrder.value = cached;
+          if (Get.isRegistered<OrdersController>()) {
+            Get.find<OrdersController>().setActiveOrder(cached);
           }
         } else {
-          // Backend returned no active orders — always clear local state.
-          // The previous guard (checking for delivered/cancelled) was wrong:
-          // after OTP completion the local value is still outForDelivery,
-          // so the card would persist on dashboard even after delivery.
           activeOrder.value = null;
           _locationService?.setActiveOrderId(null);
           if (Get.isRegistered<OrdersController>()) {
@@ -265,8 +369,8 @@ class DashboardController extends GetxController {
             }
           }
         }
-      },
-    );
+      }
+    }
     isLoading.value = false;
   }
 
@@ -353,6 +457,17 @@ class DashboardController extends GetxController {
     final order = incomingOrder.value;
     if (order == null) return;
 
+    // Guard: prevent duplicate calls from double-taps or concurrent push/modal paths
+    final targetId = (order.assignmentId != null && order.assignmentId!.isNotEmpty)
+        ? order.assignmentId!
+        : order.id;
+    if (_isAcceptingOrder) return;
+    if (_lastAcceptedOrderId != null && _lastAcceptedOrderId == targetId) {
+      debugPrint('[DashboardController] acceptIncomingOrder: already accepted $targetId, skipping duplicate call.');
+      return;
+    }
+    _isAcceptingOrder = true;
+
     _countdownTimer?.cancel();
     if (Get.isSnackbarOpen == true) {
       Get.closeCurrentSnackbar();
@@ -362,11 +477,9 @@ class DashboardController extends GetxController {
     }
 
     isLoading.value = true;
-    final targetId = (order.assignmentId != null && order.assignmentId!.isNotEmpty)
-        ? order.assignmentId!
-        : order.id;
     final result = await acceptOrderUseCase(targetId);
     isLoading.value = false;
+    _isAcceptingOrder = false;
 
     result.fold(
       (failure) {
@@ -404,6 +517,7 @@ class DashboardController extends GetxController {
           riderAttempt: accepted.riderAttempt ?? order.riderAttempt,
         );
 
+        _lastAcceptedOrderId = targetId;
         activeOrder.value = finalOrder;
         incomingOrder.value = null;
 
@@ -479,7 +593,10 @@ class DashboardController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await useCase(current.id, nextStatus);
+    final targetId = (current.assignmentId != null && current.assignmentId!.isNotEmpty)
+        ? current.assignmentId!
+        : current.id;
+    final result = await useCase(targetId, nextStatus);
     isLoading.value = false;
 
     result.fold(
@@ -528,6 +645,28 @@ class DashboardController extends GetxController {
   /// Handles incoming offer push notification payload (Section 2.1)
   void handleIncomingOfferPush(Map<String, dynamic> data, {String? fallbackTitle, String? fallbackBody}) {
     if (!isOnline.value) return;
+
+    // Guard: skip duplicate offer events for an order already shown or already active
+    final incomingOfferId = (data['assignmentId']?.toString().isNotEmpty == true
+            ? data['assignmentId']?.toString()
+            : null) ??
+        data['orderId']?.toString();
+    if (incomingOfferId != null && incomingOfferId.isNotEmpty) {
+      final currentIncoming = incomingOrder.value;
+      if (currentIncoming != null) {
+        final currentId = (currentIncoming.assignmentId?.isNotEmpty == true)
+            ? currentIncoming.assignmentId
+            : currentIncoming.id;
+        if (currentId == incomingOfferId) {
+          debugPrint('[DashboardController] handleIncomingOfferPush: duplicate offer $incomingOfferId, skipping.');
+          return;
+        }
+      }
+      if (_lastAcceptedOrderId == incomingOfferId) {
+        debugPrint('[DashboardController] handleIncomingOfferPush: already accepted $incomingOfferId, skipping re-offer.');
+        return;
+      }
+    }
 
     final orderId = data['orderId']?.toString() ?? 'cuid_order_${DateTime.now().millisecondsSinceEpoch}';
     final orderNumber = data['orderNumber']?.toString() ?? 'meeem00000042';

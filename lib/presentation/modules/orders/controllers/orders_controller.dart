@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../data/models/order_model.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../../../../domain/usecases/orders/get_active_orders_usecase.dart';
 import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
@@ -39,6 +42,20 @@ class OrdersController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
+    if (storage != null) {
+      try {
+        final raw = storage.read(AppConstants.activeOrderKey);
+        if (raw != null && raw is Map) {
+          final cached = OrderModel.fromJson(Map<String, dynamic>.from(raw));
+          if (cached.status != OrderStatus.delivered && cached.status != OrderStatus.cancelled) {
+            selectedOrder.value = cached;
+            activeOrders.assignAll([cached]);
+          }
+        }
+      } catch (_) {}
+    }
+
     ever(selectedOrder, (OrderEntity? order) {
       if (Get.isRegistered<LocationService>()) {
         Get.find<LocationService>().setActiveOrderId(order?.id);
@@ -90,7 +107,12 @@ class OrdersController extends GetxController {
                     currentAssignmentId.isNotEmpty &&
                     o.assignmentId == currentAssignmentId)).firstOrNull;
             if (matching != null) {
-              selectedOrder.value = matching;
+              if (matching.status.index >= selectedOrder.value!.status.index) {
+                selectedOrder.value = matching;
+              } else {
+                // Prevent status regression from stale backend read replica
+                selectedOrder.value = matching.copyWith(status: selectedOrder.value!.status);
+              }
             }
           }
         } else {
@@ -150,27 +172,51 @@ class OrdersController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await updateOrderStatusUseCase(current.id, nextStatus);
+    final targetId = (current.assignmentId != null && current.assignmentId!.isNotEmpty)
+        ? current.assignmentId!
+        : current.id;
+    final result = await updateOrderStatusUseCase(targetId, nextStatus);
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message),
+      (failure) {
+        if (Get.overlayContext != null) {
+          Get.snackbar(
+            'Status Update Failed',
+            failure.message,
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFFEE2E2),
+            colorText: const Color(0xFFB91C1C),
+          );
+        }
+      },
       (updated) {
-        selectedOrder.value = updated;
-        _loadActiveOrders();
+        setActiveOrder(updated);
         if (Get.isRegistered<DashboardController>()) {
           Get.find<DashboardController>().activeOrder.value = updated;
         }
-        Get.snackbar('Status Updated', '${updated.status.stepNumberText}: ${updated.status.displayName}',
-            snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
+        _loadActiveOrders();
+        if (Get.overlayContext != null) {
+          Get.snackbar(
+            'Status Updated',
+            '${updated.status.stepNumberText}: ${updated.status.displayName}',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+            colorText: const Color(0xFF009624),
+          );
+        }
       },
     );
   }
 
   Future<void> _completeDelivery(String orderId, String? photoUrl, String? otp) async {
+    final current = selectedOrder.value;
+    final targetId = (current != null && current.assignmentId != null && current.assignmentId!.isNotEmpty)
+        ? current.assignmentId!
+        : orderId;
     isLoading.value = true;
     final result = await updateOrderStatusUseCase(
-      orderId,
+      targetId,
       OrderStatus.delivered,
       proofPhotoUrl: photoUrl,
       customerOtp: otp,
@@ -199,8 +245,10 @@ class OrdersController extends GetxController {
         }
 
         Get.offNamed(AppRoutes.main);
-        Get.snackbar('🎉 Delivered Successfully!', 'Great job! Delivery charge credited to your realized revenue.',
-            snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
+        if (Get.overlayContext != null) {
+          Get.snackbar('🎉 Delivered Successfully!', 'Great job! Delivery charge credited to your realized revenue.',
+              snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));
+        }
       },
     );
   }

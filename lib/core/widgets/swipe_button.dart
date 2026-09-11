@@ -11,6 +11,7 @@ class SwipeButton extends StatefulWidget {
   final Color backgroundColor;
   final IconData icon;
   final bool isCompleted;
+  final bool isLoading;
 
   const SwipeButton({
     super.key,
@@ -20,15 +21,69 @@ class SwipeButton extends StatefulWidget {
     this.backgroundColor = AppColors.primaryContainer,
     this.icon = Icons.arrow_forward_rounded,
     this.isCompleted = false,
+    this.isLoading = false,
   });
 
   @override
   State<SwipeButton> createState() => _SwipeButtonState();
 }
 
-class _SwipeButtonState extends State<SwipeButton> {
+class _SwipeButtonState extends State<SwipeButton> with SingleTickerProviderStateMixin {
   double _dragPosition = 0.0;
   bool _isConfirmed = false;
+  AnimationController? _animController;
+  Animation<double>? _anim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    )..addListener(() {
+        if (_anim != null) {
+          setState(() {
+            _dragPosition = _anim!.value;
+          });
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _animController?.dispose();
+    super.dispose();
+  }
+
+  void reset() {
+    if (mounted) {
+      _animController?.stop();
+      setState(() {
+        _dragPosition = 0.0;
+        _isConfirmed = false;
+      });
+    }
+  }
+
+  void _animateTo(double target) {
+    if (!mounted || _animController == null) return;
+    _animController!.stop();
+    _anim = Tween<double>(begin: _dragPosition, end: target).animate(
+      CurvedAnimation(parent: _animController!, curve: Curves.easeOutCubic),
+    );
+    _animController!.forward(from: 0.0);
+  }
+
+  @override
+  void didUpdateWidget(SwipeButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Reset if text changed (milestone progressed) or if loading stopped without confirmation
+    if (widget.text != oldWidget.text ||
+        widget.isCompleted != oldWidget.isCompleted ||
+        (oldWidget.isLoading && !widget.isLoading && !widget.isCompleted)) {
+      reset();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -54,17 +109,22 @@ class _SwipeButtonState extends State<SwipeButton> {
           child: Stack(
             alignment: Alignment.centerLeft,
             children: [
-              // Center Label
+              // Center Label - responsive with padding to prevent collision with thumb
               Center(
                 child: Padding(
-                  padding: const EdgeInsets.only(left: thumbSize),
-                  child: Text(
-                    widget.text,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: widget.activeColor,
-                      letterSpacing: 0.3,
+                  padding: const EdgeInsets.symmetric(horizontal: thumbSize + 8),
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      widget.text,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: widget.activeColor,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
                 ),
@@ -89,7 +149,7 @@ class _SwipeButtonState extends State<SwipeButton> {
                 left: padding + _dragPosition,
                 child: GestureDetector(
                   onHorizontalDragUpdate: (details) {
-                    if (_isConfirmed) return;
+                    if (_isConfirmed || widget.isLoading) return;
                     setState(() {
                       _dragPosition += details.delta.dx;
                       if (_dragPosition < 0) _dragPosition = 0;
@@ -97,8 +157,8 @@ class _SwipeButtonState extends State<SwipeButton> {
                     });
                   },
                   onHorizontalDragEnd: (details) {
-                    if (_isConfirmed) return;
-                    if (_dragPosition >= maxDrag * 0.75) {
+                    if (_isConfirmed || widget.isLoading) return;
+                    if (_dragPosition >= maxDrag * 0.70) {
                       // Trigger confirmation
                       setState(() {
                         _dragPosition = maxDrag;
@@ -107,10 +167,8 @@ class _SwipeButtonState extends State<SwipeButton> {
                       HapticFeedback.heavyImpact();
                       widget.onSwiped();
                     } else {
-                      // Snap back
-                      setState(() {
-                        _dragPosition = 0.0;
-                      });
+                      // Smooth snap back
+                      _animateTo(0.0);
                     }
                   },
                   child: Container(
@@ -127,10 +185,21 @@ class _SwipeButtonState extends State<SwipeButton> {
                         )
                       ],
                     ),
-                    child: Icon(
-                      widget.icon,
-                      color: Colors.white,
-                      size: 24,
+                    child: Center(
+                      child: widget.isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Icon(
+                              widget.icon,
+                              color: Colors.white,
+                              size: 24,
+                            ),
                     ),
                   ),
                 ),

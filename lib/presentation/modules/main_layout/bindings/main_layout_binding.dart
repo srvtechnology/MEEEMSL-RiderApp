@@ -114,6 +114,7 @@ class MainLayoutBinding extends Bindings {
           getIncomingOrderUseCase: Get.find<GetIncomingOrderUseCase>(),
           acceptOrderUseCase: Get.find<AcceptOrderUseCase>(),
           declineOrderUseCase: Get.find<DeclineOrderUseCase>(),
+          getOrderDetailsUseCase: Get.find<GetOrderDetailsUseCase>(),
         ));
 
     Get.lazyPut<OrdersController>(() => OrdersController(
