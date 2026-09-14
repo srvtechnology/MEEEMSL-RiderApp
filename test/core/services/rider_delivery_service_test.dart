@@ -98,6 +98,45 @@ void main() {
       }
     });
 
+    test('3b. updateStatus with PICKED_UP posts pickupPhotos array (Option B JSON payload)', () async {
+      final photos = [
+        'https://meeemsl-bucket.s3.us-east-1.amazonaws.com/uploads/pickup-proofs/pickup-1.jpg',
+        'https://meeemsl-bucket.s3.us-east-1.amazonaws.com/uploads/pickup-proofs/pickup-2.jpg',
+      ];
+      final mockClient = MockClient((request) async {
+        expect(request.url.path, '/mobileapi/rider/orders/$testOrderId/status');
+        expect(request.method, 'POST');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['status'], 'PICKED_UP');
+        expect(body['pickupPhotos'], photos);
+
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'message': 'Delivery status updated to PICKED_UP',
+            'data': {
+              'id': testOrderId,
+              'status': 'PICKED_UP',
+              'pickupProofPhotos': photos,
+            },
+          }),
+          200,
+        );
+      });
+
+      final result = await RiderDeliveryService.updateStatus(
+        orderId: testOrderId,
+        status: 'PICKED_UP',
+        token: testToken,
+        pickupPhotos: photos,
+        client: mockClient,
+      );
+
+      expect(result['success'], isTrue);
+      expect(result['data']['status'], 'PICKED_UP');
+      expect(result['data']['pickupProofPhotos'], photos);
+    });
+
     test('4. completeDelivery posts DELIVERED with OTP and proofImage to /orders/:id/status', () async {
       final mockClient = MockClient((request) async {
         expect(request.url.path, '/mobileapi/rider/orders/$testOrderId/status');

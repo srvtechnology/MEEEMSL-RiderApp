@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_storage/get_storage.dart';
@@ -10,19 +11,24 @@ import 'package:meeem_rider/data/datasources/auth_remote_datasource.dart';
 import 'package:meeem_rider/data/datasources/dashboard_remote_datasource.dart';
 import 'package:meeem_rider/data/repositories/dashboard_repository_impl.dart';
 import 'package:meeem_rider/domain/usecases/dashboard/get_rider_status_usecase.dart';
+import 'package:meeem_rider/domain/usecases/dashboard/toggle_online_status_usecase.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  late GetStorage storage;
   late DioClient dioClient;
   late DashboardRemoteDataSourceImpl dashboardDataSource;
+  late AuthRemoteDataSourceImpl authDataSource;
   late DashboardRepositoryImpl dashboardRepository;
-  late GetStorage storage;
+  late GetRiderStatusUseCase getRiderStatusUseCase;
+  late ToggleOnlineStatusUseCase toggleOnlineStatusUseCase;
 
   setUpAll(() async {
+    final tempDir = Directory.systemTemp.createTempSync('rider_status_test_');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
-      (MethodCall methodCall) async => '.',
+      (MethodCall methodCall) async => tempDir.path,
     );
     await GetStorage.init();
   });

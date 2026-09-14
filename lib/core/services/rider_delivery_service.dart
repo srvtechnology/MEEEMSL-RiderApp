@@ -64,18 +64,23 @@ class RiderDeliveryService {
     required String orderId,
     required String status,
     required String token,
+    List<String>? pickupPhotos,
     http.Client? client,
   }) async {
     final httpClient = client ?? http.Client();
     try {
       final formattedToken = token.startsWith('Bearer ') ? token : 'Bearer $token';
+      final bodyMap = <String, dynamic>{
+        'status': status,
+        if (pickupPhotos != null && pickupPhotos.isNotEmpty) 'pickupPhotos': pickupPhotos,
+      };
       final res = await httpClient.post(
         Uri.parse('$baseUrl/orders/$orderId/status'),
         headers: {
           'Authorization': formattedToken,
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'status': status}),
+        body: jsonEncode(bodyMap),
       );
       return jsonDecode(res.body) as Map<String, dynamic>;
     } finally {

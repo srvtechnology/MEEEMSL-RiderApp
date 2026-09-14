@@ -398,19 +398,21 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     if (status == OrderStatus.pickedUp && pickupPhotos != null && pickupPhotos.isNotEmpty) {
       final localFiles = pickupPhotos.where((p) => !p.startsWith('http') && !p.startsWith('data:')).toList();
       if (localFiles.isNotEmpty) {
-        final formData = FormData();
-        formData.fields.add(MapEntry('status', status.toApiStatus));
+        final List<MultipartFile> multipartFiles = [];
         for (final path in localFiles) {
           try {
             final compressed = await ImageCompressor.compressImage(path, maxWidth: 1024, maxHeight: 1024, quality: 75);
             final filename = compressed.split('/').last;
-            formData.files.add(MapEntry('pickupPhotos', await MultipartFile.fromFile(compressed, filename: filename)));
+            multipartFiles.add(await MultipartFile.fromFile(compressed, filename: filename));
           } catch (e) {
             final filename = path.split('/').last;
-            formData.files.add(MapEntry('pickupPhotos', await MultipartFile.fromFile(path, filename: filename)));
+            multipartFiles.add(await MultipartFile.fromFile(path, filename: filename));
           }
         }
-        payload = formData;
+        payload = FormData.fromMap({
+          'status': status.toApiStatus,
+          'pickupPhotos': multipartFiles,
+        }, ListFormat.multi);
       } else {
         payload = <String, dynamic>{
           'status': status.toApiStatus,

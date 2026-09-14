@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_storage/get_storage.dart';
@@ -11,10 +12,11 @@ void main() {
   late EarningsRemoteDataSourceImpl dataSource;
 
   setUpAll(() async {
+    final tempDir = Directory.systemTemp.createTempSync('earnings_test_');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
-      (MethodCall methodCall) async => '.',
+      (MethodCall methodCall) async => tempDir.path,
     );
     await GetStorage.init();
   });

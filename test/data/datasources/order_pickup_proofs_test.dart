@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
@@ -19,10 +20,11 @@ void main() {
   late OrderRemoteDataSourceImpl dataSource;
 
   setUpAll(() async {
+    final tempDir = Directory.systemTemp.createTempSync('pickup_proofs_test_');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
-      (MethodCall methodCall) async => '.',
+      (MethodCall methodCall) async => tempDir.path,
     );
     await GetStorage.init();
   });
@@ -135,6 +137,53 @@ void main() {
             ApiEndpoints.updateDeliveryStatus(orderId),
             data: any(named: 'data'),
           )).called(1);
+    });
+
+    test('updateOrderStatus with PICKED_UP and local files sends FormData with ListFormat.multi', () async {
+      const orderId = 'ord_pickup_101';
+      final tempDir = Directory.systemTemp.createTempSync('pickup_photos_');
+      final file1 = File('${tempDir.path}/proof1.jpg')..writeAsBytesSync([1, 2, 3, 4]);
+      final file2 = File('${tempDir.path}/proof2.jpg')..writeAsBytesSync([5, 6, 7, 8]);
+      final localPhotos = [file1.path, file2.path];
+
+      FormData? capturedFormData;
+      when(() => mockDio.post(
+            ApiEndpoints.updateDeliveryStatus(orderId),
+            data: any(named: 'data'),
+          )).thenAnswer((invocation) async {
+            capturedFormData = invocation.namedArguments[#data] as FormData;
+            return Response(
+              requestOptions: RequestOptions(path: ApiEndpoints.updateDeliveryStatus(orderId)),
+              statusCode: 200,
+              data: {
+                'success': true,
+                'message': 'Delivery status updated to PICKED_UP',
+                'data': {
+                  'id': orderId,
+                  'status': 'PICKED_UP',
+                  'pickupProofPhotos': [
+                    'https://meeemsl-bucket.s3.us-east-1.amazonaws.com/uploads/pickup-proofs/pickup-1.jpg',
+                    'https://meeemsl-bucket.s3.us-east-1.amazonaws.com/uploads/pickup-proofs/pickup-2.jpg',
+                  ],
+                },
+              },
+            );
+          });
+
+      final result = await dataSource.updateOrderStatus(
+        orderId,
+        OrderStatus.pickedUp,
+        pickupPhotos: localPhotos,
+      );
+
+      expect(result.status, OrderStatus.pickedUp);
+      expect(result.pickupProofPhotos.length, 2);
+      expect(capturedFormData, isNotNull);
+      expect(capturedFormData!.fields.any((f) => f.key == 'status' && f.value == 'PICKED_UP'), isTrue);
+      final files = capturedFormData!.files.where((f) => f.key == 'pickupPhotos').toList();
+      expect(files.length, 2);
+      expect(files[0].key, 'pickupPhotos');
+      expect(files[1].key, 'pickupPhotos');
     });
   });
 }
