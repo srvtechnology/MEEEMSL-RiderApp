@@ -16,7 +16,6 @@ import 'package:meeem_rider/domain/usecases/orders/get_active_orders_usecase.dar
 import 'package:meeem_rider/domain/usecases/orders/get_incoming_order_usecase.dart';
 import 'package:meeem_rider/domain/usecases/orders/get_order_details_usecase.dart';
 import 'package:meeem_rider/presentation/modules/dashboard/controllers/dashboard_controller.dart';
-import 'package:meeem_rider/presentation/modules/orders/controllers/orders_controller.dart';
 
 class MockToggleOnlineStatusUseCase extends Mock implements ToggleOnlineStatusUseCase {}
 class MockGetDashboardSummaryUseCase extends Mock implements GetDashboardSummaryUseCase {}
@@ -131,6 +130,7 @@ void main() {
       getIncomingOrderUseCase: mockGetIncomingOrder,
       acceptOrderUseCase: mockAcceptOrder,
       declineOrderUseCase: mockDeclineOrder,
+      getOrderDetailsUseCase: mockGetOrderDetails,
     );
 
     Get.put<DashboardController>(controller);

@@ -44,6 +44,9 @@ class OrdersController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    try {
+      Get.closeAllSnackbars();
+    } catch (_) {}
     final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
     if (storage != null) {
       try {
@@ -67,6 +70,9 @@ class OrdersController extends GetxController {
   }
 
   void setActiveOrder(OrderEntity order) {
+    try {
+      Get.closeAllSnackbars();
+    } catch (_) {}
     selectedOrder.value = order;
     final index = activeOrders.indexWhere((o) =>
         o.id == order.id ||

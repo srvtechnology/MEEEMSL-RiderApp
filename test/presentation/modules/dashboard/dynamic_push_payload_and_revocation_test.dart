@@ -13,6 +13,7 @@ import 'package:meeem_rider/domain/usecases/orders/update_order_status_usecase.d
 import 'package:meeem_rider/presentation/modules/dashboard/controllers/dashboard_controller.dart';
 import 'package:meeem_rider/presentation/modules/dashboard/widgets/incoming_offer_card.dart';
 import 'package:meeem_rider/domain/entities/order_entity.dart';
+import 'package:meeem_rider/core/services/notification_service.dart';
 
 class MockToggleOnlineStatusUseCase extends Mock implements ToggleOnlineStatusUseCase {}
 class MockGetDashboardSummaryUseCase extends Mock implements GetDashboardSummaryUseCase {}
@@ -250,6 +251,95 @@ void main() {
       await controller.declineIncomingOrder('Rider busy');
 
       verify(() => mockDeclineOrder('asgn_test_xyz789', 'Rider busy')).called(1);
+      expect(controller.incomingOrder.value, isNull);
+    });
+
+    test('handleIncomingOfferPush suppresses incoming offer when rider has active order', () {
+      controller.isOnline.value = true;
+      controller.activeOrder.value = OrderEntity(
+        id: 'ord_active_123',
+        orderNumber: 'meeem00000055',
+        status: OrderStatus.accepted,
+        customerName: 'Existing Active Customer',
+        customerPhone: '+23276111222',
+        customerAvatar: '',
+        pickupName: 'Existing Store',
+        pickupAddress: 'Freetown',
+        pickupPhone: '',
+        dropoffAddress: 'Freetown',
+        pickupLat: 8.48,
+        pickupLng: -13.23,
+        dropoffLat: 8.46,
+        dropoffLng: -13.25,
+        items: const [],
+        subtotal: 100.0,
+        riderEarnings: 150.0,
+        distanceKm: 2.5,
+        estimatedDurationMin: 15,
+        createdAt: DateTime.now(),
+      );
+
+      // Now an incoming offer arrives
+      controller.handleIncomingOfferPush({
+        'type': 'NEW_OFFER',
+        'orderId': 'cmtv4o81a0002ibrgfc87dn0r',
+        'orderNumber': 'meeem00000060',
+        'assignmentId': 'asgn_test_xyz789',
+        'deliveryFee': '150.00',
+        'shopName': 'Freetown Fresh Market',
+        'customerName': 'Mariama Jalloh',
+      });
+
+      // Offer must be suppressed!
+      expect(controller.incomingOrder.value, isNull);
+      expect(NotificationService.hasActiveDelivery(), isTrue);
+    });
+
+    test('handleIncomingOfferPush suppresses duplicate or re-offered order when order was already accepted', () async {
+      controller.isOnline.value = true;
+      final offerToAccept = OrderEntity(
+        id: 'ord_just_accepted',
+        assignmentId: 'asgn_accepted_1',
+        orderNumber: 'meeem00000077',
+        status: OrderStatus.pending,
+        customerName: 'Test Customer',
+        customerPhone: '+23276000000',
+        customerAvatar: '',
+        pickupName: 'Test Shop',
+        pickupAddress: 'Freetown',
+        pickupPhone: '',
+        dropoffAddress: 'Freetown',
+        pickupLat: 8.48,
+        pickupLng: -13.23,
+        dropoffLat: 8.46,
+        dropoffLng: -13.25,
+        items: const [],
+        subtotal: 50.0,
+        riderEarnings: 150.0,
+        distanceKm: 2.0,
+        estimatedDurationMin: 10,
+        createdAt: DateTime.now(),
+      );
+      controller.incomingOrder.value = offerToAccept;
+      when(() => mockAcceptOrder('asgn_accepted_1', cachedOrder: any(named: 'cachedOrder'))).thenAnswer(
+        (_) async => Right(offerToAccept.copyWith(status: OrderStatus.accepted)),
+      );
+
+      await controller.acceptIncomingOrder();
+      expect(controller.activeOrder.value, isNotNull);
+      expect(controller.activeOrder.value!.id, 'ord_just_accepted');
+
+      // Duplicate or late FCM push arrives for the same order
+      controller.handleIncomingOfferPush({
+        'type': 'NEW_OFFER',
+        'orderId': 'ord_just_accepted',
+        'assignmentId': 'asgn_accepted_1',
+        'orderNumber': 'meeem00000077',
+        'deliveryFee': '150.00',
+        'shopName': 'Test Shop',
+      });
+
+      // Must be suppressed
       expect(controller.incomingOrder.value, isNull);
     });
   });

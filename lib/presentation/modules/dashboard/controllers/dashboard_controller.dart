@@ -130,6 +130,34 @@ class DashboardController extends GetxController {
   // Guard against duplicate accept calls (double-tap or multi-path race)
   bool _isAcceptingOrder = false;
   String? _lastAcceptedOrderId;
+  final Set<String> _acceptedOrderIds = <String>{};
+
+  /// Returns true if the given ID or orderNumber has already been accepted or is active
+  bool isOrderAcceptedOrActive(String? id) {
+    if (id == null || id.isEmpty) return false;
+    if (_acceptedOrderIds.contains(id)) return true;
+    if (_lastAcceptedOrderId == id) return true;
+    final active = activeOrder.value;
+    if (active != null) {
+      if (active.id == id ||
+          (active.assignmentId != null && active.assignmentId == id) ||
+          active.orderNumber == id) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  void _recordAcceptedOrder(OrderEntity order) {
+    if (order.id.isNotEmpty) _acceptedOrderIds.add(order.id);
+    if (order.assignmentId != null && order.assignmentId!.isNotEmpty) {
+      _acceptedOrderIds.add(order.assignmentId!);
+    }
+    if (order.orderNumber.isNotEmpty) _acceptedOrderIds.add(order.orderNumber);
+    _lastAcceptedOrderId = (order.assignmentId != null && order.assignmentId!.isNotEmpty)
+        ? order.assignmentId!
+        : order.id;
+  }
 
   LocationService? get _locationService =>
       Get.isRegistered<LocationService>() ? Get.find<LocationService>() : null;
@@ -371,6 +399,16 @@ class DashboardController extends GetxController {
         }
       }
     }
+
+    if (activeOrder.value != null &&
+        activeOrder.value!.status != OrderStatus.delivered &&
+        activeOrder.value!.status != OrderStatus.cancelled) {
+      _recordAcceptedOrder(activeOrder.value!);
+      if (incomingOrder.value != null) {
+        incomingOrder.value = null;
+        cancelCountdownTimer();
+      }
+    }
     isLoading.value = false;
   }
 
@@ -462,13 +500,16 @@ class DashboardController extends GetxController {
         ? order.assignmentId!
         : order.id;
     if (_isAcceptingOrder) return;
-    if (_lastAcceptedOrderId != null && _lastAcceptedOrderId == targetId) {
+    if (isOrderAcceptedOrActive(targetId) || isOrderAcceptedOrActive(order.id)) {
       debugPrint('[DashboardController] acceptIncomingOrder: already accepted $targetId, skipping duplicate call.');
       return;
     }
     _isAcceptingOrder = true;
+    _recordAcceptedOrder(order);
 
     _countdownTimer?.cancel();
+    _countdownTimer = null;
+    incomingOrder.value = null;
     try {
       Get.closeAllSnackbars();
     } catch (_) {}
@@ -517,7 +558,7 @@ class DashboardController extends GetxController {
           riderAttempt: accepted.riderAttempt ?? order.riderAttempt,
         );
 
-        _lastAcceptedOrderId = targetId;
+        _recordAcceptedOrder(finalOrder);
         activeOrder.value = finalOrder;
         incomingOrder.value = null;
 
@@ -647,11 +688,45 @@ class DashboardController extends GetxController {
   void handleIncomingOfferPush(Map<String, dynamic> data, {String? fallbackTitle, String? fallbackBody}) {
     if (!isOnline.value) return;
 
-    // Guard: skip duplicate offer events for an order already shown or already active
-    final incomingOfferId = (data['assignmentId']?.toString().isNotEmpty == true
-            ? data['assignmentId']?.toString()
+    // Guard 1: Suppress if rider currently has an active order in progress
+    if (activeOrder.value != null &&
+        activeOrder.value!.status != OrderStatus.delivered &&
+        activeOrder.value!.status != OrderStatus.cancelled) {
+      debugPrint('[DashboardController] handleIncomingOfferPush: rider already has active order (${activeOrder.value!.id}), suppressing new offer.');
+      return;
+    }
+
+    // Guard 2: Suppress if active order is cached in local storage
+    final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
+    if (storage != null && storage.hasData(AppConstants.activeOrderKey)) {
+      try {
+        final raw = storage.read(AppConstants.activeOrderKey);
+        if (raw != null && raw is Map) {
+          final statusStr = raw['status']?.toString().toUpperCase();
+          if (statusStr != 'DELIVERED' && statusStr != 'CANCELLED') {
+            debugPrint('[DashboardController] handleIncomingOfferPush: active order in storage, suppressing new offer.');
+            return;
+          }
+        }
+      } catch (_) {}
+    }
+
+    // Guard 3: Skip duplicate offer events for an order already shown or already active/accepted
+    final incomingOrderId = data['orderId']?.toString();
+    final incomingAssignmentId = data['assignmentId']?.toString();
+    final incomingOrderNumber = data['orderNumber']?.toString();
+    final incomingOfferId = (incomingAssignmentId?.isNotEmpty == true
+            ? incomingAssignmentId
             : null) ??
-        data['orderId']?.toString();
+        incomingOrderId;
+
+    if (isOrderAcceptedOrActive(incomingOrderId) ||
+        isOrderAcceptedOrActive(incomingAssignmentId) ||
+        isOrderAcceptedOrActive(incomingOrderNumber)) {
+      debugPrint('[DashboardController] handleIncomingOfferPush: order $incomingOfferId already active/accepted, skipping.');
+      return;
+    }
+
     if (incomingOfferId != null && incomingOfferId.isNotEmpty) {
       final currentIncoming = incomingOrder.value;
       if (currentIncoming != null) {
@@ -662,10 +737,6 @@ class DashboardController extends GetxController {
           debugPrint('[DashboardController] handleIncomingOfferPush: duplicate offer $incomingOfferId, skipping.');
           return;
         }
-      }
-      if (_lastAcceptedOrderId == incomingOfferId) {
-        debugPrint('[DashboardController] handleIncomingOfferPush: already accepted $incomingOfferId, skipping re-offer.');
-        return;
       }
     }
 

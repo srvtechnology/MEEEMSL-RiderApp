@@ -5,9 +5,11 @@ import 'package:get_storage/get_storage.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../constants/app_constants.dart';
 import '../theme/app_colors.dart';
+import '../../domain/entities/order_entity.dart';
 import '../../domain/usecases/auth/register_device_token_usecase.dart';
 import '../../domain/usecases/auth/unregister_device_token_usecase.dart';
 import '../../presentation/modules/dashboard/controllers/dashboard_controller.dart';
+import '../../presentation/modules/orders/controllers/orders_controller.dart';
 import 'device_info_service.dart';
 import 'location_service.dart';
 
@@ -51,21 +53,25 @@ class NotificationService extends GetxService {
         registerCurrentDeviceToken();
       });
 
-      // Handle foreground push messages conforming to Section 2
+      // Foreground Message Handler
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        final title = message.notification?.title;
-        final body = message.notification?.body;
-        handleFcmPayload(message.data, title: title, body: body);
+        handleFcmPayload(
+          message.data,
+          title: message.notification?.title,
+          body: message.notification?.body,
+        );
       });
 
-      // Handle notification opened when app is in background
+      // Notification Opened App Handler
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        final title = message.notification?.title;
-        final body = message.notification?.body;
-        handleFcmPayload(message.data, title: title, body: body);
+        handleFcmPayload(
+          message.data,
+          title: message.notification?.title,
+          body: message.notification?.body,
+        );
       });
 
-      // Handle notification opened when app was terminated
+      // Terminated state initial notification check
       FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
         if (message != null) {
           handleFcmPayload(
@@ -89,13 +95,88 @@ class NotificationService extends GetxService {
   static void Function(Map<String, dynamic> data)? onDirectAssignment;
   static void Function(Map<String, dynamic> data)? onAssignmentRevoked;
 
+  /// Returns true if the rider currently has an active in-flight delivery
+  /// (status is accepted, atPickup, pickedUp, outForDelivery).
+  static bool hasActiveDelivery() {
+    // 1. Check DashboardController
+    if (Get.isRegistered<DashboardController>()) {
+      final dash = Get.find<DashboardController>();
+      final active = dash.activeOrder.value;
+      if (active != null &&
+          active.status != OrderStatus.delivered &&
+          active.status != OrderStatus.cancelled) {
+        return true;
+      }
+    }
+
+    // 2. Check OrdersController
+    if (Get.isRegistered<OrdersController>()) {
+      final orders = Get.find<OrdersController>();
+      if (orders.activeOrders.any((o) =>
+          o.status != OrderStatus.delivered &&
+          o.status != OrderStatus.cancelled)) {
+        return true;
+      }
+      final selected = orders.selectedOrder.value;
+      if (selected != null &&
+          selected.status != OrderStatus.delivered &&
+          selected.status != OrderStatus.cancelled) {
+        return true;
+      }
+    }
+
+    // 3. Check LocationService active order id
+    if (Get.isRegistered<LocationService>()) {
+      final loc = Get.find<LocationService>();
+      if (loc.activeOrderId.value != null && loc.activeOrderId.value!.isNotEmpty) {
+        return true;
+      }
+    }
+
+    // 4. Check cached active order in GetStorage
+    if (Get.isRegistered<GetStorage>()) {
+      try {
+        final storage = Get.find<GetStorage>();
+        final raw = storage.read(AppConstants.activeOrderKey);
+        if (raw != null) {
+          if (raw is Map) {
+            final statusStr = raw['status']?.toString().toUpperCase();
+            if (statusStr != 'DELIVERED' && statusStr != 'CANCELLED') {
+              return true;
+            }
+          } else {
+            return true;
+          }
+        }
+      } catch (_) {}
+    }
+
+    return false;
+  }
+
+  /// Checks whether an offer payload refers to an order that is already active or accepted.
+  static bool isOrderAlreadyAcceptedOrActive(Map<String, dynamic> data) {
+    final orderId = data['orderId']?.toString();
+    final assignmentId = data['assignmentId']?.toString();
+    final orderNumber = data['orderNumber']?.toString();
+
+    if (Get.isRegistered<DashboardController>()) {
+      final dash = Get.find<DashboardController>();
+      if (dash.isOrderAcceptedOrActive(orderId) ||
+          dash.isOrderAcceptedOrActive(assignmentId) ||
+          dash.isOrderAcceptedOrActive(orderNumber)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /// Handles FCM data payload conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md Section 2:
   /// - 2.1: type == "NEW_OFFER" (Automated Waterfall Offer with 60s countdown)
   /// - 2.2: type == "MANUAL_ASSIGN" (Direct Admin/Seller Assignment)
   /// - 2.3: type == "ASSIGNMENT_REVOKED" (Offer/Assignment Cancelled or Reassigned)
   void handleFcmPayload(Map<String, dynamic> data, {String? title, String? body}) {
     final type = data['type']?.toString().toUpperCase();
-    playOrderAlertFeedback();
 
     // Checklist Point 5: Single Active Driving Device FCM Push
     if (type == 'DEVICE_SWITCHED') {
@@ -147,6 +228,18 @@ class NotificationService extends GetxService {
     final customerName = (data['customerName'] ?? '').toString();
 
     if (type == 'NEW_OFFER') {
+      // Guard: Do not show or handle offer if rider is already busy delivering an active order
+      // or if this offer corresponds to an order already accepted/active.
+      if (hasActiveDelivery() || isOrderAlreadyAcceptedOrActive(data)) {
+        debugPrint('[NotificationService] Rider currently has an active delivery or order is already active. Suppressing NEW_OFFER banner.');
+        return;
+      }
+
+      if (Get.currentRoute == '/active-order') {
+        debugPrint('[NotificationService] Rider is on ActiveOrderView. Suppressing NEW_OFFER banner.');
+        return;
+      }
+
       onNewOffer?.call(data, title: title, body: body);
       final earningStr = earning.isNotEmpty ? earning : '0.00';
       final earningBadgeText = 'Delivery Earning: NLe $earningStr';

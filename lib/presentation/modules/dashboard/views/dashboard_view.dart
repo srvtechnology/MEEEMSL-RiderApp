@@ -11,6 +11,7 @@ import '../widgets/active_delivery_card.dart';
 import '../widgets/incoming_offer_card.dart';
 import '../widgets/telemetry_radar_card.dart';
 import '../../../routes/app_routes.dart';
+import '../../../../domain/entities/order_entity.dart';
 
 /// Redesigned Rider App Dashboard
 /// Conforming to MOBILE_RIDER_APP_API_DOC_PART_2.md
@@ -385,16 +386,18 @@ class DashboardView extends GetView<DashboardController> {
 
   Widget _buildDynamicCenterStage(BuildContext context) {
     return Obx(() {
-      // 1. High Priority 60s Waterfall Offer (Section 2)
+      // 1. Active Delivery Mission Cockpit (Sections 3 & 5)
+      final active = controller.activeOrder.value;
+      if (active != null &&
+          active.status != OrderStatus.delivered &&
+          active.status != OrderStatus.cancelled) {
+        return ActiveDeliveryCard(order: active);
+      }
+
+      // 2. High Priority 60s Waterfall Offer (Section 2)
       final incoming = controller.incomingOrder.value;
       if (incoming != null) {
         return IncomingOfferCard(order: incoming);
-      }
-
-      // 2. Active Delivery Mission Cockpit (Sections 3 & 5)
-      final active = controller.activeOrder.value;
-      if (active != null) {
-        return ActiveDeliveryCard(order: active);
       }
 
       // 3. Online Radar Mode (Section 1 & 7.4)
