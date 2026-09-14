@@ -184,6 +184,96 @@ class OrderDetailsView extends StatelessWidget {
               ),
             ),
 
+            // Package Pickup Proof Photos (NEW)
+            if (order.pickupProofPhotos.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              CustomCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.inventory_2_outlined, color: AppColors.primary, size: 20),
+                            const SizedBox(width: 8),
+                            Text('Package Pickup Proof', style: AppTextStyles.titleMedium()),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            '${order.pickupProofPhotos.length} ${order.pickupProofPhotos.length == 1 ? 'Photo' : 'Photos'}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Captured during parcel collection from vendor store',
+                      style: AppTextStyles.bodySmall(),
+                    ),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 110,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: order.pickupProofPhotos.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, index) {
+                          final photoUrl = order.pickupProofPhotos[index];
+                          return GestureDetector(
+                            onTap: () => _showPhotoPreview(context, photoUrl, 'Pickup Proof #${index + 1}'),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                width: 110,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: photoUrl.startsWith('http')
+                                    ? Image.network(
+                                        photoUrl,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: AppColors.lightSurfaceVariant,
+                                          child: const Center(
+                                            child: Icon(Icons.broken_image, color: Colors.grey, size: 30),
+                                          ),
+                                        ),
+                                      )
+                                    : Image.file(
+                                        File(photoUrl),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Container(
+                                          color: AppColors.lightSurfaceVariant,
+                                          child: const Center(
+                                            child: Icon(Icons.broken_image, color: Colors.grey, size: 30),
+                                          ),
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
             // Proof of Delivery Photo (Part 3 Section 4.3 & 5.3)
             if (order.proofPhotoUrl != null && order.proofPhotoUrl!.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -201,40 +291,92 @@ class OrderDetailsView extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: order.proofPhotoUrl!.startsWith('http')
-                          ? Image.network(
-                              order.proofPhotoUrl!,
-                              width: double.infinity,
-                              height: 200,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                height: 120,
-                                color: AppColors.lightSurfaceVariant,
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                    GestureDetector(
+                      onTap: () => _showPhotoPreview(context, order.proofPhotoUrl!, 'Handover Proof Photo'),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: order.proofPhotoUrl!.startsWith('http')
+                            ? Image.network(
+                                order.proofPhotoUrl!,
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  height: 120,
+                                  color: AppColors.lightSurfaceVariant,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                                  ),
+                                ),
+                              )
+                            : Image.file(
+                                File(order.proofPhotoUrl!),
+                                width: double.infinity,
+                                height: 200,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Container(
+                                  height: 120,
+                                  color: AppColors.lightSurfaceVariant,
+                                  child: const Center(
+                                    child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
+                                  ),
                                 ),
                               ),
-                            )
-                          : Image.file(
-                              File(order.proofPhotoUrl!),
-                              width: double.infinity,
-                              height: 200,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Container(
-                                height: 120,
-                                color: AppColors.lightSurfaceVariant,
-                                child: const Center(
-                                  child: Icon(Icons.broken_image, color: Colors.grey, size: 40),
-                                ),
-                              ),
-                            ),
+                      ),
                     ),
                   ],
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showPhotoPreview(BuildContext context, String url, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+            ),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              child: InteractiveViewer(
+                child: url.startsWith('http')
+                    ? Image.network(url, fit: BoxFit.contain)
+                    : Image.file(File(url), fit: BoxFit.contain),
+              ),
+            ),
           ],
         ),
       ),

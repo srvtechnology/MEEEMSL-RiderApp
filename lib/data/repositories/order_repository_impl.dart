@@ -35,9 +35,9 @@ class OrderRepositoryImpl implements OrderRepository {
   }
 
   @override
-  Future<Either<Failure, OrderEntity>> acceptOrder(String orderId) async {
+  Future<Either<Failure, OrderEntity>> acceptOrder(String orderId, {OrderEntity? cachedOrder}) async {
     try {
-      final order = await remoteDataSource.acceptOrder(orderId);
+      final order = await remoteDataSource.acceptOrder(orderId, cachedOrder: cachedOrder);
       return Right(order);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
@@ -65,6 +65,7 @@ class OrderRepositoryImpl implements OrderRepository {
     String? proofPhotoUrl,
     String? customerOtp,
     String? cancellationReason,
+    List<String>? pickupPhotos,
   }) async {
     try {
       final order = await remoteDataSource.updateOrderStatus(
@@ -73,6 +74,7 @@ class OrderRepositoryImpl implements OrderRepository {
         proofPhotoUrl: proofPhotoUrl,
         customerOtp: customerOtp,
         cancellationReason: cancellationReason,
+        pickupPhotos: pickupPhotos,
       );
       return Right(order);
     } on ServerException catch (e) {

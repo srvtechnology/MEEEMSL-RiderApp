@@ -27,6 +27,7 @@ class OrderModel extends OrderEntity {
     super.notes = '',
     super.deliveryOtp = '',
     super.proofPhotoUrl,
+    super.pickupProofPhotos = const [],
     super.cycle,
     super.riderAttempt,
   });
@@ -252,6 +253,20 @@ class OrderModel extends OrderEntity {
       notes: json['notes']?.toString() ?? '',
       deliveryOtp: deliveryOtp,
       proofPhotoUrl: (json['proofPhotoUrl'] ?? json['deliveryProofImage'] ?? orderMap?['deliveryProofImage'])?.toString(),
+      pickupProofPhotos: () {
+        final rawPhotos = json['pickupProofPhotos'] ??
+            orderMap?['pickupProofPhotos'] ??
+            json['pickupPhotos'] ??
+            orderMap?['pickupPhotos'] ??
+            (json['activeAssignment'] is Map ? (json['activeAssignment'] as Map)['pickupProofPhotos'] : null);
+        if (rawPhotos is List) {
+          return rawPhotos
+              .where((p) => p != null && p.toString().trim().isNotEmpty)
+              .map((p) => p.toString())
+              .toList();
+        }
+        return const <String>[];
+      }(),
       cycle: cycle,
       riderAttempt: riderAttempt,
     );
@@ -285,6 +300,7 @@ class OrderModel extends OrderEntity {
       'notes': notes,
       'deliveryOtp': deliveryOtp,
       'proofPhotoUrl': proofPhotoUrl,
+      'pickupProofPhotos': pickupProofPhotos,
       'cycle': cycle,
       'riderAttempt': riderAttempt,
     };
@@ -316,6 +332,7 @@ class OrderModel extends OrderEntity {
       notes: entity.notes,
       deliveryOtp: entity.deliveryOtp,
       proofPhotoUrl: entity.proofPhotoUrl,
+      pickupProofPhotos: entity.pickupProofPhotos,
       cycle: entity.cycle,
       riderAttempt: entity.riderAttempt,
     );

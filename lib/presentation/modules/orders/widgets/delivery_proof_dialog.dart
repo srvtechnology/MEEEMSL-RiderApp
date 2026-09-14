@@ -119,7 +119,15 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close_rounded, size: 22),
-                    onPressed: () => Get.back(),
+                    onPressed: () {
+                      if (Navigator.of(context, rootNavigator: true).canPop()) {
+                        Navigator.of(context, rootNavigator: true).pop();
+                      } else if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        Get.back();
+                      }
+                    },
                   ),
                 ],
               ),
@@ -286,7 +294,13 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
                     return;
                   }
 
-                  Get.back();
+                  if (Navigator.of(context, rootNavigator: true).canPop()) {
+                    Navigator.of(context, rootNavigator: true).pop();
+                  } else if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  } else {
+                    Get.back();
+                  }
                   widget.onConfirmed(
                     capturedPhotoPath ?? 'https://images.unsplash.com/photo-1526367790999-0150786686a2',
                     otp,

@@ -7,7 +7,7 @@ class AcceptOrderUseCase {
   final OrderRepository repository;
   AcceptOrderUseCase(this.repository);
 
-  Future<Either<Failure, OrderEntity>> call(String orderId) {
-    return repository.acceptOrder(orderId);
+  Future<Either<Failure, OrderEntity>> call(String orderId, {OrderEntity? cachedOrder}) {
+    return repository.acceptOrder(orderId, cachedOrder: cachedOrder);
   }
 }

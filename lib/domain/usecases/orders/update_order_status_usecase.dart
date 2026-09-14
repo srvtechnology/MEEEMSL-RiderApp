@@ -13,6 +13,7 @@ class UpdateOrderStatusUseCase {
     String? proofPhotoUrl,
     String? customerOtp,
     String? cancellationReason,
+    List<String>? pickupPhotos,
   }) {
     return repository.updateOrderStatus(
       orderId,
@@ -20,6 +21,7 @@ class UpdateOrderStatusUseCase {
       proofPhotoUrl: proofPhotoUrl,
       customerOtp: customerOtp,
       cancellationReason: cancellationReason,
+      pickupPhotos: pickupPhotos,
     );
   }
 }

@@ -948,7 +948,11 @@ class MockInterceptor extends Interceptor {
 
     // 5.1, 5.2, 6.1 Status Updates & Cancellation: POST /orders/:id/status
     if (path.endsWith('/status')) {
-      final data = options.data is Map ? options.data as Map : {};
+      final Map<dynamic, dynamic> data = options.data is Map
+          ? options.data as Map
+          : (options.data is FormData
+              ? Map.fromEntries((options.data as FormData).fields)
+              : {});
       final status = data['status']?.toString() ?? 'ACCEPTED';
       final assignmentId = path.split('/').reversed.skip(1).first;
 
@@ -964,6 +968,42 @@ class MockInterceptor extends Interceptor {
               'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
               'status': 'CANCELLED_BY_RIDER',
               'cancelledAt': DateTime.now().toUtc().toIso8601String(),
+            },
+          },
+        );
+      }
+
+      if (status == 'PICKED_UP') {
+        final List<String> pickupPhotos = [];
+        if (options.data is FormData) {
+          final formData = options.data as FormData;
+          for (final f in formData.files) {
+            pickupPhotos.add('https://storage.googleapis.com/meeemsl-staging/pickup-proofs/${f.value.filename ?? "pickup.jpg"}');
+          }
+        } else if (options.data is Map && (options.data as Map)['pickupPhotos'] is List) {
+          for (final p in (options.data as Map)['pickupPhotos'] as List) {
+            pickupPhotos.add(p.toString());
+          }
+        }
+        if (pickupPhotos.isEmpty) {
+          pickupPhotos.addAll([
+            'https://storage.googleapis.com/meeemsl-staging/pickup-proofs/pickup-cmtwol9o-1.jpg',
+            'https://storage.googleapis.com/meeemsl-staging/pickup-proofs/pickup-cmtwol9o-2.jpg',
+          ]);
+        }
+        return Response(
+          requestOptions: options,
+          statusCode: 200,
+          data: {
+            'success': true,
+            'message': 'Assignment status updated to PICKED_UP',
+            'data': {
+              'id': assignmentId.isEmpty ? 'cuid_assignment_id' : assignmentId,
+              'orderId': 'cmtwognce00048grf3xuko4bu',
+              'riderId': 'rider_12345',
+              'status': 'PICKED_UP',
+              'pickedUpAt': DateTime.now().toUtc().toIso8601String(),
+              'pickupProofPhotos': pickupPhotos,
             },
           },
         );

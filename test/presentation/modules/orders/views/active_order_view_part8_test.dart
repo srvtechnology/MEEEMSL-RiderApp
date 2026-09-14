@@ -252,7 +252,7 @@ void main() {
       dashController.incomingOrder.value = incoming;
 
       final accepted = incoming.copyWith(status: OrderStatus.accepted);
-      when(() => mockAcceptOrder('asgn_123')).thenAnswer((_) async => Right(accepted));
+      when(() => mockAcceptOrder('asgn_123', cachedOrder: any(named: 'cachedOrder'))).thenAnswer((_) async => Right(accepted));
 
       expect(controller.selectedOrder.value, isNull);
 

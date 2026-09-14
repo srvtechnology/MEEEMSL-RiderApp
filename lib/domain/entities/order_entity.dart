@@ -109,6 +109,7 @@ class OrderEntity extends Equatable {
   final String notes;
   final String deliveryOtp;
   final String? proofPhotoUrl;
+  final List<String> pickupProofPhotos;
   final int? cycle;
   final int? riderAttempt;
 
@@ -137,6 +138,7 @@ class OrderEntity extends Equatable {
     this.notes = '',
     this.deliveryOtp = '',
     this.proofPhotoUrl,
+    this.pickupProofPhotos = const [],
     this.cycle,
     this.riderAttempt,
   });
@@ -166,6 +168,7 @@ class OrderEntity extends Equatable {
     String? notes,
     String? deliveryOtp,
     String? proofPhotoUrl,
+    List<String>? pickupProofPhotos,
     int? cycle,
     int? riderAttempt,
   }) {
@@ -194,6 +197,7 @@ class OrderEntity extends Equatable {
       notes: notes ?? this.notes,
       deliveryOtp: deliveryOtp ?? this.deliveryOtp,
       proofPhotoUrl: proofPhotoUrl ?? this.proofPhotoUrl,
+      pickupProofPhotos: pickupProofPhotos ?? this.pickupProofPhotos,
       cycle: cycle ?? this.cycle,
       riderAttempt: riderAttempt ?? this.riderAttempt,
     );
@@ -211,6 +215,7 @@ class OrderEntity extends Equatable {
         dropoffAddress,
         riderEarnings,
         distanceKm,
+        pickupProofPhotos,
         cycle,
         riderAttempt,
       ];

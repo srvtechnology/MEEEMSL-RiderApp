@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -112,6 +113,10 @@ class ActiveOrderView extends GetView<OrdersController> {
 
                       // Order Items Checklist
                       _buildItemsCard(order),
+                      if (order.pickupProofPhotos.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        _buildPickupProofCard(context, order),
+                      ],
                       if (order.notes.isNotEmpty) ...[
                         const SizedBox(height: 10),
                         _buildInstructionsCard(order),
@@ -141,7 +146,7 @@ class ActiveOrderView extends GetView<OrdersController> {
                       SwipeButton(
                         key: ValueKey('swipe_step_${order.id}_${order.status}'),
                         text: order.status.nextStepActionTitle,
-                        isLoading: controller.isLoading.value,
+                        isLoading: controller.isTransitioningStatus.value,
                         activeColor: AppColors.primary,
                         onSwiped: () => controller.advanceActiveOrderStatus(),
                       ),
@@ -510,6 +515,130 @@ class ActiveOrderView extends GetView<OrdersController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPickupProofCard(BuildContext context, OrderEntity order) {
+    return CustomCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: const [
+                  Icon(Icons.inventory_2_outlined, size: 18, color: AppColors.primary),
+                  SizedBox(width: 8),
+                  Text(
+                    'Package Pickup Proof',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryLight,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${order.pickupProofPhotos.length} ${order.pickupProofPhotos.length == 1 ? 'photo' : 'photos'}',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Verified at store during package collection',
+            style: AppTextStyles.bodySmall(),
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 74,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: order.pickupProofPhotos.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final photoUrl = order.pickupProofPhotos[index];
+                return GestureDetector(
+                  onTap: () => _showPhotoDialog(context, photoUrl, 'Pickup Proof #${index + 1}'),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 74,
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: photoUrl.startsWith('http')
+                          ? Image.network(photoUrl, fit: BoxFit.cover)
+                          : Image.file(File(photoUrl), fit: BoxFit.cover),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPhotoDialog(BuildContext context, String url, String title) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                color: Colors.black87,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 14)),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+            ),
+            ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              child: InteractiveViewer(
+                child: url.startsWith('http')
+                    ? Image.network(url, fit: BoxFit.contain)
+                    : Image.file(File(url), fit: BoxFit.contain),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -225,11 +225,11 @@ void main() {
         createdAt: DateTime.now(),
       );
 
-      when(() => mockAcceptOrder('asgn_test_xyz789')).thenAnswer((_) async => Right(accepted));
+      when(() => mockAcceptOrder('asgn_test_xyz789', cachedOrder: any(named: 'cachedOrder'))).thenAnswer((_) async => Right(accepted));
 
       await controller.acceptIncomingOrder();
 
-      verify(() => mockAcceptOrder('asgn_test_xyz789')).called(1);
+      verify(() => mockAcceptOrder('asgn_test_xyz789', cachedOrder: any(named: 'cachedOrder'))).called(1);
       expect(controller.incomingOrder.value, isNull);
     });
 

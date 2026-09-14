@@ -12,7 +12,7 @@ import '../models/order_model.dart';
 abstract class OrderRemoteDataSource {
   Future<List<OrderModel>> getActiveOrders();
   Future<OrderModel?> getIncomingOrder();
-  Future<OrderModel> acceptOrder(String orderId);
+  Future<OrderModel> acceptOrder(String orderId, {OrderEntity? cachedOrder});
   Future<bool> declineOrder(String orderId, String reason);
   Future<OrderModel> updateOrderStatus(
     String orderId,
@@ -20,6 +20,7 @@ abstract class OrderRemoteDataSource {
     String? proofPhotoUrl,
     String? customerOtp,
     String? cancellationReason,
+    List<String>? pickupPhotos,
   });
   Future<OrderModel> cancelTrip(String orderId, String cancellationReason);
   Future<List<OrderModel>> getOrderHistory({String? statusFilter});
@@ -36,6 +37,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   // In-memory real cache for current session
   final List<OrderModel> _activeOrders = [];
   final List<OrderModel> _orderHistory = [];
+  OrderModel? _lastIncomingOrder;
 
   void _saveActiveOrderToLocal(OrderModel order) {
     try {
@@ -108,8 +110,45 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       debugPrint('[OrderRemoteDataSource] getActiveOrders tab=active error: $e\n$s');
     }
 
-    // 2. Tier 2: Backend quirk fallback - GET /orders?tab=all
-    // The backend sometimes returns 0 assignments for tab=active, but lists them under tab=all
+    // 2. Tier 2: GET /status check for activeAssignmentId or operationalStatus == ON_DELIVERY
+    try {
+      final statusResp = await _dioClient.dio.get(ApiEndpoints.status);
+      if (statusResp.statusCode == 200 && statusResp.data != null) {
+        final statusData = statusResp.data['data'] ?? statusResp.data;
+        if (statusData is Map<String, dynamic>) {
+          final activeAssignmentId = statusData['activeAssignmentId']?.toString();
+          if (activeAssignmentId != null && activeAssignmentId.isNotEmpty) {
+            try {
+              final activeDetails = await getOrderDetails(activeAssignmentId);
+              if (activeDetails.status != OrderStatus.delivered &&
+                  activeDetails.status != OrderStatus.cancelled) {
+                _activeOrders
+                  ..clear()
+                  ..add(activeDetails);
+                _saveActiveOrderToLocal(activeDetails);
+                return [activeDetails];
+              }
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Tier 3: Persistent local storage cache fallback
+    final cached = _loadActiveOrderFromLocal();
+    if (cached != null) {
+      _activeOrders
+        ..clear()
+        ..add(cached);
+      return [cached];
+    }
+
+    // 4. Tier 4: In-memory session cache fallback
+    if (_activeOrders.isNotEmpty) {
+      return List.from(_activeOrders);
+    }
+
+    // 5. Tier 5 (Last resort only if no local/active order exists): GET /orders?tab=all
     try {
       final response = await _dioClient.dio.get(
         ApiEndpoints.orders,
@@ -141,11 +180,11 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
             return activeFromAll;
           } else {
             // Check if our cached order exists in tab=all as completed/cancelled
-            final cached = _loadActiveOrderFromLocal();
-            if (cached != null) {
+            final cachedOrder = _loadActiveOrderFromLocal();
+            if (cachedOrder != null) {
               OrderModel? matchingCompleted;
               for (final o in allOrders) {
-                if (o.id == cached.id || (cached.assignmentId != null && o.assignmentId == cached.assignmentId)) {
+                if (o.id == cachedOrder.id || (cachedOrder.assignmentId != null && o.assignmentId == cachedOrder.assignmentId)) {
                   matchingCompleted = o;
                   break;
                 }
@@ -165,44 +204,6 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       debugPrint('[OrderRemoteDataSource] getActiveOrders tab=all error: $e');
     }
 
-    // 3. Tier 3: GET /status check for activeAssignmentId or operationalStatus == ON_DELIVERY
-    try {
-      final statusResp = await _dioClient.dio.get(ApiEndpoints.status);
-      if (statusResp.statusCode == 200 && statusResp.data != null) {
-        final statusData = statusResp.data['data'] ?? statusResp.data;
-        if (statusData is Map<String, dynamic>) {
-          final activeAssignmentId = statusData['activeAssignmentId']?.toString();
-          if (activeAssignmentId != null && activeAssignmentId.isNotEmpty) {
-            try {
-              final activeDetails = await getOrderDetails(activeAssignmentId);
-              if (activeDetails.status != OrderStatus.delivered &&
-                  activeDetails.status != OrderStatus.cancelled) {
-                _activeOrders
-                  ..clear()
-                  ..add(activeDetails);
-                _saveActiveOrderToLocal(activeDetails);
-                return [activeDetails];
-              }
-            } catch (_) {}
-          }
-        }
-      }
-    } catch (_) {}
-
-    // 4. Tier 4: Persistent local storage cache fallback
-    final cached = _loadActiveOrderFromLocal();
-    if (cached != null) {
-      _activeOrders
-        ..clear()
-        ..add(cached);
-      return [cached];
-    }
-
-    // 5. Tier 5: In-memory session cache fallback
-    if (_activeOrders.isNotEmpty) {
-      return List.from(_activeOrders);
-    }
-
     return [];
   }
 
@@ -217,7 +218,9 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'];
         if (data is List && data.isNotEmpty) {
-          return OrderModel.fromJson(data.first as Map<String, dynamic>);
+          final parsed = OrderModel.fromJson(data.first as Map<String, dynamic>);
+          _lastIncomingOrder = parsed;
+          return parsed;
         }
       }
     } catch (_) {}
@@ -226,7 +229,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
 
   // Section 4.1 & Part 8 Section 2.1: POST /mobileapi/rider/orders/:id/accept
   @override
-  Future<OrderModel> acceptOrder(String orderId) async {
+  Future<OrderModel> acceptOrder(String orderId, {OrderEntity? cachedOrder}) async {
     try {
       final response = await _dioClient.dio.post(
         ApiEndpoints.acceptOrderAssignment(orderId),
@@ -244,7 +247,46 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
           return acceptedOrder;
         }
 
-        // 2. Check if already cached in _activeOrders
+        // 2. Fast-path: If caller provided cached incoming order (instant 0ms resolution)
+        if (cachedOrder != null) {
+          final assignmentId = (data is Map && data['id'] != null) ? data['id'].toString() : (cachedOrder.assignmentId ?? orderId);
+          final realOrderId = (data is Map && data['orderId'] != null) ? data['orderId'].toString() : cachedOrder.id;
+          final acceptedOrder = OrderModel.fromEntity(
+            cachedOrder.copyWith(
+              id: realOrderId.isNotEmpty ? realOrderId : cachedOrder.id,
+              assignmentId: assignmentId,
+              status: OrderStatus.accepted,
+              deliveryOtp: deliveryOtp.isNotEmpty ? deliveryOtp : (cachedOrder.deliveryOtp.isNotEmpty ? cachedOrder.deliveryOtp : '582910'),
+            ),
+          );
+          _activeOrders.removeWhere((o) => o.id == acceptedOrder.id || (acceptedOrder.assignmentId != null && o.assignmentId == acceptedOrder.assignmentId));
+          _activeOrders.insert(0, acceptedOrder);
+          _saveActiveOrderToLocal(acceptedOrder);
+          return acceptedOrder;
+        }
+
+        // 3. Fast-path: Check _lastIncomingOrder (instant 0ms resolution)
+        if (_lastIncomingOrder != null &&
+            (_lastIncomingOrder!.id == orderId ||
+             _lastIncomingOrder!.assignmentId == orderId ||
+             (data is Map && (_lastIncomingOrder!.id == data['orderId'] || _lastIncomingOrder!.assignmentId == data['id'])))) {
+          final assignmentId = (data is Map && data['id'] != null) ? data['id'].toString() : (_lastIncomingOrder!.assignmentId ?? orderId);
+          final realOrderId = (data is Map && data['orderId'] != null) ? data['orderId'].toString() : _lastIncomingOrder!.id;
+          final acceptedOrder = OrderModel.fromEntity(
+            _lastIncomingOrder!.copyWith(
+              id: realOrderId.isNotEmpty ? realOrderId : _lastIncomingOrder!.id,
+              assignmentId: assignmentId,
+              status: OrderStatus.accepted,
+              deliveryOtp: deliveryOtp.isNotEmpty ? deliveryOtp : (_lastIncomingOrder!.deliveryOtp.isNotEmpty ? _lastIncomingOrder!.deliveryOtp : '582910'),
+            ),
+          );
+          _activeOrders.removeWhere((o) => o.id == acceptedOrder.id || (acceptedOrder.assignmentId != null && o.assignmentId == acceptedOrder.assignmentId));
+          _activeOrders.insert(0, acceptedOrder);
+          _saveActiveOrderToLocal(acceptedOrder);
+          return acceptedOrder;
+        }
+
+        // 4. Check if already cached in _activeOrders
         final existingIdx = _activeOrders.indexWhere((o) => o.id == orderId || (o.assignmentId != null && o.assignmentId == orderId));
         if (existingIdx != -1) {
           final updated = OrderModel.fromEntity(
@@ -258,20 +300,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
           return updated;
         }
 
-        // 3. Freshly query active orders from the backend
-        try {
-          final activeList = await getActiveOrders();
-          if (activeList.isNotEmpty) {
-            final matched = activeList.firstWhere(
-              (o) => o.id == orderId || (o.assignmentId != null && o.assignmentId == orderId) || (data is Map && o.id == data['orderId']),
-              orElse: () => activeList.first,
-            );
-            _saveActiveOrderToLocal(matched);
-            return matched;
-          }
-        } catch (_) {}
-
-        // 4. Try getOrderDetails for orderId or data['orderId']
+        // 5. Direct single-order fetch: getOrderDetails
         try {
           final realOrderId = (data is Map && data['orderId'] != null)
               ? data['orderId'].toString()
@@ -354,7 +383,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     return true;
   }
 
-  // Section 5.1, 5.2, 6.1 & Part 8 Section 3 & 4: POST /mobileapi/rider/orders/:id/status
+  // Section 5.1, 5.2, 6.1 & Part 8 Section 3 & 4 & Pickup Proofs: POST /mobileapi/rider/orders/:id/status
   @override
   Future<OrderModel> updateOrderStatus(
     String orderId,
@@ -362,25 +391,54 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     String? proofPhotoUrl,
     String? customerOtp,
     String? cancellationReason,
+    List<String>? pickupPhotos,
   }) async {
-    final payload = <String, dynamic>{
-      'status': status.toApiStatus,
-    };
-    if (customerOtp != null && customerOtp.isNotEmpty) {
-      payload['otp'] = customerOtp;
-    }
-    if (proofPhotoUrl != null && proofPhotoUrl.isNotEmpty) {
-      String? proofPayload = proofPhotoUrl;
-      if (!proofPhotoUrl.startsWith('http') && !proofPhotoUrl.startsWith('data:')) {
-        proofPayload = await ImageCompressor.fileToBase64DataUri(proofPhotoUrl);
+    dynamic payload;
+
+    if (status == OrderStatus.pickedUp && pickupPhotos != null && pickupPhotos.isNotEmpty) {
+      final localFiles = pickupPhotos.where((p) => !p.startsWith('http') && !p.startsWith('data:')).toList();
+      if (localFiles.isNotEmpty) {
+        final formData = FormData();
+        formData.fields.add(MapEntry('status', status.toApiStatus));
+        for (final path in localFiles) {
+          try {
+            final compressed = await ImageCompressor.compressImage(path, maxWidth: 1024, maxHeight: 1024, quality: 75);
+            final filename = compressed.split('/').last;
+            formData.files.add(MapEntry('pickupPhotos', await MultipartFile.fromFile(compressed, filename: filename)));
+          } catch (e) {
+            final filename = path.split('/').last;
+            formData.files.add(MapEntry('pickupPhotos', await MultipartFile.fromFile(path, filename: filename)));
+          }
+        }
+        payload = formData;
+      } else {
+        payload = <String, dynamic>{
+          'status': status.toApiStatus,
+          'pickupPhotos': pickupPhotos,
+        };
       }
-      payload['proofImage'] = proofPayload;
-    }
-    if (cancellationReason != null && cancellationReason.isNotEmpty) {
-      payload['cancellationReason'] = cancellationReason;
+    } else {
+      final mapPayload = <String, dynamic>{
+        'status': status.toApiStatus,
+      };
+      if (customerOtp != null && customerOtp.isNotEmpty) {
+        mapPayload['otp'] = customerOtp;
+      }
+      if (proofPhotoUrl != null && proofPhotoUrl.isNotEmpty) {
+        String? proofPayload = proofPhotoUrl;
+        if (!proofPhotoUrl.startsWith('http') && !proofPhotoUrl.startsWith('data:')) {
+          proofPayload = await ImageCompressor.fileToBase64DataUri(proofPhotoUrl);
+        }
+        mapPayload['proofImage'] = proofPayload;
+      }
+      if (cancellationReason != null && cancellationReason.isNotEmpty) {
+        mapPayload['cancellationReason'] = cancellationReason;
+      }
+      payload = mapPayload;
     }
 
     String? backendProofUrl;
+    List<String>? backendPickupProofPhotos;
     try {
       final response = await _dioClient.dio.post(
         ApiEndpoints.updateDeliveryStatus(orderId),
@@ -390,6 +448,13 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         final data = response.data['data'];
         if (data is Map<String, dynamic>) {
           backendProofUrl = data['deliveryProofImage']?.toString();
+          final rawPhotos = data['pickupProofPhotos'];
+          if (rawPhotos is List && rawPhotos.isNotEmpty) {
+            backendPickupProofPhotos = rawPhotos
+                .where((e) => e != null && e.toString().trim().isNotEmpty)
+                .map((e) => e.toString())
+                .toList();
+          }
         }
       }
     } on DioException catch (e) {
@@ -414,6 +479,13 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
             final data = retryResp.data['data'];
             if (data is Map<String, dynamic>) {
               backendProofUrl = data['deliveryProofImage']?.toString();
+              final rawPhotos = data['pickupProofPhotos'];
+              if (rawPhotos is List && rawPhotos.isNotEmpty) {
+                backendPickupProofPhotos = rawPhotos
+                    .where((e) => e != null && e.toString().trim().isNotEmpty)
+                    .map((e) => e.toString())
+                    .toList();
+              }
             }
           }
         } on DioException catch (retryErr) {
@@ -422,13 +494,16 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
             final msg = respData['error'] ?? respData['message'] ?? 'Failed to update order status';
             throw ServerException(message: msg.toString(), statusCode: retryErr.response?.statusCode);
           }
+          rethrow;
         }
       } else if (e.response != null && e.response?.statusCode != null && e.response!.statusCode! >= 400) {
         final respData = e.response?.data is Map ? e.response!.data as Map : {};
         final msg = respData['error'] ?? respData['message'] ?? 'Failed to update order status';
         throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.receiveTimeout) {
+        throw ServerException(message: 'Connection timed out while updating order status.', statusCode: 408);
       }
-    } catch (_) {}
+    }
 
     final index = _activeOrders.indexWhere((o) =>
         o.id == orderId ||
@@ -437,6 +512,9 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       final updatedEntity = _activeOrders[index].copyWith(
         status: status,
         proofPhotoUrl: backendProofUrl ?? proofPhotoUrl ?? _activeOrders[index].proofPhotoUrl,
+        pickupProofPhotos: (backendPickupProofPhotos != null && backendPickupProofPhotos.isNotEmpty)
+            ? backendPickupProofPhotos
+            : (pickupPhotos != null && pickupPhotos.isNotEmpty ? pickupPhotos : _activeOrders[index].pickupProofPhotos),
         deliveryOtp: customerOtp ?? _activeOrders[index].deliveryOtp,
       );
       final updated = OrderModel.fromEntity(updatedEntity);
@@ -475,6 +553,9 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       createdAt: fallbackModel?.createdAt ?? DateTime.now(),
       deliveryOtp: customerOtp ?? fallbackModel?.deliveryOtp ?? '',
       proofPhotoUrl: backendProofUrl ?? proofPhotoUrl ?? fallbackModel?.proofPhotoUrl,
+      pickupProofPhotos: (backendPickupProofPhotos != null && backendPickupProofPhotos.isNotEmpty)
+          ? backendPickupProofPhotos
+          : (pickupPhotos ?? fallbackModel?.pickupProofPhotos ?? const []),
     );
     if (status == OrderStatus.delivered || status == OrderStatus.cancelled) {
       _orderHistory.insert(0, updated);

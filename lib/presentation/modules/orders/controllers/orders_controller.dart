@@ -14,6 +14,7 @@ import '../../../../core/services/location_service.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../earnings/controllers/earnings_controller.dart';
 import '../widgets/delivery_proof_dialog.dart';
+import '../widgets/pickup_proof_dialog.dart';
 import '../widgets/cancel_delivery_dialog.dart';
 import '../../../routes/app_routes.dart';
 
@@ -34,6 +35,7 @@ class OrdersController extends GetxController {
 
   // State Observables
   final isLoading = false.obs;
+  final isTransitioningStatus = false.obs;
   final activeOrders = <OrderEntity>[].obs;
   final orderHistory = <OrderEntity>[].obs;
   final selectedOrder = Rxn<OrderEntity>();
@@ -79,7 +81,9 @@ class OrdersController extends GetxController {
   }
 
   Future<void> loadOrders() async {
-    isLoading.value = true;
+    if (selectedOrder.value == null) {
+      isLoading.value = true;
+    }
     await Future.wait([
       _loadActiveOrders(),
       _loadHistory(),
@@ -107,11 +111,17 @@ class OrdersController extends GetxController {
                     currentAssignmentId.isNotEmpty &&
                     o.assignmentId == currentAssignmentId)).firstOrNull;
             if (matching != null) {
+              final mergedPhotos = matching.pickupProofPhotos.isNotEmpty
+                  ? matching.pickupProofPhotos
+                  : (selectedOrder.value?.pickupProofPhotos ?? const <String>[]);
               if (matching.status.index >= selectedOrder.value!.status.index) {
-                selectedOrder.value = matching;
+                selectedOrder.value = matching.copyWith(pickupProofPhotos: mergedPhotos);
               } else {
                 // Prevent status regression from stale backend read replica
-                selectedOrder.value = matching.copyWith(status: selectedOrder.value!.status);
+                selectedOrder.value = matching.copyWith(
+                  status: selectedOrder.value!.status,
+                  pickupProofPhotos: mergedPhotos,
+                );
               }
             }
           }
@@ -155,6 +165,14 @@ class OrdersController extends GetxController {
         nextStatus = OrderStatus.atPickup;
         break;
       case OrderStatus.atPickup:
+        // Step 3: Requires Package Pickup Proof Photos (1 to 5 photos)
+        if (Get.overlayContext != null || Get.context != null) {
+          Get.dialog(PickupProofDialog(
+            order: current,
+            onConfirmed: (photoPaths) => _confirmPackagePickup(current.id, photoPaths),
+          ));
+          return;
+        }
         nextStatus = OrderStatus.pickedUp;
         break;
       case OrderStatus.pickedUp:
@@ -162,21 +180,27 @@ class OrdersController extends GetxController {
         break;
       case OrderStatus.outForDelivery:
         // Step 5: Requires Proof of Delivery (Customer OTP + optional Photo)
-        Get.dialog(DeliveryProofDialog(
-          order: current,
-          onConfirmed: (photoUrl, otp) => _completeDelivery(current.id, photoUrl, otp),
-        ));
-        return;
+        if (Get.overlayContext != null || Get.context != null) {
+          Get.dialog(DeliveryProofDialog(
+            order: current,
+            onConfirmed: (photoUrl, otp) => _completeDelivery(current.id, photoUrl, otp),
+          ));
+          return;
+        }
+        nextStatus = OrderStatus.delivered;
+        break;
       default:
         return;
     }
 
+    isTransitioningStatus.value = true;
     isLoading.value = true;
     final targetId = (current.assignmentId != null && current.assignmentId!.isNotEmpty)
         ? current.assignmentId!
         : current.id;
     final result = await updateOrderStatusUseCase(targetId, nextStatus);
     isLoading.value = false;
+    isTransitioningStatus.value = false;
 
     result.fold(
       (failure) {
@@ -209,11 +233,77 @@ class OrdersController extends GetxController {
     );
   }
 
+  Future<bool> _confirmPackagePickup(String orderId, List<String> photoPaths) async {
+    if (photoPaths.length < 2) {
+      if (Get.overlayContext != null) {
+        Get.snackbar(
+          'Photos Required',
+          'Please capture at least 2 photos before confirming package pickup.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFFEE2E2),
+          colorText: const Color(0xFFB91C1C),
+        );
+      }
+      return false;
+    }
+
+    final current = selectedOrder.value;
+    final targetId = (current != null && current.assignmentId != null && current.assignmentId!.isNotEmpty)
+        ? current.assignmentId!
+        : orderId;
+
+    isTransitioningStatus.value = true;
+    isLoading.value = true;
+    final result = await updateOrderStatusUseCase(
+      targetId,
+      OrderStatus.pickedUp,
+      pickupPhotos: photoPaths,
+    );
+    isLoading.value = false;
+    isTransitioningStatus.value = false;
+
+    return result.fold(
+      (failure) {
+        if (Get.overlayContext != null) {
+          Get.snackbar(
+            'Pickup Update Failed',
+            failure.message,
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFFEE2E2),
+            colorText: const Color(0xFFB91C1C),
+          );
+        }
+        return false;
+      },
+      (updated) {
+        setActiveOrder(updated);
+        if (Get.isRegistered<DashboardController>()) {
+          Get.find<DashboardController>().activeOrder.value = updated;
+        }
+        if (Get.isDialogOpen == true) {
+          Get.back();
+        }
+        _loadActiveOrders();
+        if (Get.overlayContext != null) {
+          Get.snackbar(
+            'Package Collected & Verified',
+            '${updated.status.stepNumberText}: ${updated.status.displayName}',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+            colorText: const Color(0xFF009624),
+          );
+        }
+        return true;
+      },
+    );
+  }
+
   Future<void> _completeDelivery(String orderId, String? photoUrl, String? otp) async {
     final current = selectedOrder.value;
     final targetId = (current != null && current.assignmentId != null && current.assignmentId!.isNotEmpty)
         ? current.assignmentId!
         : orderId;
+    isTransitioningStatus.value = true;
     isLoading.value = true;
     final result = await updateOrderStatusUseCase(
       targetId,
@@ -222,6 +312,7 @@ class OrdersController extends GetxController {
       customerOtp: otp,
     );
     isLoading.value = false;
+    isTransitioningStatus.value = false;
 
     result.fold(
       (failure) => Get.snackbar('Delivery Failed', failure.message),
@@ -282,6 +373,7 @@ class OrdersController extends GetxController {
       return;
     }
 
+    isTransitioningStatus.value = true;
     isLoading.value = true;
     final result = cancelTripUseCase != null
         ? await cancelTripUseCase!(current.id, reason)
@@ -291,6 +383,7 @@ class OrdersController extends GetxController {
             cancellationReason: reason,
           );
     isLoading.value = false;
+    isTransitioningStatus.value = false;
 
     result.fold(
       (failure) => Get.snackbar(

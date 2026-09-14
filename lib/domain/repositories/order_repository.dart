@@ -5,7 +5,7 @@ import '../entities/order_entity.dart';
 abstract class OrderRepository {
   Future<Either<Failure, List<OrderEntity>>> getActiveOrders();
   Future<Either<Failure, OrderEntity?>> getIncomingOrder();
-  Future<Either<Failure, OrderEntity>> acceptOrder(String orderId);
+  Future<Either<Failure, OrderEntity>> acceptOrder(String orderId, {OrderEntity? cachedOrder});
   Future<Either<Failure, bool>> declineOrder(String orderId, String reason);
   Future<Either<Failure, OrderEntity>> updateOrderStatus(
     String orderId,
@@ -13,6 +13,7 @@ abstract class OrderRepository {
     String? proofPhotoUrl,
     String? customerOtp,
     String? cancellationReason,
+    List<String>? pickupPhotos,
   });
   Future<Either<Failure, OrderEntity>> cancelTrip(String orderId, String cancellationReason);
   Future<Either<Failure, List<OrderEntity>>> getOrderHistory({String? statusFilter});

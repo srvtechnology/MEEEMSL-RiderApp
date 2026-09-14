@@ -469,15 +469,15 @@ class DashboardController extends GetxController {
     _isAcceptingOrder = true;
 
     _countdownTimer?.cancel();
-    if (Get.isSnackbarOpen == true) {
-      Get.closeCurrentSnackbar();
-    }
+    try {
+      Get.closeAllSnackbars();
+    } catch (_) {}
     if (Get.isBottomSheetOpen == true) {
       Get.back(); // close bottom sheet
     }
 
     isLoading.value = true;
-    final result = await acceptOrderUseCase(targetId);
+    final result = await acceptOrderUseCase(targetId, cachedOrder: order);
     isLoading.value = false;
     _isAcceptingOrder = false;
 
@@ -527,6 +527,10 @@ class DashboardController extends GetxController {
           ordersCtrl.setActiveOrder(finalOrder);
         }
 
+        try {
+          Get.closeAllSnackbars();
+        } catch (_) {}
+
         Get.toNamed(AppRoutes.activeOrder);
       },
     );
@@ -559,8 +563,8 @@ class DashboardController extends GetxController {
     final current = activeOrder.value;
     if (current == null) return;
 
-    if (current.status == OrderStatus.outForDelivery) {
-      // Step 5 requires customer OTP handover verification in active order view
+    if (current.status == OrderStatus.outForDelivery || current.status == OrderStatus.atPickup) {
+      // Step 5 requires customer OTP handover verification or pickup photo proofs in active order view
       if (Get.isRegistered<OrdersController>()) {
         Get.find<OrdersController>().setActiveOrder(current);
       }
@@ -581,9 +585,6 @@ class DashboardController extends GetxController {
     switch (current.status) {
       case OrderStatus.accepted:
         nextStatus = OrderStatus.atPickup;
-        break;
-      case OrderStatus.atPickup:
-        nextStatus = OrderStatus.pickedUp;
         break;
       case OrderStatus.pickedUp:
         nextStatus = OrderStatus.outForDelivery;
