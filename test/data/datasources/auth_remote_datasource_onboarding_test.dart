@@ -110,4 +110,35 @@ void main() {
     expect(result.selectedZones, ['ZONE 1', 'ZONE 2']);
     expect(result.selectedLocations, ['NO 2 RIVER', 'BAW BAW']);
   });
+
+  test('submitOnboarding includes flat payout fields in FormData conforming to API Doc Part 2', () async {
+    final payout = {
+      'paymentOption': 'Orange Money',
+      'preferredPayoutMethod': 'Mobile Wallet',
+      'mobileMoneyOption': 'Orange Money',
+      'mobileNumber': '+23276123456',
+      'agentNumber': 'AG-9081',
+    };
+
+    await remoteDataSource.submitOnboarding(
+      name: 'Samuel Taylor',
+      selectedZones: ['ZONE 1'],
+      selectedLocations: ['NO 2 RIVER'],
+      payoutInfo: payout,
+    );
+
+    final req = capturedRequests.last;
+    final formData = req.data as FormData;
+    final fieldsMap = <String, dynamic>{};
+    for (final field in formData.fields) {
+      fieldsMap[field.key] = field.value;
+    }
+
+    expect(fieldsMap['paymentOption'], 'Orange Money');
+    expect(fieldsMap['preferredPayoutMethod'], 'Mobile Wallet');
+    expect(fieldsMap['mobileMoneyOption'], 'Orange Money');
+    expect(fieldsMap['mobileNumber'], '+23276123456');
+    expect(fieldsMap['agentNumber'], 'AG-9081');
+    expect(fieldsMap['payoutInfo'], jsonEncode(payout));
+  });
 }

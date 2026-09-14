@@ -262,6 +262,26 @@ class MockInterceptor extends Interceptor {
               'vehicleInsuranceDoc': 'https://s3.amazonaws.com/meeem/docs/ins.png',
               'selectedZones': sZones,
               'selectedLocations': sLocs,
+              'paymentOption': incoming['paymentOption'] ?? 'Bank',
+              'preferredPayoutMethod': incoming['preferredPayoutMethod'] ??
+                  (incoming['paymentOption'] == 'Orange Money' || incoming['paymentOption'] == 'AfriMoney'
+                      ? 'Mobile Wallet'
+                      : 'Bank Transfer'),
+              'bankName': incoming['bankName'] ??
+                  (incoming['paymentOption'] != 'Orange Money' && incoming['paymentOption'] != 'AfriMoney'
+                      ? 'Sierra Leone Commercial Bank'
+                      : null),
+              'bankAddress': incoming['bankAddress'],
+              'accountHolderName': incoming['accountHolderName'] ?? incoming['accountHolder'],
+              'accountNumber': incoming['accountNumber'],
+              'bbanNumber': incoming['bbanNumber'] ?? incoming['routingNumber'],
+              'branchName': incoming['branchName'],
+              'mobileMoneyOption': incoming['mobileMoneyOption'] ??
+                  (incoming['paymentOption'] == 'Orange Money' || incoming['paymentOption'] == 'AfriMoney'
+                      ? incoming['paymentOption']
+                      : null),
+              'mobileNumber': incoming['mobileNumber'] ?? incoming['phone'],
+              'agentNumber': incoming['agentNumber'],
             }
           }
         },
@@ -289,6 +309,20 @@ class MockInterceptor extends Interceptor {
                 'vehicleName': patchData['vehicleName'] ?? 'Honda CB Shine 125 Super',
                 'vehicleNumber': patchData['vehicleNumber'] ?? 'SL-AA-9988-NEW',
                 'drivingLicenseNo': 'DL-10928374',
+                'paymentOption': patchData['paymentOption'] ?? 'Bank',
+                'preferredPayoutMethod': patchData['preferredPayoutMethod'] ??
+                    (patchData['paymentOption'] == 'Orange Money' || patchData['paymentOption'] == 'AfriMoney'
+                        ? 'Mobile Wallet'
+                        : 'Bank Transfer'),
+                'bankName': patchData['bankName'],
+                'bankAddress': patchData['bankAddress'],
+                'accountHolderName': patchData['accountHolderName'],
+                'accountNumber': patchData['accountNumber'],
+                'bbanNumber': patchData['bbanNumber'],
+                'branchName': patchData['branchName'],
+                'mobileMoneyOption': patchData['mobileMoneyOption'],
+                'mobileNumber': patchData['mobileNumber'],
+                'agentNumber': patchData['agentNumber'],
               }
             }
           },
@@ -323,6 +357,17 @@ class MockInterceptor extends Interceptor {
               'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
               'selectedZones': ['ZONE 1', 'ZONE 2'],
               'selectedLocations': ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+              'paymentOption': 'Bank',
+              'preferredPayoutMethod': 'Bank Transfer',
+              'bankName': 'Rokel Commercial Bank',
+              'bankAddress': 'Freetown Central',
+              'accountHolderName': 'Mohamed Kamara',
+              'accountNumber': '012345678901',
+              'bbanNumber': 'SL0010001000123456789',
+              'branchName': 'Freetown Main',
+              'mobileMoneyOption': null,
+              'mobileNumber': null,
+              'agentNumber': null,
             }
           }
         },
@@ -386,6 +431,20 @@ class MockInterceptor extends Interceptor {
                 'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
                 'selectedZones': selectedZones,
                 'selectedLocations': selectedLocations,
+                'paymentOption': body['paymentOption'] ?? 'Bank',
+                'preferredPayoutMethod': body['preferredPayoutMethod'] ??
+                    (body['paymentOption'] == 'Orange Money' || body['paymentOption'] == 'AfriMoney'
+                        ? 'Mobile Wallet'
+                        : 'Bank Transfer'),
+                'bankName': body['bankName'],
+                'bankAddress': body['bankAddress'],
+                'accountHolderName': body['accountHolderName'],
+                'accountNumber': body['accountNumber'],
+                'bbanNumber': body['bbanNumber'],
+                'branchName': body['branchName'],
+                'mobileMoneyOption': body['mobileMoneyOption'],
+                'mobileNumber': body['mobileNumber'],
+                'agentNumber': body['agentNumber'],
               }
             }
           },
@@ -420,6 +479,17 @@ class MockInterceptor extends Interceptor {
               'profileImage': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400',
               'selectedZones': ['ZONE 1', 'ZONE 2'],
               'selectedLocations': ['NO 2 RIVER', 'BAW BAW', 'HAMILTON', 'LAKKA'],
+              'paymentOption': 'Bank',
+              'preferredPayoutMethod': 'Bank Transfer',
+              'bankName': 'Rokel Commercial Bank',
+              'bankAddress': 'Freetown Central',
+              'accountHolderName': 'Mohamed Kamara',
+              'accountNumber': '012345678901',
+              'bbanNumber': 'SL0010001000123456789',
+              'branchName': 'Freetown Main',
+              'mobileMoneyOption': null,
+              'mobileNumber': null,
+              'agentNumber': null,
             },
             'registeredDevices': [
               {

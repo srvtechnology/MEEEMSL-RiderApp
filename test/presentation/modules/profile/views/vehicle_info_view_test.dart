@@ -154,7 +154,7 @@ void main() {
     when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(tRider));
     when(() => mockGetDocumentsUseCase()).thenAnswer((_) async => const Right(<DocumentEntity>[]));
     when(() => mockGetOperatingZonesUseCase()).thenAnswer((_) async => const Right(<OperatingZoneEntity>[]));
-    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(PayoutInfoEntity(methodType: PayoutMethodType.bank)));
+    when(() => mockGetPayoutInfoUseCase()).thenAnswer((_) async => const Right(PayoutInfoEntity(paymentOption: PaymentOption.bank)));
     when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(RiderSettingsEntity()));
 
     controller = ProfileController(

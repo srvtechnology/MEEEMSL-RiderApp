@@ -1,5 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:dartz/dartz.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:meeem_rider/domain/entities/payout_info_entity.dart';
 import 'package:meeem_rider/domain/entities/user_entity.dart';
 import 'package:meeem_rider/domain/entities/rider_entity.dart';
 import 'package:meeem_rider/domain/usecases/auth/login_usecase.dart';
@@ -14,6 +17,7 @@ import 'package:meeem_rider/domain/usecases/auth/self_register_usecase.dart';
 import 'package:meeem_rider/domain/usecases/auth/verify_registration_otp_usecase.dart';
 import 'package:meeem_rider/domain/usecases/auth/resend_registration_otp_usecase.dart';
 import 'package:meeem_rider/domain/usecases/auth/reset_password_usecase.dart';
+import 'package:get/get.dart';
 import 'package:meeem_rider/core/services/device_info_service.dart';
 import 'package:meeem_rider/presentation/modules/auth/controllers/auth_controller.dart';
 
@@ -37,6 +41,7 @@ void main() {
   late AuthController controller;
 
   setUp(() {
+    Get.testMode = true;
     controller = AuthController(
       loginUseCase: MockLoginUseCase(),
       loginWithPasswordUseCase: MockLoginWithPasswordUseCase(),
@@ -179,5 +184,98 @@ void main() {
     expect(controller.selectedLocations, isEmpty);
     expect(controller.bankNameController.text, isEmpty);
     expect(controller.accountNumberController.text, isEmpty);
+  });
+
+  testWidgets('submitFullOnboarding passes flat payout fields according to selected PaymentOption', (tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: '/',
+        getPages: [
+          GetPage(name: '/', page: () => const Scaffold()),
+          GetPage(name: '/main', page: () => const Scaffold()),
+          GetPage(name: '/pending-approval', page: () => const Scaffold()),
+        ],
+      ),
+    );
+    const testRider = RiderEntity(
+      id: 'cm7rider0001',
+      name: 'Samuel Taylor',
+      phone: '76145892',
+      email: 'hadane3655@fanzher.com',
+      avatar: '',
+      rating: 5.0,
+      totalTrips: 0,
+      isOnline: false,
+      walletBalance: 0.0,
+      approvalStatus: 'APPROVED',
+      isApproved: true,
+      status: 'APPROVED',
+      onboardingCompleted: true,
+      isFirstLogin: false,
+      vehicleTypes: ['2_WHEELER'],
+      selectedZones: ['ZONE 1'],
+      selectedLocations: ['NO 2 RIVER'],
+    );
+
+    when(() => controller.submitOnboardingUseCase(
+      name: any(named: 'name'),
+      phone: any(named: 'phone'),
+      phoneCountryCode: any(named: 'phoneCountryCode'),
+      newPassword: any(named: 'newPassword'),
+      vehicleType: any(named: 'vehicleType'),
+      vehicleTypes: any(named: 'vehicleTypes'),
+      vehicleName: any(named: 'vehicleName'),
+      vehicleNumber: any(named: 'vehicleNumber'),
+      drivingLicenseNo: any(named: 'drivingLicenseNo'),
+      selectedZones: any(named: 'selectedZones'),
+      selectedLocations: any(named: 'selectedLocations'),
+      address: any(named: 'address'),
+      emergencyContact: any(named: 'emergencyContact'),
+      payoutInfo: any(named: 'payoutInfo'),
+      profileImagePath: any(named: 'profileImagePath'),
+      drivingLicenseDocPath: any(named: 'drivingLicenseDocPath'),
+      nationalIdDocPath: any(named: 'nationalIdDocPath'),
+      vehicleInsuranceDocPath: any(named: 'vehicleInsuranceDocPath'),
+    )).thenAnswer((_) async => const Right(testRider));
+
+    controller.fullNameController.text = 'Samuel Taylor';
+    controller.onboardingPhoneController.text = '+23276145892';
+    controller.vehicleType.value = '2_WHEELER';
+    controller.selectedPaymentOption.value = PaymentOption.orangeMoney;
+    controller.mobileNumberController.text = '+23276123456';
+    controller.agentNumberController.text = 'AG-9081';
+
+    await controller.submitFullOnboarding();
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
+
+    final captured = verify(() => controller.submitOnboardingUseCase(
+      name: any(named: 'name'),
+      phone: any(named: 'phone'),
+      phoneCountryCode: any(named: 'phoneCountryCode'),
+      newPassword: any(named: 'newPassword'),
+      vehicleType: any(named: 'vehicleType'),
+      vehicleTypes: any(named: 'vehicleTypes'),
+      vehicleName: any(named: 'vehicleName'),
+      vehicleNumber: any(named: 'vehicleNumber'),
+      drivingLicenseNo: any(named: 'drivingLicenseNo'),
+      selectedZones: any(named: 'selectedZones'),
+      selectedLocations: any(named: 'selectedLocations'),
+      address: any(named: 'address'),
+      emergencyContact: any(named: 'emergencyContact'),
+      payoutInfo: captureAny(named: 'payoutInfo'),
+      profileImagePath: any(named: 'profileImagePath'),
+      drivingLicenseDocPath: any(named: 'drivingLicenseDocPath'),
+      nationalIdDocPath: any(named: 'nationalIdDocPath'),
+      vehicleInsuranceDocPath: any(named: 'vehicleInsuranceDocPath'),
+    )).captured;
+
+    expect(captured.length, 1);
+    final payout = captured.first as Map<String, dynamic>;
+    expect(payout['paymentOption'], 'Orange Money');
+    expect(payout['preferredPayoutMethod'], 'Mobile Wallet');
+    expect(payout['mobileMoneyOption'], 'Orange Money');
+    expect(payout['mobileNumber'], '+23276123456');
+    expect(payout['agentNumber'], 'AG-9081');
   });
 }

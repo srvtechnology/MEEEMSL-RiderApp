@@ -19,25 +19,19 @@ class PayoutInfoView extends StatefulWidget {
 class _PayoutInfoViewState extends State<PayoutInfoView> {
   final ProfileController controller = Get.find<ProfileController>();
 
-  late PayoutMethodType currentMethod;
+  late PaymentOption currentOption;
   final bankNameCtrl = TextEditingController();
-  final accountNumCtrl = TextEditingController();
+  final branchNameCtrl = TextEditingController();
   final holderNameCtrl = TextEditingController();
-  final routingCtrl = TextEditingController();
+  final accountNumCtrl = TextEditingController();
+  final bbanCtrl = TextEditingController();
+  final bankAddressCtrl = TextEditingController();
 
-  final mmProviderCtrl = TextEditingController();
-  final mmNumberCtrl = TextEditingController();
-  final mmBeneficiaryCtrl = TextEditingController();
+  final mobileNumCtrl = TextEditingController();
+  final agentNumCtrl = TextEditingController();
 
   StreamSubscription? _payoutSubscription;
   StreamSubscription? _riderSubscription;
-
-  static const List<String> popularMMProviders = [
-    'Orange Money',
-    'Afrimoney',
-    'QMoney',
-    'MTN MoMo',
-  ];
 
   @override
   void initState() {
@@ -63,24 +57,21 @@ class _PayoutInfoViewState extends State<PayoutInfoView> {
     final riderPhone = rider?.phone ?? '';
 
     setState(() {
-      currentMethod = info?.methodType ?? PayoutMethodType.bank;
+      currentOption = info?.paymentOption ?? PaymentOption.bank;
 
       bankNameCtrl.text = info?.bankName ?? 'Sierra Leone Commercial Bank';
-      accountNumCtrl.text = info?.accountNumber ?? '•••• 8829';
+      branchNameCtrl.text = info?.branchName ?? '';
       holderNameCtrl.text = (info?.accountHolderName?.isNotEmpty == true)
           ? info!.accountHolderName!
           : (riderName.isNotEmpty ? riderName : 'Ibrahim Koroma');
-      routingCtrl.text = info?.routingNumber ?? '021000021';
+      accountNumCtrl.text = info?.accountNumber ?? '•••• 8829';
+      bbanCtrl.text = info?.bbanNumber ?? '';
+      bankAddressCtrl.text = info?.bankAddress ?? '';
 
-      mmProviderCtrl.text = (info?.mobileMoneyProvider?.isNotEmpty == true)
-          ? info!.mobileMoneyProvider!
-          : 'Orange Money';
-      mmNumberCtrl.text = (info?.mobileMoneyNumber?.isNotEmpty == true)
-          ? info!.mobileMoneyNumber!
+      mobileNumCtrl.text = (info?.mobileNumber?.isNotEmpty == true)
+          ? info!.mobileNumber!
           : (riderPhone.isNotEmpty ? riderPhone : '76123456');
-      mmBeneficiaryCtrl.text = (info?.beneficiaryName?.isNotEmpty == true)
-          ? info!.beneficiaryName!
-          : (riderName.isNotEmpty ? riderName : 'Ibrahim Koroma');
+      agentNumCtrl.text = info?.agentNumber ?? '';
     });
   }
 
@@ -89,17 +80,18 @@ class _PayoutInfoViewState extends State<PayoutInfoView> {
     _payoutSubscription?.cancel();
     _riderSubscription?.cancel();
     bankNameCtrl.dispose();
-    accountNumCtrl.dispose();
+    branchNameCtrl.dispose();
     holderNameCtrl.dispose();
-    routingCtrl.dispose();
-    mmProviderCtrl.dispose();
-    mmNumberCtrl.dispose();
-    mmBeneficiaryCtrl.dispose();
+    accountNumCtrl.dispose();
+    bbanCtrl.dispose();
+    bankAddressCtrl.dispose();
+    mobileNumCtrl.dispose();
+    agentNumCtrl.dispose();
     super.dispose();
   }
 
   void _onSave() {
-    if (currentMethod == PayoutMethodType.bank) {
+    if (currentOption == PaymentOption.bank) {
       final bank = bankNameCtrl.text.trim();
       final accNum = accountNumCtrl.text.trim();
       final holder = holderNameCtrl.text.trim();
@@ -119,40 +111,68 @@ class _PayoutInfoViewState extends State<PayoutInfoView> {
             snackPosition: SnackPosition.BOTTOM);
         return;
       }
-    } else {
-      final provider = mmProviderCtrl.text.trim();
-      final phone = mmNumberCtrl.text.trim();
-      final beneficiary = mmBeneficiaryCtrl.text.trim();
 
-      if (provider.isEmpty) {
-        Get.snackbar('Validation', 'Please select or enter your Mobile Money provider',
-            snackPosition: SnackPosition.BOTTOM);
-        return;
-      }
+      final info = PayoutInfoEntity(
+        paymentOption: PaymentOption.bank,
+        preferredPayoutMethod: 'Bank Transfer',
+        bankName: bank,
+        branchName: branchNameCtrl.text.trim().isNotEmpty ? branchNameCtrl.text.trim() : null,
+        accountHolderName: holder,
+        accountNumber: accNum,
+        bbanNumber: bbanCtrl.text.trim().isNotEmpty ? bbanCtrl.text.trim() : null,
+        bankAddress: bankAddressCtrl.text.trim().isNotEmpty ? bankAddressCtrl.text.trim() : null,
+      );
+      controller.savePayoutInfo(info);
+    } else {
+      final phone = mobileNumCtrl.text.trim();
       if (phone.isEmpty) {
         Get.snackbar('Validation', 'Please enter your Mobile Money phone number',
             snackPosition: SnackPosition.BOTTOM);
         return;
       }
-      if (beneficiary.isEmpty) {
-        Get.snackbar('Validation', 'Please enter the registered beneficiary name',
-            snackPosition: SnackPosition.BOTTOM);
-        return;
-      }
+
+      final opt = currentOption.apiValue;
+      final info = PayoutInfoEntity(
+        paymentOption: currentOption,
+        preferredPayoutMethod: 'Mobile Wallet',
+        mobileMoneyOption: opt,
+        mobileNumber: phone,
+        agentNumber: agentNumCtrl.text.trim().isNotEmpty ? agentNumCtrl.text.trim() : null,
+      );
+      controller.savePayoutInfo(info);
     }
+  }
 
-    final info = PayoutInfoEntity(
-      methodType: currentMethod,
-      bankName: bankNameCtrl.text.trim(),
-      accountNumber: accountNumCtrl.text.trim(),
-      accountHolderName: holderNameCtrl.text.trim(),
-      routingNumber: routingCtrl.text.trim(),
-      mobileMoneyProvider: mmProviderCtrl.text.trim(),
-      mobileMoneyNumber: mmNumberCtrl.text.trim(),
-      beneficiaryName: mmBeneficiaryCtrl.text.trim(),
+  Widget _buildOptionTab({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Center(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : AppColors.textPrimaryLight,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
-
-    controller.savePayoutInfo(info);
   }
 
   @override
@@ -188,7 +208,7 @@ class _PayoutInfoViewState extends State<PayoutInfoView> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Method Selector Toggle
+                      // 3-Option Method Selector Toggle
                       Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
@@ -198,57 +218,20 @@ class _PayoutInfoViewState extends State<PayoutInfoView> {
                         ),
                         child: Row(
                           children: [
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => currentMethod = PayoutMethodType.bank),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: currentMethod == PayoutMethodType.bank
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      AppStrings.bankAccount,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: currentMethod == PayoutMethodType.bank
-                                            ? Colors.white
-                                            : AppColors.textPrimaryLight,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            _buildOptionTab(
+                              title: AppStrings.bank,
+                              isSelected: currentOption == PaymentOption.bank,
+                              onTap: () => setState(() => currentOption = PaymentOption.bank),
                             ),
-                            Expanded(
-                              child: GestureDetector(
-                                onTap: () => setState(() => currentMethod = PayoutMethodType.mobileMoney),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: currentMethod == PayoutMethodType.mobileMoney
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      AppStrings.mobileMoney,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: currentMethod == PayoutMethodType.mobileMoney
-                                            ? Colors.white
-                                            : AppColors.textPrimaryLight,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            _buildOptionTab(
+                              title: AppStrings.orangeMoney,
+                              isSelected: currentOption == PaymentOption.orangeMoney,
+                              onTap: () => setState(() => currentOption = PaymentOption.orangeMoney),
+                            ),
+                            _buildOptionTab(
+                              title: AppStrings.afriMoney,
+                              isSelected: currentOption == PaymentOption.afriMoney,
+                              onTap: () => setState(() => currentOption = PaymentOption.afriMoney),
                             ),
                           ],
                         ),
@@ -256,79 +239,128 @@ class _PayoutInfoViewState extends State<PayoutInfoView> {
                       const SizedBox(height: 24),
 
                       // Form Fields
-                      if (currentMethod == PayoutMethodType.bank) ...[
+                      if (currentOption == PaymentOption.bank) ...[
                         CustomTextField(
                           controller: bankNameCtrl,
-                          label: AppStrings.bankName,
+                          label: '${AppStrings.bankName} *',
                           hintText: 'Sierra Leone Commercial Bank',
                           prefixIcon: Icons.account_balance_outlined,
                         ),
                         const SizedBox(height: 16),
                         CustomTextField(
-                          controller: accountNumCtrl,
-                          label: AppStrings.accountNumber,
-                          hintText: '•••• 8829',
-                          keyboardType: TextInputType.number,
-                          prefixIcon: Icons.tag,
+                          controller: branchNameCtrl,
+                          label: AppStrings.branchName,
+                          hintText: 'Head Office / Siaka Stevens',
+                          prefixIcon: Icons.location_city_outlined,
                         ),
                         const SizedBox(height: 16),
                         CustomTextField(
                           controller: holderNameCtrl,
-                          label: AppStrings.accountHolder,
+                          label: '${AppStrings.accountHolder} *',
                           hintText: 'Ibrahim Koroma',
                           prefixIcon: Icons.person_outline,
                         ),
                         const SizedBox(height: 16),
                         CustomTextField(
-                          controller: routingCtrl,
-                          label: 'Routing / Sort Code / IBAN',
-                          hintText: '021000021',
+                          controller: accountNumCtrl,
+                          label: '${AppStrings.accountNumber} *',
+                          hintText: '•••• 8829',
+                          keyboardType: TextInputType.number,
+                          prefixIcon: Icons.numbers_outlined,
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: bbanCtrl,
+                          label: '${AppStrings.bbanNumber} (Optional)',
+                          hintText: 'SL0010001000123456789',
                           prefixIcon: Icons.tag,
                         ),
-                      ] else ...[
+                        const SizedBox(height: 16),
                         CustomTextField(
-                          controller: mmProviderCtrl,
-                          label: AppStrings.mobileMoneyProvider,
-                          hintText: 'Orange Money',
+                          controller: bankAddressCtrl,
+                          label: '${AppStrings.bankAddress} (Optional)',
+                          hintText: '15 Siaka Stevens St, Freetown',
+                          prefixIcon: Icons.place_outlined,
+                        ),
+                      ] else if (currentOption == PaymentOption.orangeMoney) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF7ED),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFED7AA)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 18, color: Color(0xFFC2410C)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  AppStrings.mobileWalletOrangeNotice,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFFC2410C),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: mobileNumCtrl,
+                          label: '${AppStrings.mobileNumber} *',
+                          hintText: '+232 76 123456',
+                          keyboardType: TextInputType.phone,
                           prefixIcon: Icons.phone_android_outlined,
                         ),
-                        const SizedBox(height: 8),
-                        // Quick Provider Selector Chips
-                        Wrap(
-                          spacing: 8,
-                          children: popularMMProviders.map((prov) {
-                            final isSelected = mmProviderCtrl.text == prov;
-                            return ChoiceChip(
-                              label: Text(prov),
-                              selected: isSelected,
-                              selectedColor: AppColors.primaryContainer.withAlpha(50),
-                              labelStyle: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                                color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
+                        const SizedBox(height: 16),
+                        CustomTextField(
+                          controller: agentNumCtrl,
+                          label: AppStrings.agentNumber,
+                          hintText: 'AG-9081',
+                          prefixIcon: Icons.badge_outlined,
+                        ),
+                      ] else ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF0FDF4),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline, size: 18, color: Color(0xFF15803D)),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  AppStrings.mobileWalletAfriNotice,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF15803D),
+                                  ),
+                                ),
                               ),
-                              onSelected: (_) {
-                                setState(() {
-                                  mmProviderCtrl.text = prov;
-                                });
-                              },
-                            );
-                          }).toList(),
+                            ],
+                          ),
                         ),
                         const SizedBox(height: 16),
                         CustomTextField(
-                          controller: mmNumberCtrl,
-                          label: AppStrings.mobileMoneyNumber,
-                          hintText: '76123456',
+                          controller: mobileNumCtrl,
+                          label: '${AppStrings.mobileNumber} *',
+                          hintText: '+232 77 123456',
                           keyboardType: TextInputType.phone,
-                          prefixIcon: Icons.phone_outlined,
+                          prefixIcon: Icons.phone_android_outlined,
                         ),
                         const SizedBox(height: 16),
                         CustomTextField(
-                          controller: mmBeneficiaryCtrl,
-                          label: AppStrings.beneficiaryName,
-                          hintText: 'Ibrahim Koroma',
-                          prefixIcon: Icons.person_outline,
+                          controller: agentNumCtrl,
+                          label: AppStrings.agentNumber,
+                          hintText: 'AG-9081',
+                          prefixIcon: Icons.badge_outlined,
                         ),
                       ],
                     ],

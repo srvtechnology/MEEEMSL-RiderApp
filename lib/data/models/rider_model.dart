@@ -157,7 +157,21 @@ class RiderModel extends RiderEntity {
           ? PayoutInfoModel.fromJson(rider['payoutInfo'] as Map<String, dynamic>)
           : json['payoutInfo'] != null
               ? PayoutInfoModel.fromJson(json['payoutInfo'] as Map<String, dynamic>)
-              : null,
+              : (rider['paymentOption'] != null ||
+                      rider['bankName'] != null ||
+                      rider['mobileMoneyOption'] != null ||
+                      rider['accountNumber'] != null ||
+                      rider['mobileNumber'] != null ||
+                      rider['preferredPayoutMethod'] != null)
+                  ? PayoutInfoModel.fromJson(rider)
+                  : (json['paymentOption'] != null ||
+                          json['bankName'] != null ||
+                          json['mobileMoneyOption'] != null ||
+                          json['accountNumber'] != null ||
+                          json['mobileNumber'] != null ||
+                          json['preferredPayoutMethod'] != null)
+                      ? PayoutInfoModel.fromJson(json)
+                      : null,
       operatingZones: ((rider['operatingZones'] ?? json['operatingZones']) as List<dynamic>?)
               ?.map((e) => e.toString())
               .toList() ??
@@ -198,6 +212,7 @@ class RiderModel extends RiderEntity {
       'payoutInfo': payoutInfo != null
           ? PayoutInfoModel.fromEntity(payoutInfo!).toJson()
           : null,
+      if (payoutInfo != null) ...PayoutInfoModel.fromEntity(payoutInfo!).toPayload(),
       'operatingZones': operatingZones,
     };
   }

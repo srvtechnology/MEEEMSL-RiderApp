@@ -62,11 +62,12 @@ void main() {
   late MockUpdateSettingsUseCase mockUpdateSettingsUseCase;
 
   const tPayoutInfo = PayoutInfoEntity(
-    methodType: PayoutMethodType.bank,
+    paymentOption: PaymentOption.bank,
+    preferredPayoutMethod: 'Bank Transfer',
     bankName: 'Sierra Leone Commercial Bank',
     accountNumber: '•••• 8829',
     accountHolderName: 'Ibrahim Koroma',
-    routingNumber: '021000021',
+    bbanNumber: '021000021',
   );
 
   const tRider = RiderEntity(
@@ -198,7 +199,7 @@ void main() {
     expect(find.byWidgetPredicate((w) => w is TextField && w.controller?.text == '021000021'), findsOneWidget);
   });
 
-  testWidgets('PayoutInfoView switches between Bank Account and Mobile Money tabs', (tester) async {
+  testWidgets('PayoutInfoView switches between Bank, Orange Money, and AfriMoney options', (tester) async {
     await tester.pumpWidget(
       const GetMaterialApp(
         home: PayoutInfoView(),
@@ -206,32 +207,43 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    // Tap Mobile Money tab
-    await tester.tap(find.text('Mobile Money'));
+    // Verify initially Bank fields are shown
+    expect(find.text('${AppStrings.bankName} *'), findsOneWidget);
+
+    // Tap Orange Money tab
+    await tester.tap(find.text(AppStrings.orangeMoney));
     await tester.pumpAndSettle();
 
-    // Verify Mobile Money fields and quick chips are shown
-    expect(find.text('Mobile Money Provider'), findsOneWidget);
-    expect(find.text('Orange Money'), findsWidgets);
-    expect(find.text('Afrimoney'), findsOneWidget);
-    expect(find.text(AppStrings.mobileMoneyNumber), findsOneWidget);
-    expect(find.text('Beneficiary Name'), findsOneWidget);
+    // Verify Orange Money banner and fields are shown
+    expect(find.text(AppStrings.mobileWalletOrangeNotice), findsOneWidget);
+    expect(find.text('${AppStrings.mobileNumber} *'), findsOneWidget);
+    expect(find.text(AppStrings.agentNumber), findsOneWidget);
 
-    // Tap Afrimoney chip
-    await tester.tap(find.text('Afrimoney'));
+    // Tap AfriMoney tab
+    await tester.tap(find.text(AppStrings.afriMoney));
     await tester.pumpAndSettle();
 
-    // Provider field now contains Afrimoney
-    expect(find.text('Afrimoney'), findsWidgets);
+    // Verify AfriMoney banner is shown
+    expect(find.text(AppStrings.mobileWalletAfriNotice), findsOneWidget);
+    expect(find.text('${AppStrings.mobileNumber} *'), findsOneWidget);
+
+    // Tap Bank tab
+    await tester.tap(find.text(AppStrings.bank));
+    await tester.pumpAndSettle();
+
+    // Verify Bank fields are shown again
+    expect(find.text('${AppStrings.bankName} *'), findsOneWidget);
+    expect(find.text('${AppStrings.accountNumber} *'), findsOneWidget);
   });
 
   testWidgets('PayoutInfoView saves updated payout details successfully', (tester) async {
     const updatedInfo = PayoutInfoEntity(
-      methodType: PayoutMethodType.bank,
+      paymentOption: PaymentOption.bank,
+      preferredPayoutMethod: 'Bank Transfer',
       bankName: 'Rokel Commercial Bank',
       accountNumber: 'SL-77889900',
       accountHolderName: 'Ibrahim Koroma',
-      routingNumber: '021000021',
+      bbanNumber: '021000021',
     );
 
     when(() => mockUpdatePayoutInfoUseCase(any()))

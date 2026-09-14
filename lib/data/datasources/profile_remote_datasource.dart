@@ -241,11 +241,12 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       return PayoutInfoModel.fromJson(stored);
     }
     return const PayoutInfoModel(
-      methodType: PayoutMethodType.bank,
+      paymentOption: PaymentOption.bank,
+      preferredPayoutMethod: 'Bank Transfer',
       bankName: 'Sierra Leone Commercial Bank',
       accountNumber: '•••• 8829',
       accountHolderName: 'Ibrahim Koroma',
-      routingNumber: '021000021',
+      bbanNumber: '021000021',
     );
   }
 
@@ -257,6 +258,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       await _dioClient.dio.patch(
         ApiEndpoints.riderProfile,
         data: {
+          ...payoutInfo.toPayload(),
           'payoutInfo': payoutInfo.toJson(),
         },
       );

@@ -1125,10 +1125,10 @@ class OnboardingView extends GetView<AuthController> {
         ),
         const SizedBox(height: 20),
 
-        Text('Payout Method', style: AppTextStyles.titleMedium()),
+        Text(AppStrings.payoutMethod, style: AppTextStyles.titleMedium()),
         const SizedBox(height: 8),
 
-        // Payout Method Selector
+        // Payout Method Selector (Bank / Orange Money / AfriMoney)
         Obx(() => Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -1138,57 +1138,20 @@ class OnboardingView extends GetView<AuthController> {
               ),
               child: Row(
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => controller.payoutMethodType.value = PayoutMethodType.bank,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: controller.payoutMethodType.value == PayoutMethodType.bank
-                              ? AppColors.primary
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            AppStrings.bankAccount,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: controller.payoutMethodType.value == PayoutMethodType.bank
-                                  ? Colors.white
-                                  : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  _buildPayoutOptionTab(
+                    title: AppStrings.bank,
+                    isSelected: controller.selectedPaymentOption.value == PaymentOption.bank,
+                    onTap: () => controller.selectedPaymentOption.value = PaymentOption.bank,
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => controller.payoutMethodType.value = PayoutMethodType.mobileMoney,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        decoration: BoxDecoration(
-                          color: controller.payoutMethodType.value == PayoutMethodType.mobileMoney
-                              ? AppColors.primary
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            AppStrings.mobileMoney,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: controller.payoutMethodType.value == PayoutMethodType.mobileMoney
-                                  ? Colors.white
-                                  : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  _buildPayoutOptionTab(
+                    title: AppStrings.orangeMoney,
+                    isSelected: controller.selectedPaymentOption.value == PaymentOption.orangeMoney,
+                    onTap: () => controller.selectedPaymentOption.value = PaymentOption.orangeMoney,
+                  ),
+                  _buildPayoutOptionTab(
+                    title: AppStrings.afriMoney,
+                    isSelected: controller.selectedPaymentOption.value == PaymentOption.afriMoney,
+                    onTap: () => controller.selectedPaymentOption.value = PaymentOption.afriMoney,
                   ),
                 ],
               ),
@@ -1196,68 +1159,179 @@ class OnboardingView extends GetView<AuthController> {
         const SizedBox(height: 24),
 
         Obx(() {
-          if (controller.payoutMethodType.value == PayoutMethodType.bank) {
+          final selectedOption = controller.selectedPaymentOption.value;
+          if (selectedOption == PaymentOption.bank) {
             return Column(
               children: [
                 CustomTextField(
                   controller: controller.bankNameController,
-                  label: AppStrings.bankName,
-                  hintText: 'e.g. Chase Bank, Wells Fargo, Barclays',
+                  label: '${AppStrings.bankName} *',
+                  hintText: 'e.g. Sierra Leone Commercial Bank, Rokel',
                   prefixIcon: Icons.account_balance_outlined,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
+                  controller: controller.branchNameController,
+                  label: AppStrings.branchName,
+                  hintText: 'e.g. Head Office / Siaka Stevens',
+                  prefixIcon: Icons.location_city_outlined,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: controller.accountHolderController,
+                  label: '${AppStrings.accountHolder} *',
+                  hintText: 'e.g. Mohamed Kamara',
+                  prefixIcon: Icons.person_outline,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
                   controller: controller.accountNumberController,
-                  label: AppStrings.accountNumber,
-                  hintText: 'e.g. 9920184920',
+                  label: '${AppStrings.accountNumber} *',
+                  hintText: 'e.g. 003001002345678',
                   keyboardType: TextInputType.number,
                   prefixIcon: Icons.numbers_outlined,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
-                  controller: controller.accountHolderController,
-                  label: AppStrings.accountHolder,
-                  hintText: 'e.g. Alex Johnson',
-                  prefixIcon: Icons.person_outline,
+                  controller: controller.bbanNumberController,
+                  label: '${AppStrings.bbanNumber} (Optional)',
+                  hintText: 'e.g. SL0010001000123456789',
+                  prefixIcon: Icons.tag,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
-                  controller: controller.routingNumberController,
-                  label: 'Routing Number / IBAN',
-                  hintText: 'e.g. 021000021',
-                  prefixIcon: Icons.tag,
+                  controller: controller.bankAddressController,
+                  label: '${AppStrings.bankAddress} (Optional)',
+                  hintText: 'e.g. 15 Siaka Stevens St, Freetown',
+                  prefixIcon: Icons.place_outlined,
+                ),
+              ],
+            );
+          } else if (selectedOption == PaymentOption.orangeMoney) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 18, color: Color(0xFFC2410C)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          AppStrings.mobileWalletOrangeNotice,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFC2410C),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: controller.mobileNumberController,
+                  label: '${AppStrings.mobileNumber} *',
+                  hintText: 'e.g. +232 76 123456',
+                  keyboardType: TextInputType.phone,
+                  prefixIcon: Icons.phone_android_outlined,
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  controller: controller.agentNumberController,
+                  label: AppStrings.agentNumber,
+                  hintText: 'e.g. AG-9081',
+                  prefixIcon: Icons.badge_outlined,
                 ),
               ],
             );
           } else {
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFBBF7D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 18, color: Color(0xFF15803D)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          AppStrings.mobileWalletAfriNotice,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF15803D),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
                 CustomTextField(
-                  controller: controller.mobileMoneyProviderController,
-                  label: AppStrings.mobileMoneyProvider,
-                  hintText: 'e.g. M-Pesa, MTN MoMo, Airtel, GCash',
+                  controller: controller.mobileNumberController,
+                  label: '${AppStrings.mobileNumber} *',
+                  hintText: 'e.g. +232 77 123456',
+                  keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_android_outlined,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
-                  controller: controller.mobileMoneyNumberController,
-                  label: AppStrings.mobileMoneyNumber,
-                  hintText: 'e.g. +232 76 123456',
-                  keyboardType: TextInputType.phone,
-                  prefixIcon: Icons.phone_outlined,
-                ),
-                const SizedBox(height: 16),
-                CustomTextField(
-                  controller: controller.beneficiaryNameController,
-                  label: AppStrings.beneficiaryName,
-                  hintText: 'e.g. Alex Johnson',
-                  prefixIcon: Icons.person_outline,
+                  controller: controller.agentNumberController,
+                  label: AppStrings.agentNumber,
+                  hintText: 'e.g. AG-9081',
+                  prefixIcon: Icons.badge_outlined,
                 ),
               ],
             );
           }
         }),
       ],
+    );
+  }
+
+  Widget _buildPayoutOptionTab({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Center(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : AppColors.textPrimaryLight,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

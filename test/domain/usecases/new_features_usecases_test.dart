@@ -106,7 +106,7 @@ void main() {
 
   group('Payout Info & Vehicle UseCases', () {
     const tPayout = PayoutInfoEntity(
-      methodType: PayoutMethodType.bank,
+      paymentOption: PaymentOption.bank,
       bankName: 'Chase Bank USA',
       accountNumber: '9920184920',
       accountHolderName: 'Alex Johnson',

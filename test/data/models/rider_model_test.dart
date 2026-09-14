@@ -117,5 +117,26 @@ void main() {
       expect(rider.vehicleName, "Honda Cbz");
       expect(rider.vehicleNumber, "SL-5373828");
     });
+
+    test('correctly parses flat payout fields directly from rider JSON and serializes them', () {
+      final json = {
+        "id": "cm7rider0001",
+        "paymentOption": "Orange Money",
+        "preferredPayoutMethod": "Mobile Wallet",
+        "mobileMoneyOption": "Orange Money",
+        "mobileNumber": "+23276123456",
+        "agentNumber": "AG-9081",
+      };
+
+      final rider = RiderModel.fromJson(json);
+      expect(rider.payoutInfo, isNotNull);
+      expect(rider.payoutInfo!.paymentOption.apiValue, "Orange Money");
+      expect(rider.payoutInfo!.mobileNumber, "+23276123456");
+      expect(rider.payoutInfo!.agentNumber, "AG-9081");
+
+      final serialized = rider.toJson();
+      expect(serialized['paymentOption'], 'Orange Money');
+      expect(serialized['mobileNumber'], '+23276123456');
+    });
   });
 }

@@ -136,15 +136,24 @@ class AuthController extends GetxController {
   final selectedZones = <String>[].obs;
   final selectedLocations = <String>[].obs;
 
-  // Step 5: Payout Info
-  final payoutMethodType = PayoutMethodType.bank.obs;
-  final bankNameController = TextEditingController();
-  final accountNumberController = TextEditingController();
-  final accountHolderController = TextEditingController();
-  final routingNumberController = TextEditingController();
+  // Step 5: Payout Info (API Doc Part 2)
+  final selectedPaymentOption = PaymentOption.bank.obs;
+  Rx<PaymentOption> get payoutMethodType => selectedPaymentOption;
 
+  // Bank fields
+  final bankNameController = TextEditingController();
+  final branchNameController = TextEditingController();
+  final accountHolderController = TextEditingController();
+  final accountNumberController = TextEditingController();
+  final bbanNumberController = TextEditingController();
+  final bankAddressController = TextEditingController();
+  TextEditingController get routingNumberController => bbanNumberController;
+
+  // Mobile money fields (Orange Money / AfriMoney)
+  final mobileNumberController = TextEditingController();
+  final agentNumberController = TextEditingController();
   final mobileMoneyProviderController = TextEditingController();
-  final mobileMoneyNumberController = TextEditingController();
+  TextEditingController get mobileMoneyNumberController => mobileNumberController;
   final beneficiaryNameController = TextEditingController();
 
   final _imagePicker = ImagePicker();
@@ -902,26 +911,48 @@ class AuthController extends GetxController {
 
     final hasBankDetails = bankNameController.text.trim().isNotEmpty ||
         accountNumberController.text.trim().isNotEmpty;
-    final hasMobileMoneyDetails = mobileMoneyProviderController.text.trim().isNotEmpty ||
-        mobileMoneyNumberController.text.trim().isNotEmpty;
+    final mobilePhone = mobileNumberController.text.trim().isNotEmpty
+        ? mobileNumberController.text.trim()
+        : mobileMoneyNumberController.text.trim();
+    final hasMobileMoneyDetails = mobilePhone.isNotEmpty;
 
-    final Map<String, dynamic>? payoutData = payoutMethodType.value == PayoutMethodType.bank
+    final selectedOpt = selectedPaymentOption.value;
+    final Map<String, dynamic>? payoutData = selectedOpt == PaymentOption.bank
         ? (hasBankDetails
             ? {
-                'methodType': 'bank',
+                'paymentOption': 'Bank',
+                'preferredPayoutMethod': 'Bank Transfer',
                 'bankName': bankNameController.text.trim(),
+                'bankAddress': bankAddressController.text.trim(),
+                'accountHolderName': accountHolderController.text.trim().isNotEmpty
+                    ? accountHolderController.text.trim()
+                    : fullNameController.text.trim(),
                 'accountNumber': accountNumberController.text.trim(),
+                'bbanNumber': bbanNumberController.text.trim().isNotEmpty
+                    ? bbanNumberController.text.trim()
+                    : routingNumberController.text.trim(),
+                'branchName': branchNameController.text.trim(),
+                // Backward compatibility keys
+                'methodType': 'bank',
                 'accountHolder': accountHolderController.text.trim().isNotEmpty
                     ? accountHolderController.text.trim()
                     : fullNameController.text.trim(),
-                'routingNumber': routingNumberController.text.trim(),
+                'routingNumber': bbanNumberController.text.trim().isNotEmpty
+                    ? bbanNumberController.text.trim()
+                    : routingNumberController.text.trim(),
               }
             : null)
         : (hasMobileMoneyDetails
             ? {
+                'paymentOption': selectedOpt.apiValue,
+                'preferredPayoutMethod': 'Mobile Wallet',
+                'mobileMoneyOption': selectedOpt.apiValue,
+                'mobileNumber': mobilePhone,
+                'agentNumber': agentNumberController.text.trim(),
+                // Backward compatibility keys
                 'methodType': 'mobile_money',
-                'provider': mobileMoneyProviderController.text.trim(),
-                'phone': mobileMoneyNumberController.text.trim(),
+                'provider': selectedOpt.apiValue,
+                'phone': mobilePhone,
                 'accountHolder': beneficiaryNameController.text.trim().isNotEmpty
                     ? beneficiaryNameController.text.trim()
                     : fullNameController.text.trim(),

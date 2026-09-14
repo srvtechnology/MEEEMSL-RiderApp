@@ -353,6 +353,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         formDataMap['emergencyContact'] = jsonEncode(emergencyContact);
       }
       if (payoutInfo != null && payoutInfo.isNotEmpty) {
+        // Flat payout fields conforming to API Doc Part 2
+        payoutInfo.forEach((key, value) {
+          if (value != null) {
+            formDataMap[key] = value.toString();
+          }
+        });
         formDataMap['payoutInfo'] = jsonEncode(payoutInfo);
       }
 

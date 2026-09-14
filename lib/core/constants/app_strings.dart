@@ -61,14 +61,27 @@ class AppStrings {
   static const String operatingZones = 'Preferred Operating Zones';
   static const String selectZonesSubtitle = 'Choose districts you prefer to receive orders from';
   static const String payoutInfo = 'Payout Information';
+  static const String paymentOption = 'Payment Option';
+  static const String payoutMethod = 'Payout Method';
+  static const String choosePayoutOption = 'Choose Payout Option';
+  static const String bank = 'Bank';
   static const String bankAccount = 'Bank Account';
+  static const String orangeMoney = 'Orange Money';
+  static const String afriMoney = 'AfriMoney';
   static const String mobileMoney = 'Mobile Money';
   static const String bankName = 'Bank Name';
+  static const String branchName = 'Branch Name';
   static const String accountNumber = 'Account Number';
   static const String accountHolder = 'Account Holder Name';
+  static const String bbanNumber = 'BBAN Number';
+  static const String bankAddress = 'Bank Address';
+  static const String mobileNumber = 'Mobile Number';
+  static const String agentNumber = 'Agent / Outlet Number (Optional)';
   static const String mobileMoneyProvider = 'Mobile Money Provider';
   static const String mobileMoneyNumber = 'Mobile Money Phone Number';
   static const String beneficiaryName = 'Beneficiary Name';
+  static const String mobileWalletOrangeNotice = 'Preferred method set to Mobile Wallet - Orange';
+  static const String mobileWalletAfriNotice = 'Preferred method set to Mobile Wallet - Afri';
   static const String nextStep = 'Next Step';
   static const String completeOnboarding = 'Submit Application';
 
