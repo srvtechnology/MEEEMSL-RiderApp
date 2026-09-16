@@ -261,7 +261,9 @@ class RiderSettingsView extends GetView<ProfileController> {
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
-          Text(title, style: AppTextStyles.headlineSmall()),
+          Expanded(
+            child: Text(title, style: AppTextStyles.headlineSmall()),
+          ),
         ],
       ),
     );
@@ -296,6 +298,8 @@ class RiderSettingsView extends GetView<ProfileController> {
                     Text(
                       riderName,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 2),
                     Row(
@@ -324,37 +328,62 @@ class RiderSettingsView extends GetView<ProfileController> {
           ),
           const Divider(height: 24),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.phone_outlined, size: 16, color: AppColors.textSecondaryLight),
-                  const SizedBox(width: 6),
-                  Text(phone, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-                ],
-              ),
-              InkWell(
-                onTap: () {
-                  Clipboard.setData(ClipboardData(text: riderId));
-                  Get.snackbar(
-                    'Copied',
-                    'Rider ID copied to clipboard',
-                    snackPosition: SnackPosition.BOTTOM,
-                    duration: const Duration(seconds: 2),
-                  );
-                },
-                borderRadius: BorderRadius.circular(8),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  child: Row(
-                    children: [
-                      Text(
-                        'ID: $riderId',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.45),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.phone_outlined, size: 16, color: AppColors.textSecondaryLight),
+                    const SizedBox(width: 6),
+                    Flexible(
+                      child: Text(
+                        phone,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.copy_rounded, size: 12, color: AppColors.primary),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: InkWell(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: riderId));
+                      Get.snackbar(
+                        'Copied',
+                        'Rider ID copied to clipboard',
+                        snackPosition: SnackPosition.BOTTOM,
+                        duration: const Duration(seconds: 2),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'ID: $riderId',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.primary,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.copy_rounded, size: 12, color: AppColors.primary),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -380,7 +409,9 @@ class RiderSettingsView extends GetView<ProfileController> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Preferred Operating Zones', style: AppTextStyles.bodyMedium().copyWith(fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Text('Preferred Operating Zones', style: AppTextStyles.bodyMedium().copyWith(fontWeight: FontWeight.w700)),
+              ),
               TextButton.icon(
                 onPressed: () => Get.to(() => const OperatingZonesView()),
                 icon: const Icon(Icons.edit_location_alt_outlined, size: 16),

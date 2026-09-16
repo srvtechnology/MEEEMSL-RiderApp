@@ -267,4 +267,31 @@ void main() {
     expect(find.text('Confirm New Password'), findsOneWidget);
     expect(find.widgetWithText(CustomButton, 'Update Password'), findsOneWidget);
   });
+
+  testWidgets('RiderSettingsView renders without overflow on narrow screen with long CUID and phone', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final longRider = tRider.copyWith(
+      id: 'cmtu3d10r000ab484p4ryanb8',
+      name: 'Rider Long Name Person',
+      email: 'sewic42385@94an.com',
+      phone: '732594563',
+    );
+    controller.riderProfile.value = longRider;
+
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: RiderSettingsView(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify no exception was thrown (tester.takeException() is null)
+    expect(tester.takeException(), isNull);
+    expect(find.text('Account & Verification'), findsOneWidget);
+    expect(find.byIcon(Icons.copy_rounded), findsOneWidget);
+  });
 }
