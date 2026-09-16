@@ -32,6 +32,10 @@ import '../../../../core/services/location_service.dart';
 import '../../../../core/services/socket_service.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/services/device_info_service.dart';
+import '../../../../domain/usecases/dashboard/get_dashboard_summary_usecase.dart';
+import '../../../../domain/usecases/earnings/get_rider_revenue_usecase.dart';
+import '../../dashboard/controllers/dashboard_controller.dart';
+import '../../earnings/controllers/earnings_controller.dart';
 import '../../../routes/app_routes.dart';
 
 class ProfileController extends GetxController {
@@ -46,6 +50,8 @@ class ProfileController extends GetxController {
   final UpdateVehicleUseCase updateVehicleUseCase;
   final GetSettingsUseCase getSettingsUseCase;
   final UpdateSettingsUseCase updateSettingsUseCase;
+  final GetDashboardSummaryUseCase? _dashboardSummaryUseCase;
+  final GetRiderRevenueUseCase? _riderRevenueUseCase;
 
   ProfileController({
     required this.getProfileUseCase,
@@ -59,7 +65,22 @@ class ProfileController extends GetxController {
     required this.updateVehicleUseCase,
     required this.getSettingsUseCase,
     required this.updateSettingsUseCase,
-  });
+    GetDashboardSummaryUseCase? getDashboardSummaryUseCase,
+    GetRiderRevenueUseCase? getRiderRevenueUseCase,
+  })  : _dashboardSummaryUseCase = getDashboardSummaryUseCase,
+        _riderRevenueUseCase = getRiderRevenueUseCase;
+
+  GetDashboardSummaryUseCase? get dashboardSummaryUseCase =>
+      _dashboardSummaryUseCase ??
+      (Get.isRegistered<GetDashboardSummaryUseCase>()
+          ? Get.find<GetDashboardSummaryUseCase>()
+          : null);
+
+  GetRiderRevenueUseCase? get riderRevenueUseCase =>
+      _riderRevenueUseCase ??
+      (Get.isRegistered<GetRiderRevenueUseCase>()
+          ? Get.find<GetRiderRevenueUseCase>()
+          : null);
 
   final isLoading = false.obs;
   final isDarkMode = false.obs;
@@ -69,6 +90,11 @@ class ProfileController extends GetxController {
   final operatingZones = <OperatingZoneEntity>[].obs;
   final payoutInfo = Rxn<PayoutInfoEntity>();
   final riderSettings = const RiderSettingsEntity().obs;
+
+  // Real-time dynamic stats observables
+  final totalDeliveries = 0.obs;
+  final rating = 5.0.obs;
+  final walletBalance = 0.0.obs;
 
   final _imagePicker = ImagePicker();
 
@@ -88,7 +114,11 @@ class ProfileController extends GetxController {
       }
       if (rawRider != null && rawRider.isNotEmpty) {
         final riderMap = jsonDecode(rawRider) as Map<String, dynamic>;
-        riderProfile.value = RiderModel.fromJson(riderMap, userMap);
+        final initialRider = RiderModel.fromJson(riderMap, userMap);
+        riderProfile.value = initialRider;
+        if (initialRider.totalTrips > 0) totalDeliveries.value = initialRider.totalTrips;
+        if (initialRider.rating > 0) rating.value = initialRider.rating;
+        if (initialRider.walletBalance > 0) walletBalance.value = initialRider.walletBalance;
       }
     } catch (_) {}
 
@@ -97,7 +127,31 @@ class ProfileController extends GetxController {
         Get.find<DeviceInfoService>().getDeviceId().then((id) => currentDeviceId.value = id);
       }
     } catch (_) {}
-    ever(riderProfile, (_) => syncOperatingZonesWithProfile());
+    ever(riderProfile, (rider) {
+      syncOperatingZonesWithProfile();
+      if (rider != null) {
+        if (rider.totalTrips > 0 || totalDeliveries.value == 0) {
+          totalDeliveries.value = rider.totalTrips;
+        }
+        if (rider.rating > 0) {
+          rating.value = rider.rating;
+        }
+        if (rider.walletBalance > 0 || walletBalance.value == 0.0) {
+          walletBalance.value = rider.walletBalance;
+        }
+      }
+    });
+    ever(riderSettings, (settings) {
+      final stats = settings.stats;
+      if (stats != null) {
+        if (stats.completedDeliveriesCount > 0 && totalDeliveries.value == 0) {
+          totalDeliveries.value = stats.completedDeliveriesCount;
+        }
+        if (stats.totalEarnings > 0 && walletBalance.value == 0.0) {
+          walletBalance.value = stats.totalEarnings;
+        }
+      }
+    });
     loadAllProfileData();
   }
 
@@ -109,8 +163,101 @@ class ProfileController extends GetxController {
       _loadOperatingZones(),
       _loadPayoutInfo(),
       _loadSettings(),
+      _loadLiveStats(),
     ]);
     isLoading.value = false;
+  }
+
+  Future<void> _loadLiveStats() async {
+    try {
+      // 1. Sync from active DashboardController if registered
+      if (Get.isRegistered<DashboardController>()) {
+        final dash = Get.find<DashboardController>();
+        if (dash.totalDeliveries.value > 0) {
+          totalDeliveries.value = dash.totalDeliveries.value;
+        } else if (dash.completedDeliveriesCount.value > 0) {
+          totalDeliveries.value = dash.completedDeliveriesCount.value;
+        }
+        if (dash.totalEarnings.value > 0) {
+          walletBalance.value = dash.totalEarnings.value;
+        }
+        if (dash.rating.value > 0) {
+          rating.value = dash.rating.value;
+        }
+      }
+
+      // 2. Sync from active EarningsController if registered
+      if (Get.isRegistered<EarningsController>()) {
+        final earn = Get.find<EarningsController>();
+        final summary = earn.revenueData.value?.summary;
+        if (summary != null) {
+          final count = summary.deliveredCount > 0 ? summary.deliveredCount : summary.totalDeliveriesCount;
+          if (count > 0 && totalDeliveries.value == 0) {
+            totalDeliveries.value = count;
+          }
+          if (summary.totalDeliveredRevenue > 0 && walletBalance.value == 0.0) {
+            walletBalance.value = summary.totalDeliveredRevenue;
+          }
+        }
+      }
+
+      // 3. Query DashboardSummaryUseCase for authoritative server metrics
+      final summaryUseCase = dashboardSummaryUseCase;
+      if (summaryUseCase != null) {
+        final result = await summaryUseCase();
+        result.fold(
+          (_) => null,
+          (data) {
+            final trips = (data['totalTrips'] as num?)?.toInt() ??
+                (data['completedDeliveriesCount'] as num?)?.toInt() ??
+                (data['totalDeliveries'] as num?)?.toInt();
+            final earnings = (data['totalEarnings'] as num?)?.toDouble() ??
+                (data['walletBalance'] as num?)?.toDouble();
+            final r = (data['rating'] as num?)?.toDouble();
+
+            if (trips != null && trips > 0) {
+              totalDeliveries.value = trips;
+            }
+            if (earnings != null && earnings > 0) {
+              walletBalance.value = earnings;
+            }
+            if (r != null && r > 0) {
+              rating.value = r;
+            }
+          },
+        );
+      }
+
+      // 4. Query RiderRevenueUseCase if balance/deliveries still needed
+      final revenueUseCase = riderRevenueUseCase;
+      if (revenueUseCase != null && (totalDeliveries.value == 0 || walletBalance.value == 0.0)) {
+        final revResult = await revenueUseCase(status: 'all', period: 'all');
+        revResult.fold(
+          (_) => null,
+          (revenueData) {
+            final count = revenueData.summary.deliveredCount > 0
+                ? revenueData.summary.deliveredCount
+                : revenueData.summary.totalDeliveriesCount;
+            final balance = revenueData.summary.totalDeliveredRevenue;
+            if (count > 0 && totalDeliveries.value == 0) {
+              totalDeliveries.value = count;
+            }
+            if (balance > 0 && walletBalance.value == 0.0) {
+              walletBalance.value = balance;
+            }
+          },
+        );
+      }
+
+      // 5. Keep riderProfile entity in sync
+      if (riderProfile.value != null) {
+        riderProfile.value = riderProfile.value!.copyWith(
+          totalTrips: totalDeliveries.value > 0 ? totalDeliveries.value : riderProfile.value!.totalTrips,
+          walletBalance: walletBalance.value > 0 ? walletBalance.value : riderProfile.value!.walletBalance,
+          rating: rating.value > 0 ? rating.value : riderProfile.value!.rating,
+        );
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadSettings() async {
@@ -119,10 +266,42 @@ class ProfileController extends GetxController {
       (failure) => null,
       (settings) {
         riderSettings.value = settings;
+        final stats = settings.stats;
+        if (stats != null) {
+          if (stats.completedDeliveriesCount > 0 && totalDeliveries.value == 0) {
+            totalDeliveries.value = stats.completedDeliveriesCount;
+          }
+          if (stats.totalEarnings > 0 && walletBalance.value == 0.0) {
+            walletBalance.value = stats.totalEarnings;
+          }
+        }
         if (settings.rider != null) {
           final current = riderProfile.value;
           final r = settings.rider!;
           final u = settings.user;
+
+          final resolvedTotalTrips = (stats != null && stats.completedDeliveriesCount > 0)
+              ? stats.completedDeliveriesCount
+              : (totalDeliveries.value > 0
+                  ? totalDeliveries.value
+                  : (r.totalTrips > 0
+                      ? r.totalTrips
+                      : (current?.totalTrips ?? 0)));
+
+          final resolvedBalance = (stats != null && stats.totalEarnings > 0)
+              ? stats.totalEarnings
+              : (walletBalance.value > 0
+                  ? walletBalance.value
+                  : (r.walletBalance > 0
+                      ? r.walletBalance
+                      : (current?.walletBalance ?? 0.0)));
+
+          final resolvedRating = rating.value > 0
+              ? rating.value
+              : (r.rating > 0
+                  ? r.rating
+                  : (current?.rating ?? 5.0));
+
           riderProfile.value = r.copyWith(
             name: r.name.isNotEmpty ? r.name : (u?.name.isNotEmpty == true ? u!.name : current?.name),
             email: r.email.isNotEmpty ? r.email : (u?.email.isNotEmpty == true ? u!.email : current?.email),
@@ -136,6 +315,9 @@ class ProfileController extends GetxController {
             avatar: r.avatar.isNotEmpty
                 ? r.avatar
                 : (u?.image != null && u!.image!.isNotEmpty ? u.image! : current?.avatar),
+            totalTrips: resolvedTotalTrips,
+            walletBalance: resolvedBalance,
+            rating: resolvedRating,
           );
         }
       },

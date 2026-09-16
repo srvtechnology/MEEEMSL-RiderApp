@@ -143,6 +143,8 @@ class MainLayoutBinding extends Bindings {
           updateVehicleUseCase: Get.find<UpdateVehicleUseCase>(),
           getSettingsUseCase: Get.find<GetSettingsUseCase>(),
           updateSettingsUseCase: Get.find<UpdateSettingsUseCase>(),
+          getDashboardSummaryUseCase: Get.find<GetDashboardSummaryUseCase>(),
+          getRiderRevenueUseCase: Get.find<GetRiderRevenueUseCase>(),
         ));
   }
 }

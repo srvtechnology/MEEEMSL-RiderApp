@@ -8,6 +8,8 @@ import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../controllers/profile_controller.dart';
+import '../../main_layout/controllers/main_layout_controller.dart';
+import '../../../routes/app_routes.dart';
 import 'documents_view.dart';
 import 'operating_zones_view.dart';
 import 'payout_info_view.dart';
@@ -185,6 +187,22 @@ class ProfileView extends GetView<ProfileController> {
         badgeText = 'IN REVIEW';
       }
 
+      final totalTrips = (rider?.totalTrips != null && rider!.totalTrips > 0)
+          ? rider.totalTrips
+          : (controller.totalDeliveries.value > 0
+              ? controller.totalDeliveries.value
+              : (controller.riderSettings.value.stats?.completedDeliveriesCount ?? 0));
+
+      final ratingVal = (rider?.rating != null && rider!.rating > 0)
+          ? rider.rating
+          : (controller.rating.value > 0 ? controller.rating.value : 5.0);
+
+      final balanceVal = (rider?.walletBalance != null && rider!.walletBalance > 0)
+          ? rider.walletBalance
+          : (controller.walletBalance.value > 0
+              ? controller.walletBalance.value
+              : (controller.riderSettings.value.stats?.totalEarnings ?? 0.0));
+
       return CustomCard(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -253,34 +271,83 @@ class ProfileView extends GetView<ProfileController> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                Column(
-                  children: [
-                    Text(
-                      '${rider?.totalTrips ?? 0}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      if (Get.isRegistered<MainLayoutController>()) {
+                        Get.find<MainLayoutController>().changeTab(1);
+                      } else {
+                        Get.toNamed(AppRoutes.orderHistory);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          Text(
+                            '$totalTrips',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.primary),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(AppStrings.totalDeliveries, style: AppTextStyles.labelSmall()),
+                        ],
+                      ),
                     ),
-                    Text(AppStrings.totalDeliveries, style: AppTextStyles.labelSmall()),
-                  ],
+                  ),
                 ),
                 Container(height: 24, width: 1, color: AppColors.lightCardBorder),
-                Column(
-                  children: [
-                    Text(
-                      '★ ${(rider?.rating ?? 5.0).toStringAsFixed(1)}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.amber),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      Get.snackbar(
+                        'Rider Rating',
+                        '★ ${ratingVal.toStringAsFixed(1)} based on completed delivery customer ratings.',
+                        snackPosition: SnackPosition.BOTTOM,
+                        duration: const Duration(seconds: 2),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          Text(
+                            '★ ${ratingVal.toStringAsFixed(1)}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.amber),
+                          ),
+                          const SizedBox(height: 2),
+                          Text('Rating', style: AppTextStyles.labelSmall()),
+                        ],
+                      ),
                     ),
-                    Text('Rating', style: AppTextStyles.labelSmall()),
-                  ],
+                  ),
                 ),
                 Container(height: 24, width: 1, color: AppColors.lightCardBorder),
-                Column(
-                  children: [
-                    Text(
-                      'Nle ${(rider?.walletBalance ?? 0.0).toStringAsFixed(1)}',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.successDark),
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      if (Get.isRegistered<MainLayoutController>()) {
+                        Get.find<MainLayoutController>().changeTab(2);
+                      } else {
+                        Get.toNamed(AppRoutes.earnings);
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Column(
+                        children: [
+                          Text(
+                            'Nle ${balanceVal.toStringAsFixed(1)}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.successDark),
+                          ),
+                          const SizedBox(height: 2),
+                          Text('Balance', style: AppTextStyles.labelSmall()),
+                        ],
+                      ),
                     ),
-                    Text('Balance', style: AppTextStyles.labelSmall()),
-                  ],
+                  ),
                 ),
               ],
             ),

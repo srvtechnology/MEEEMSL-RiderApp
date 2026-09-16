@@ -244,6 +244,58 @@ void main() {
     expect(find.text('Save Changes'), findsOneWidget);
   });
 
+  testWidgets('ProfileView dynamically displays stats from RiderStatsEntity and controller',
+      (WidgetTester tester) async {
+    const zeroRider = RiderEntity(
+      id: 'rider-zero',
+      name: 'Zero Rider',
+      phone: '+23276000000',
+      email: 'zero@example.com',
+      avatar: '',
+      isOnline: true,
+      approvalStatus: 'approved',
+      walletBalance: 0.0,
+      totalTrips: 0,
+      rating: 4.8,
+    );
+
+    const statsSettings = RiderSettingsEntity(
+      stats: RiderStatsEntity(
+        completedDeliveriesCount: 28,
+        totalEarnings: 450.0,
+        activeDeliveriesCount: 1,
+      ),
+    );
+
+    when(() => mockGetProfileUseCase()).thenAnswer((_) async => const Right(zeroRider));
+    when(() => mockGetSettingsUseCase()).thenAnswer((_) async => const Right(statsSettings));
+
+    controller.riderProfile.value = zeroRider;
+    controller.riderSettings.value = statsSettings;
+    controller.rating.value = 4.8;
+    controller.totalDeliveries.value = 28;
+    controller.walletBalance.value = 450.0;
+
+    await tester.pumpWidget(
+      const GetMaterialApp(
+        home: ProfileView(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify dynamic stats resolved from stats and rating observable
+    expect(find.text('28'), findsOneWidget); // completedDeliveriesCount from stats
+    expect(find.text('★ 4.8'), findsOneWidget); // rating
+    expect(find.text('Nle 450.0'), findsOneWidget); // totalEarnings from stats
+
+    // Tapping rating shows rating snackbar
+    await tester.tap(find.text('★ 4.8'));
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('RiderSettingsView renders with CustomCards and ListTiles without assertion error',
       (WidgetTester tester) async {
     await tester.pumpWidget(

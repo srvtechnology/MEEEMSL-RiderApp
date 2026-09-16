@@ -13,6 +13,7 @@ import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
 import '../../../../core/services/location_service.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../earnings/controllers/earnings_controller.dart';
+import '../../profile/controllers/profile_controller.dart';
 import '../widgets/delivery_proof_dialog.dart';
 import '../widgets/pickup_proof_dialog.dart';
 import '../widgets/cancel_delivery_dialog.dart';
@@ -339,6 +340,11 @@ class OrdersController extends GetxController {
         if (Get.isRegistered<EarningsController>()) {
           Get.find<EarningsController>().loadRevenue(showLoading: false);
           Get.find<EarningsController>().loadEarnings();
+        }
+
+        // Immediately refresh Profile stats as well
+        if (Get.isRegistered<ProfileController>()) {
+          Get.find<ProfileController>().loadAllProfileData();
         }
 
         Get.offNamed(AppRoutes.main);

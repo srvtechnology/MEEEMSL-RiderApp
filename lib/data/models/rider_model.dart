@@ -103,16 +103,62 @@ class RiderModel extends RiderEntity {
             ? (rider['profileImage'] as String)
             : (user?['image'] as String? ?? json['avatar'] as String? ?? '');
 
+    final statsMap = (rider['stats'] is Map<String, dynamic>)
+        ? rider['stats'] as Map<String, dynamic>
+        : (json['stats'] is Map<String, dynamic>)
+            ? json['stats'] as Map<String, dynamic>
+            : null;
+
+    final walletMap = (rider['wallet'] is Map<String, dynamic>)
+        ? rider['wallet'] as Map<String, dynamic>
+        : (json['wallet'] is Map<String, dynamic>)
+            ? json['wallet'] as Map<String, dynamic>
+            : null;
+
+    final ratingVal = (rider['rating'] as num?)?.toDouble() ??
+        (rider['avgRating'] as num?)?.toDouble() ??
+        (rider['averageRating'] as num?)?.toDouble() ??
+        (statsMap?['rating'] as num?)?.toDouble() ??
+        (json['rating'] as num?)?.toDouble() ??
+        (json['avgRating'] as num?)?.toDouble() ??
+        5.0;
+
+    final totalTripsVal = (rider['totalTrips'] as num?)?.toInt() ??
+        (rider['totalDeliveries'] as num?)?.toInt() ??
+        (rider['completedDeliveriesCount'] as num?)?.toInt() ??
+        (rider['completedDeliveries'] as num?)?.toInt() ??
+        (rider['completedOrders'] as num?)?.toInt() ??
+        (rider['tripsCount'] as num?)?.toInt() ??
+        (rider['total_trips'] as num?)?.toInt() ??
+        (statsMap?['completedDeliveriesCount'] as num?)?.toInt() ??
+        (statsMap?['totalDeliveries'] as num?)?.toInt() ??
+        (json['totalTrips'] as num?)?.toInt() ??
+        (json['totalDeliveries'] as num?)?.toInt() ??
+        0;
+
+    final walletBalanceVal = (rider['walletBalance'] as num?)?.toDouble() ??
+        (rider['wallet_balance'] as num?)?.toDouble() ??
+        (rider['balance'] as num?)?.toDouble() ??
+        (rider['totalEarnings'] as num?)?.toDouble() ??
+        (rider['earnings'] as num?)?.toDouble() ??
+        (walletMap?['balance'] as num?)?.toDouble() ??
+        (walletMap?['amount'] as num?)?.toDouble() ??
+        (statsMap?['totalEarnings'] as num?)?.toDouble() ??
+        (json['walletBalance'] as num?)?.toDouble() ??
+        (json['balance'] as num?)?.toDouble() ??
+        (json['totalEarnings'] as num?)?.toDouble() ??
+        0.0;
+
     return RiderModel(
       id: rider['id'] as String? ?? json['id'] as String? ?? user?['id'] as String? ?? '',
       name: nameVal,
       phone: phoneVal,
       email: emailVal,
       avatar: avatarVal,
-      rating: (rider['rating'] as num?)?.toDouble() ?? (json['rating'] as num?)?.toDouble() ?? 5.0,
-      totalTrips: (rider['totalTrips'] as num?)?.toInt() ?? (json['totalTrips'] as num?)?.toInt() ?? 0,
+      rating: ratingVal,
+      totalTrips: totalTripsVal,
       isOnline: (rider['isOnline'] as bool?) ?? (json['isOnline'] as bool?) ?? false,
-      walletBalance: (rider['walletBalance'] as num?)?.toDouble() ?? (json['walletBalance'] as num?)?.toDouble() ?? 0.0,
+      walletBalance: walletBalanceVal,
       approvalStatus: statusStr,
       isApproved: isApprovedVal,
       isSuspended: isSuspendedVal,

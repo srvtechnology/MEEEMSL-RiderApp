@@ -49,7 +49,17 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       if (response.data != null && response.data['data'] != null) {
         final data = response.data['data'] as Map<String, dynamic>;
         final userMap = data['user'] as Map<String, dynamic>?;
-        final riderMap = data['rider'] as Map<String, dynamic>? ?? data;
+        final rawRider = data['rider'] as Map<String, dynamic>? ?? data;
+        final riderMap = Map<String, dynamic>.from(rawRider);
+        if (data['stats'] != null && riderMap['stats'] == null) {
+          riderMap['stats'] = data['stats'];
+        }
+        if (data['summary'] != null && riderMap['summary'] == null) {
+          riderMap['summary'] = data['summary'];
+        }
+        if (data['wallet'] != null && riderMap['wallet'] == null) {
+          riderMap['wallet'] = data['wallet'];
+        }
         return RiderModel.fromJson(riderMap, userMap);
       }
       throw const ServerException(message: 'Invalid profile response');
