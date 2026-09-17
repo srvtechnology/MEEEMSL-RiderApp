@@ -1,4 +1,5 @@
 import 'package:dartz/dartz.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:mocktail/mocktail.dart';
@@ -171,5 +172,9 @@ void main() {
 
     // Amber badge for In-Progress: "Pending (Upon Delivery)"
     expect(find.text('Pending (Upon Delivery)'), findsOneWidget);
+
+    // Instant cash out feature should not be present
+    expect(find.text('Request Instant Cash Out'), findsNothing);
+    expect(find.byIcon(Icons.flash_on_rounded), findsNothing);
   });
 }

@@ -193,6 +193,8 @@ void main() {
 
     expect(find.text('Documents & Verification'), findsOneWidget);
     expect(find.text('Settings & Preferences'), findsOneWidget);
+    expect(find.text('Help & Support'), findsNothing);
+    expect(find.text('Dark Mode'), findsNothing);
     expect(find.text('Log Out'), findsOneWidget);
   });
 
@@ -215,7 +217,7 @@ void main() {
 
     // Verify stats
     expect(find.text('45'), findsOneWidget); // totalTrips
-    expect(find.text('★ 4.9'), findsOneWidget); // rating
+    expect(find.text('★ 4.9'), findsNothing); // rating removed
     expect(find.text('Nle 120.0'), findsOneWidget); // walletBalance
   });
 
@@ -284,16 +286,10 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify dynamic stats resolved from stats and rating observable
+    // Verify dynamic stats resolved from stats
     expect(find.text('28'), findsOneWidget); // completedDeliveriesCount from stats
-    expect(find.text('★ 4.8'), findsOneWidget); // rating
+    expect(find.text('★ 4.8'), findsNothing); // rating removed
     expect(find.text('Nle 450.0'), findsOneWidget); // totalEarnings from stats
-
-    // Tapping rating shows rating snackbar
-    await tester.tap(find.text('★ 4.8'));
-    await tester.pump();
-    await tester.pump(const Duration(seconds: 3));
-    await tester.pumpAndSettle();
   });
 
   testWidgets('RiderSettingsView renders with CustomCards and ListTiles without assertion error',

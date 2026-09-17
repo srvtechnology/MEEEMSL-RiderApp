@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
-import '../../../../core/widgets/custom_button.dart';
 import '../../../../domain/entities/rider_revenue_entity.dart';
 import '../controllers/earnings_controller.dart';
 import '../widgets/revenue_delivery_card.dart';
@@ -18,11 +17,6 @@ class EarningsView extends GetView<EarningsController> {
       appBar: AppBar(
         title: const Text(AppStrings.myRevenue),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.flash_on_rounded, color: Colors.amber),
-            tooltip: AppStrings.cashOut,
-            onPressed: () => controller.openPayoutModal(),
-          ),
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             tooltip: 'Refresh',
@@ -106,15 +100,6 @@ class EarningsView extends GetView<EarningsController> {
                 // 6. Deliveries Cards
                 _buildDeliveriesList(revenue?.deliveries ?? [], summary.currency),
 
-                const SizedBox(height: 20),
-
-                // 7. Cash Out Action Button
-                CustomButton(
-                  text: 'Request Instant Cash Out',
-                  type: ButtonType.primary,
-                  icon: Icons.account_balance_wallet_outlined,
-                  onPressed: () => controller.openPayoutModal(),
-                ),
                 const SizedBox(height: 24),
               ],
             ),

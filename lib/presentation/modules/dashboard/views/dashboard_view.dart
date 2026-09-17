@@ -10,7 +10,7 @@ import '../controllers/dashboard_controller.dart';
 import '../widgets/active_delivery_card.dart';
 import '../widgets/incoming_offer_card.dart';
 import '../widgets/telemetry_radar_card.dart';
-import '../../../routes/app_routes.dart';
+// import '../../../routes/app_routes.dart';
 import '../../../../domain/entities/order_entity.dart';
 
 /// Redesigned Rider App Dashboard
@@ -119,12 +119,12 @@ class DashboardView extends GetView<DashboardController> {
           ),
         ],
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_none_rounded, size: 24),
-          onPressed: () => Get.toNamed(AppRoutes.notifications),
-        ),
-      ],
+      // actions: [
+      //   IconButton(
+      //     icon: const Icon(Icons.notifications_none_rounded, size: 24),
+      //     onPressed: () => Get.toNamed(AppRoutes.notifications),
+      //   ),
+      // ],
     );
   }
 

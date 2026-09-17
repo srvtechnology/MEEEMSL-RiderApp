@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../data/models/rider_model.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/camera_service.dart';
 import '../../../../core/utils/image_compressor.dart';
 import '../../../../domain/entities/rider_entity.dart';
 import '../../../../domain/entities/document_entity.dart';
@@ -390,16 +391,14 @@ class ProfileController extends GetxController {
   // Document Upload
   Future<void> uploadDoc(String type, {ImageSource source = ImageSource.gallery}) async {
     try {
-      final file = await _imagePicker.pickImage(
+      final filePath = await CameraService.to.capturePhoto(
         source: source,
         maxWidth: 1200,
         maxHeight: 1200,
-        imageQuality: 70,
+        quality: 70,
+        showGalleryFallback: true,
       );
-      var filePath = file?.path ?? 'mock_doc_path_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      if (file != null) {
-        filePath = await ImageCompressor.compressImage(file.path, maxWidth: 1200, maxHeight: 1200, quality: 70);
-      }
+      if (filePath == null) return;
 
       isLoading.value = true;
       final result = await uploadDocumentUseCase(type, filePath);
@@ -419,7 +418,7 @@ class ProfileController extends GetxController {
         },
       );
     } catch (_) {
-      Get.snackbar('Upload', 'Document attached');
+      Get.snackbar('Upload', 'Document upload could not be completed.');
     }
   }
 

@@ -79,36 +79,18 @@ class ProfileView extends GetView<ProfileController> {
                       trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                       onTap: () => Get.to(() => const RiderSettingsView()),
                     ),
-                    const Divider(),
-                    Obx(() => SwitchListTile(
-                          secondary: const Icon(Icons.dark_mode_outlined, color: AppColors.primary),
-                          title: const Text(AppStrings.darkMode),
-                          value: controller.isDarkMode.value,
-                          onChanged: (_) => controller.toggleTheme(),
-                        )),
                   ],
                 ),
               ),
               const SizedBox(height: 16),
 
-              // Support & About
+              // Terms & Privacy
               CustomCard(
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.help_outline_rounded, color: AppColors.primary),
-                      title: const Text(AppStrings.helpSupport),
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                      onTap: () => Get.snackbar('Support', '24/7 Rider Dispatch Hotline: +1 800 555 MEEEM'),
-                    ),
-                    const Divider(),
-                    ListTile(
-                      leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.primary),
-                      title: const Text(AppStrings.termsPrivacy),
-                      trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                      onTap: () => Get.snackbar('Legal', 'Meeem Rider Partner Terms & Conditions 2026'),
-                    ),
-                  ],
+                child: ListTile(
+                  leading: const Icon(Icons.privacy_tip_outlined, color: AppColors.primary),
+                  title: const Text(AppStrings.termsPrivacy),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () => Get.toNamed(AppRoutes.termsPrivacy),
                 ),
               ),
               const SizedBox(height: 20),
@@ -192,10 +174,6 @@ class ProfileView extends GetView<ProfileController> {
           : (controller.totalDeliveries.value > 0
               ? controller.totalDeliveries.value
               : (controller.riderSettings.value.stats?.completedDeliveriesCount ?? 0));
-
-      final ratingVal = (rider?.rating != null && rider!.rating > 0)
-          ? rider.rating
-          : (controller.rating.value > 0 ? controller.rating.value : 5.0);
 
       final balanceVal = (rider?.walletBalance != null && rider!.walletBalance > 0)
           ? rider.walletBalance
@@ -310,33 +288,6 @@ class ProfileView extends GetView<ProfileController> {
                           ),
                           const SizedBox(height: 2),
                           Text(AppStrings.totalDeliveries, style: AppTextStyles.labelSmall()),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                Container(height: 24, width: 1, color: AppColors.lightCardBorder),
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
-                    onTap: () {
-                      Get.snackbar(
-                        'Rider Rating',
-                        '★ ${ratingVal.toStringAsFixed(1)} based on completed delivery customer ratings.',
-                        snackPosition: SnackPosition.BOTTOM,
-                        duration: const Duration(seconds: 2),
-                      );
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 4),
-                      child: Column(
-                        children: [
-                          Text(
-                            '★ ${ratingVal.toStringAsFixed(1)}',
-                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.amber),
-                          ),
-                          const SizedBox(height: 2),
-                          Text('Rating', style: AppTextStyles.labelSmall()),
                         ],
                       ),
                     ),
