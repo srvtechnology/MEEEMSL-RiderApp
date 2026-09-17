@@ -15,6 +15,7 @@ class AppConstants {
   static const String operatingZonesKey = 'rider_operating_zones';
   static const String payoutInfoKey = 'rider_payout_info';
   static const String activeOrderKey = 'rider_active_order_cache';
+  static const String orderHistoryKey = 'rider_order_history_cache';
 
   // Default Localization
   static const String defaultCountryCode = '+232';

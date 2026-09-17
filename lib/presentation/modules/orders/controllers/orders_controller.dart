@@ -59,6 +59,21 @@ class OrdersController extends GetxController {
             activeOrders.assignAll([cached]);
           }
         }
+
+        final historyRaw = storage.read(AppConstants.orderHistoryKey);
+        if (historyRaw is List) {
+          final cachedHistory = <OrderEntity>[];
+          for (final item in historyRaw) {
+            if (item is Map) {
+              try {
+                cachedHistory.add(OrderModel.fromJson(Map<String, dynamic>.from(item)));
+              } catch (_) {}
+            }
+          }
+          if (cachedHistory.isNotEmpty) {
+            orderHistory.assignAll(cachedHistory);
+          }
+        }
       } catch (_) {}
     }
 
@@ -88,7 +103,7 @@ class OrdersController extends GetxController {
   }
 
   Future<void> loadOrders() async {
-    if (selectedOrder.value == null) {
+    if (selectedOrder.value == null && orderHistory.isEmpty) {
       isLoading.value = true;
     }
     await Future.wait([
@@ -97,6 +112,8 @@ class OrdersController extends GetxController {
     ]);
     isLoading.value = false;
   }
+
+  Future<void> refreshOrders() => loadOrders();
 
   Future<void> _loadActiveOrders() async {
     final result = await getActiveOrdersUseCase();
@@ -147,12 +164,54 @@ class OrdersController extends GetxController {
   }
 
   Future<void> _loadHistory() async {
+    final filterVal = historyFilter.value;
     final result = await getOrderHistoryUseCase(
-      statusFilter: historyFilter.value == 'all' ? null : historyFilter.value,
+      statusFilter: (filterVal == 'all' || filterVal.isEmpty) ? null : filterVal,
     );
     result.fold(
-      (failure) => null,
-      (orders) => orderHistory.assignAll(orders),
+      (failure) {
+        debugPrint('[OrdersController] _loadHistory failure: ${failure.message}');
+      },
+      (orders) {
+        final combined = <OrderEntity>[];
+        final seenKeys = <String>{};
+
+        void addUnique(List<OrderEntity> list) {
+          for (final o in list) {
+            final key = o.id.isNotEmpty ? o.id : (o.assignmentId ?? o.orderNumber);
+            if (!seenKeys.contains(key)) {
+              seenKeys.add(key);
+              combined.add(o);
+            }
+          }
+        }
+
+        // Under 'all' or 'active', ensure any active order in memory/storage is visible at top
+        if (historyFilter.value == 'all' || historyFilter.value == 'active') {
+          addUnique(activeOrders);
+          if (selectedOrder.value != null &&
+              selectedOrder.value!.status != OrderStatus.delivered &&
+              selectedOrder.value!.status != OrderStatus.cancelled) {
+            addUnique([selectedOrder.value!]);
+          }
+        }
+
+        addUnique(orders);
+
+        final filter = historyFilter.value.toLowerCase().trim();
+        if (filter == 'all' || filter.isEmpty) {
+          orderHistory.assignAll(combined);
+        } else if (filter == 'delivered' || filter == 'completed') {
+          orderHistory.assignAll(combined.where((o) => o.status == OrderStatus.delivered).toList());
+        } else if (filter == 'cancelled') {
+          orderHistory.assignAll(combined.where((o) => o.status == OrderStatus.cancelled).toList());
+        } else if (filter == 'active') {
+          orderHistory.assignAll(combined.where((o) =>
+              o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled).toList());
+        } else {
+          orderHistory.assignAll(combined.where((o) => o.status.name.toLowerCase() == filter).toList());
+        }
+      },
     );
   }
 

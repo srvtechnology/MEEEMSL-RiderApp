@@ -75,6 +75,39 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     }
   }
 
+  void _saveOrderHistoryToLocal(List<OrderModel> orders) {
+    try {
+      final list = orders.map((o) => o.toJson()).toList();
+      _storage.write(AppConstants.orderHistoryKey, list);
+      debugPrint('[OrderRemoteDataSource] Cached ${orders.length} history orders to GetStorage');
+    } catch (e) {
+      debugPrint('[OrderRemoteDataSource] Failed to cache order history: $e');
+    }
+  }
+
+  List<OrderModel> _loadOrderHistoryFromLocal() {
+    try {
+      final raw = _storage.read(AppConstants.orderHistoryKey);
+      if (raw is List) {
+        final list = <OrderModel>[];
+        for (final item in raw) {
+          if (item is Map) {
+            try {
+              list.add(OrderModel.fromJson(Map<String, dynamic>.from(item)));
+            } catch (_) {}
+          }
+        }
+        if (list.isNotEmpty) {
+          debugPrint('[OrderRemoteDataSource] Loaded ${list.length} history orders from GetStorage');
+          return list;
+        }
+      }
+    } catch (e) {
+      debugPrint('[OrderRemoteDataSource] Error loading cached order history: $e');
+    }
+    return [];
+  }
+
   // Section 3.1: GET /mobileapi/rider/orders?tab=active (with robust multi-tier fallback)
   @override
   Future<List<OrderModel>> getActiveOrders() async {
@@ -523,6 +556,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       if (status == OrderStatus.delivered || status == OrderStatus.cancelled) {
         _activeOrders.removeAt(index);
         _orderHistory.insert(0, updated);
+        _saveOrderHistoryToLocal(_orderHistory);
         _clearActiveOrderFromLocal();
       } else {
         _activeOrders[index] = updated;
@@ -561,6 +595,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     );
     if (status == OrderStatus.delivered || status == OrderStatus.cancelled) {
       _orderHistory.insert(0, updated);
+      _saveOrderHistoryToLocal(_orderHistory);
       _clearActiveOrderFromLocal();
     } else {
       _activeOrders.add(updated);
@@ -579,58 +614,173 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
     );
   }
 
-  // Section 3.1: GET /mobileapi/rider/orders?tab=completed
+  // Section 3.1: GET /mobileapi/rider/orders?tab=all | completed | active
   @override
   Future<List<OrderModel>> getOrderHistory({String? statusFilter}) async {
+    final normFilter = (statusFilter ?? 'all').toLowerCase().trim();
+    String tabParam;
+    if (normFilter == 'delivered' || normFilter == 'completed') {
+      tabParam = 'completed';
+    } else if (normFilter == 'active') {
+      tabParam = 'active';
+    } else {
+      tabParam = 'all';
+    }
+
+    List<OrderModel> extractOrders(dynamic responseData) {
+      if (responseData == null) return [];
+      dynamic rawList;
+      if (responseData is List) {
+        rawList = responseData;
+      } else if (responseData is Map) {
+        if (responseData['data'] is List) {
+          rawList = responseData['data'];
+        } else if (responseData['orders'] is List) {
+          rawList = responseData['orders'];
+        } else if (responseData['deliveries'] is List) {
+          rawList = responseData['deliveries'];
+        } else if (responseData['data'] is Map) {
+          final inner = responseData['data'];
+          if (inner['deliveries'] is List) {
+            rawList = inner['deliveries'];
+          } else if (inner['orders'] is List) {
+            rawList = inner['orders'];
+          }
+        }
+      }
+      if (rawList is! List) return [];
+      final orders = <OrderModel>[];
+      for (final item in rawList) {
+        if (item is Map) {
+          try {
+            orders.add(OrderModel.fromJson(Map<String, dynamic>.from(item)));
+          } catch (err, stack) {
+            debugPrint('[OrderRemoteDataSource] Error parsing history order item: $err\n$stack');
+          }
+        }
+      }
+      return orders;
+    }
+
+    List<OrderModel> filterResult(List<OrderModel> list) {
+      if (normFilter == 'all' || normFilter.isEmpty) {
+        return list;
+      }
+      if (normFilter == 'delivered' || normFilter == 'completed') {
+        return list.where((o) => o.status == OrderStatus.delivered).toList();
+      }
+      if (normFilter == 'cancelled') {
+        return list.where((o) => o.status == OrderStatus.cancelled).toList();
+      }
+      if (normFilter == 'active') {
+        return list.where((o) => o.status != OrderStatus.delivered && o.status != OrderStatus.cancelled).toList();
+      }
+      return list.where((o) => o.status.name.toLowerCase() == normFilter).toList();
+    }
+
+    // Tier 1: Primary fetch: GET /orders?tab=$tabParam
     try {
-      final tabParam = (statusFilter != null && statusFilter == 'all')
-          ? 'all'
-          : 'completed';
       final response = await _dioClient.dio.get(
         ApiEndpoints.orders,
         queryParameters: {'tab': tabParam},
       );
+      debugPrint('[OrderRemoteDataSource] getOrderHistory tab=$tabParam statusCode: ${response.statusCode}');
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'];
-        if (data is List) {
-          final history = data
-              .map((e) => OrderModel.fromJson(e as Map<String, dynamic>))
-              .toList();
+        final orders = extractOrders(response.data);
+        if (orders.isNotEmpty) {
           _orderHistory
             ..clear()
-            ..addAll(history);
-          if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'all') {
-            final filter = statusFilter.toLowerCase();
-            return history.where((o) {
-              final statusName = o.status.name.toLowerCase();
-              if (filter == 'completed' || filter == 'delivered') {
-                return statusName == 'delivered';
-              }
-              if (filter == 'cancelled') {
-                return statusName == 'cancelled';
-              }
-              return statusName == filter;
-            }).toList();
-          }
-          return history;
+            ..addAll(orders);
+          _saveOrderHistoryToLocal(orders);
+          return filterResult(orders);
         }
       }
-    } catch (_) {}
-
-    if (statusFilter != null && statusFilter.isNotEmpty && statusFilter != 'all') {
-      final filter = statusFilter.toLowerCase();
-      return _orderHistory.where((o) {
-        final statusName = o.status.name.toLowerCase();
-        if (filter == 'completed' || filter == 'delivered') {
-          return statusName == 'delivered';
-        }
-        if (filter == 'cancelled') {
-          return statusName == 'cancelled';
-        }
-        return statusName == filter;
-      }).toList();
+    } catch (e) {
+      debugPrint('[OrderRemoteDataSource] getOrderHistory tab=$tabParam error: $e');
     }
-    return List.from(_orderHistory);
+
+    // Tier 2: If tab=all returned empty or was requested, try querying tab=completed and tab=active and combine
+    if (tabParam == 'all') {
+      try {
+        final completedResp = await _dioClient.dio.get(
+          ApiEndpoints.orders,
+          queryParameters: {'tab': 'completed'},
+        );
+        final activeResp = await _dioClient.dio.get(
+          ApiEndpoints.orders,
+          queryParameters: {'tab': 'active'},
+        );
+        final combined = <OrderModel>[];
+        final seen = <String>{};
+        void addUnique(List<OrderModel> items) {
+          for (final o in items) {
+            final key = o.id.isNotEmpty ? o.id : (o.assignmentId ?? o.orderNumber);
+            if (!seen.contains(key)) {
+              seen.add(key);
+              combined.add(o);
+            }
+          }
+        }
+        if (activeResp.statusCode == 200 && activeResp.data != null) {
+          addUnique(extractOrders(activeResp.data));
+        }
+        if (completedResp.statusCode == 200 && completedResp.data != null) {
+          addUnique(extractOrders(completedResp.data));
+        }
+        if (combined.isNotEmpty) {
+          _orderHistory
+            ..clear()
+            ..addAll(combined);
+          _saveOrderHistoryToLocal(combined);
+          return filterResult(combined);
+        }
+      } catch (e) {
+        debugPrint('[OrderRemoteDataSource] getOrderHistory completed+active fallback error: $e');
+      }
+    }
+
+    // Tier 3: GET /mobileapi/rider/revenue (Part 6: data.deliveries returns all rider order packages)
+    try {
+      final revResp = await _dioClient.dio.get(ApiEndpoints.revenue);
+      if (revResp.statusCode == 200 && revResp.data != null) {
+        final revOrders = extractOrders(revResp.data);
+        if (revOrders.isNotEmpty) {
+          debugPrint('[OrderRemoteDataSource] getOrderHistory resolved ${revOrders.length} orders from /revenue');
+          _orderHistory
+            ..clear()
+            ..addAll(revOrders);
+          _saveOrderHistoryToLocal(revOrders);
+          return filterResult(revOrders);
+        }
+      }
+    } catch (e) {
+      debugPrint('[OrderRemoteDataSource] getOrderHistory revenue fallback error: $e');
+    }
+
+    // Tier 4: Persistent local storage cache fallback
+    final cachedHistory = _loadOrderHistoryFromLocal();
+    if (cachedHistory.isNotEmpty) {
+      _orderHistory
+        ..clear()
+        ..addAll(cachedHistory);
+      return filterResult(cachedHistory);
+    }
+
+    // Tier 5: In-memory session cache fallback
+    if (_orderHistory.isNotEmpty) {
+      return filterResult(_orderHistory);
+    }
+
+    // Tier 6: If an active order is present in local cache or memory, make sure it's returned for 'all' or 'active'
+    final localActive = _loadActiveOrderFromLocal();
+    if (localActive != null) {
+      return filterResult([localActive]);
+    }
+    if (_activeOrders.isNotEmpty) {
+      return filterResult(_activeOrders);
+    }
+
+    return [];
   }
 
   // Section 3.2: GET /mobileapi/rider/orders/:id

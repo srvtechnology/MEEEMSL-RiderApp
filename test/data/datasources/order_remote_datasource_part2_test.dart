@@ -50,6 +50,23 @@ void main() {
       expect(history.first.status, equals(OrderStatus.delivered));
     });
 
+    test('3.1 getOrderHistory fetches all orders from /orders?tab=all when filter is all or null', () async {
+      final allHistory = await dataSource.getOrderHistory(statusFilter: 'all');
+      expect(allHistory, isNotEmpty);
+      expect(allHistory.any((o) => o.status == OrderStatus.accepted), isTrue);
+      expect(allHistory.any((o) => o.status == OrderStatus.delivered), isTrue);
+      expect(allHistory.any((o) => o.status == OrderStatus.cancelled), isTrue);
+
+      final nullHistory = await dataSource.getOrderHistory(statusFilter: null);
+      expect(nullHistory, isNotEmpty);
+    });
+
+    test('3.1 getOrderHistory filters cancelled orders properly', () async {
+      final cancelled = await dataSource.getOrderHistory(statusFilter: 'cancelled');
+      expect(cancelled, isNotEmpty);
+      expect(cancelled.every((o) => o.status == OrderStatus.cancelled), isTrue);
+    });
+
     test('3.2 getOrderDetails fetches snapshot for single order from /orders/:id', () async {
       final details = await dataSource.getOrderDetails('cuid_assignment_id');
       expect(details, isNotNull);

@@ -35,6 +35,8 @@ class OrderModel extends OrderEntity {
   static OrderStatus _parseStatus(String? statusStr) {
     switch (statusStr?.trim().toLowerCase()) {
       case 'accepted':
+      case 'order_accepted':
+      case 'assigned':
         return OrderStatus.accepted;
       case 'at_pickup':
       case 'atpickup':
@@ -46,15 +48,20 @@ class OrderModel extends OrderEntity {
       case 'out_for_delivery':
       case 'outfordelivery':
       case 'in_transit':
+      case 'in_progress':
+      case 'inprogress':
       case 'arrived_at_dropoff':
         return OrderStatus.outForDelivery;
       case 'delivered':
+      case 'completed':
         return OrderStatus.delivered;
       case 'cancelled':
       case 'cancelled_by_rider':
       case 'cancelledbyrider':
       case 'timed_out':
       case 'timedout':
+      case 'rejected':
+      case 'declined':
         return OrderStatus.cancelled;
       case 'offered':
       case 'pending':
@@ -68,26 +75,35 @@ class OrderModel extends OrderEntity {
   }
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
-    final orderMap = json['order'] as Map<String, dynamic>?;
-    final sellerMap = orderMap?['seller'] as Map<String, dynamic>? ??
-        json['seller'] as Map<String, dynamic>?;
-    final businessInfo = sellerMap?['businessInfo'] as Map<String, dynamic>?;
-    final store = sellerMap?['store'] as Map<String, dynamic>?;
+    Map<String, dynamic>? safeMap(dynamic val) {
+      if (val == null) return null;
+      if (val is Map<String, dynamic>) return val;
+      if (val is Map) {
+        try {
+          return Map<String, dynamic>.from(val);
+        } catch (_) {}
+      }
+      return null;
+    }
+
+    final orderMap = safeMap(json['order']);
+    final sellerMap = safeMap(orderMap?['seller'] ?? json['seller']);
+    final businessInfo = safeMap(sellerMap?['businessInfo']);
+    final store = safeMap(sellerMap?['store'] ?? json['store'] ?? orderMap?['store']);
+    final customer = safeMap(orderMap?['customer'] ?? json['customer']);
 
     final customerName = orderMap?['shippingFullName']?.toString() ??
         json['shippingFullName']?.toString() ??
         orderMap?['customerName']?.toString() ??
         json['customerName']?.toString() ??
-        (orderMap?['customer'] is Map ? (orderMap!['customer'] as Map)['name']?.toString() : null) ??
-        (json['customer'] is Map ? (json['customer'] as Map)['name']?.toString() : null) ??
+        customer?['name']?.toString() ??
         'Customer';
 
     final customerPhone = orderMap?['shippingPhone']?.toString() ??
         json['shippingPhone']?.toString() ??
         orderMap?['customerPhone']?.toString() ??
         json['customerPhone']?.toString() ??
-        (orderMap?['customer'] is Map ? (orderMap!['customer'] as Map)['phone']?.toString() : null) ??
-        (json['customer'] is Map ? (json['customer'] as Map)['phone']?.toString() : null) ??
+        customer?['phone']?.toString() ??
         '';
 
     final dropoffParts = [
@@ -98,7 +114,12 @@ class OrderModel extends OrderEntity {
 
     final dropoffAddress = dropoffParts.isNotEmpty
         ? dropoffParts.join(', ')
-        : (json['customerAddress']?.toString() ?? json['dropoffAddress']?.toString() ?? '');
+        : (customer?['dropAddress']?.toString() ??
+            customer?['address']?.toString() ??
+            json['customerAddress']?.toString() ??
+            json['dropoffAddress']?.toString() ??
+            orderMap?['dropoffAddress']?.toString() ??
+            '');
 
     final pickupName = store?['name']?.toString() ??
         businessInfo?['businessName']?.toString() ??
@@ -106,6 +127,7 @@ class OrderModel extends OrderEntity {
         json['seller']?['store']?['name']?.toString() ??
         json['shopName']?.toString() ??
         json['pickupName']?.toString() ??
+        orderMap?['pickupName']?.toString() ??
         'Store / Vendor';
 
     final pickupParts = [
@@ -115,27 +137,36 @@ class OrderModel extends OrderEntity {
 
     final pickupAddress = pickupParts.isNotEmpty
         ? pickupParts.join(', ')
-        : (json['shopAddress']?.toString() ?? json['pickupAddress']?.toString() ?? '');
+        : (store?['address']?.toString() ??
+            json['shopAddress']?.toString() ??
+            json['pickupAddress']?.toString() ??
+            orderMap?['pickupAddress']?.toString() ??
+            '');
 
     final pickupPhone = businessInfo?['pocContact']?.toString() ??
         store?['phone']?.toString() ??
         (sellerMap?['user'] is Map ? (sellerMap!['user'] as Map)['phone']?.toString() : null) ??
         json['pickupPhone']?.toString() ??
+        orderMap?['pickupPhone']?.toString() ??
         '';
 
     final pickupLat = double.tryParse(businessInfo?['latitude']?.toString() ?? '') ??
         double.tryParse(store?['lat']?.toString() ?? '') ??
         double.tryParse(json['sellerLatitude']?.toString() ?? '') ??
         double.tryParse(json['pickupLat']?.toString() ?? '') ??
+        double.tryParse(orderMap?['pickupLat']?.toString() ?? '') ??
         8.484245;
 
     final pickupLng = double.tryParse(businessInfo?['longitude']?.toString() ?? '') ??
         double.tryParse(store?['lng']?.toString() ?? '') ??
         double.tryParse(json['sellerLongitude']?.toString() ?? '') ??
         double.tryParse(json['pickupLng']?.toString() ?? '') ??
+        double.tryParse(orderMap?['pickupLng']?.toString() ?? '') ??
         -13.234125;
 
     final dropoffLat = double.tryParse(json['dropoffLat']?.toString() ?? '') ??
+        double.tryParse(orderMap?['dropoffLat']?.toString() ?? '') ??
+        8.460;
         double.tryParse(orderMap?['dropoffLat']?.toString() ?? '') ??
         8.460;
     final dropoffLng = double.tryParse(json['dropoffLng']?.toString() ?? '') ??
@@ -160,7 +191,9 @@ class OrderModel extends OrderEntity {
 
     final orderNumber = orderMap?['orderNumber']?.toString() ??
         json['orderNumber']?.toString() ??
-        '';
+        orderMap?['orderNo']?.toString() ??
+        json['orderNo']?.toString() ??
+        (json['id'] != null ? json['id'].toString() : '');
 
     String? resolvedOtp = json['deliveryOtp']?.toString() ??
         orderMap?['deliveryOtp']?.toString();
@@ -183,6 +216,7 @@ class OrderModel extends OrderEntity {
     final subtotal = parseDouble(orderMap?['totalAmount']) ??
         parseDouble(orderMap?['subtotal']) ??
         parseDouble(json['subtotal']) ??
+        parseDouble(json['totalAmount']) ??
         0.0;
 
     double itemsShippingSum = 0.0;
@@ -196,16 +230,19 @@ class OrderModel extends OrderEntity {
 
     final earnings = parseDouble(json['deliveryFee']) ??
         parseDouble(json['deliveryEarning']) ??
+        parseDouble(json['deliveryCharge']) ??
         parseDouble(json['earning']) ??
         parseDouble(json['earningForThisDelivery']) ??
         parseDouble(orderMap?['deliveryFee']) ??
         parseDouble(orderMap?['deliveryEarning']) ??
+        parseDouble(orderMap?['deliveryCharge']) ??
         parseDouble(orderMap?['earning']) ??
         parseDouble(orderMap?['earningForThisDelivery']) ??
         parseDouble(json['riderEarnings']) ??
         parseDouble(orderMap?['riderEarnings']) ??
         parseDouble(orderMap?['shipping']) ??
         parseDouble(orderMap?['shippingAmount']) ??
+        parseDouble(json['totalAmount']) ??
         (itemsShippingSum > 0.0 ? itemsShippingSum : 0.0);
 
     final distanceKm = parseDouble(json['distanceKm']) ?? parseDouble(orderMap?['distanceKm']) ?? 2.1;
@@ -218,7 +255,11 @@ class OrderModel extends OrderEntity {
     final cycle = int.tryParse(json['cycle']?.toString() ?? '') ?? int.tryParse(orderMap?['cycle']?.toString() ?? '');
     final riderAttempt = int.tryParse(json['riderAttempt']?.toString() ?? '') ?? int.tryParse(orderMap?['riderAttempt']?.toString() ?? '');
 
-    final resolvedId = json['id']?.toString() ?? orderMap?['id']?.toString() ?? '';
+    final resolvedId = json['id']?.toString() ??
+        orderMap?['id']?.toString() ??
+        json['orderId']?.toString() ??
+        orderMap?['orderId']?.toString() ??
+        '';
 
     final rawCreatedAt = json['createdAt']?.toString() ??
         orderMap?['createdAt']?.toString() ??

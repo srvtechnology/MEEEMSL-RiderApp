@@ -1219,6 +1219,79 @@ class MockInterceptor extends Interceptor {
       );
     }
 
+    if (tab == 'cancelled') {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'tab': tab,
+          'count': 1,
+          'data': [
+            _buildPart2OrderAssignment(
+              id: 'ord_102920',
+              orderNumber: 'meeem00000015',
+              status: 'CANCELLED_BY_RIDER',
+              pickupName: 'Freetown Fresh Market',
+              dropoffAddress: '88 Circular Road, Freetown',
+              riderEarnings: 0.0,
+              subtotal: 210000,
+            ),
+          ],
+        },
+      );
+    }
+
+    if (tab == 'all') {
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'tab': tab,
+          'count': 4,
+          'data': [
+            _buildPart2OrderAssignment(
+              id: 'cuid_assignment_id',
+              orderNumber: 'meeem00000042',
+              status: 'ACCEPTED',
+              pickupName: 'MEEEM Super Store',
+              dropoffAddress: '14 Wilkinson Road, Freetown',
+              riderEarnings: 14.80,
+              subtotal: 450000,
+            ),
+            _buildPart2OrderAssignment(
+              id: 'ord_102940',
+              orderNumber: 'meeem00000030',
+              status: 'DELIVERED',
+              pickupName: 'Tokeh Seafood Shack',
+              dropoffAddress: 'Baw Baw Point #2',
+              riderEarnings: 15.00,
+              subtotal: 420000,
+            ),
+            _buildPart2OrderAssignment(
+              id: 'ord_102935',
+              orderNumber: 'meeem00000021',
+              status: 'DELIVERED',
+              pickupName: 'Lakka Ocean Grill',
+              dropoffAddress: 'Hamilton Village Center',
+              riderEarnings: 13.50,
+              subtotal: 385000,
+            ),
+            _buildPart2OrderAssignment(
+              id: 'ord_102920',
+              orderNumber: 'meeem00000015',
+              status: 'CANCELLED_BY_RIDER',
+              pickupName: 'Freetown Fresh Market',
+              dropoffAddress: '88 Circular Road, Freetown',
+              riderEarnings: 0.0,
+              subtotal: 210000,
+            ),
+          ],
+        },
+      );
+    }
+
     if (tab == 'offered') {
       return Response(
         requestOptions: options,
