@@ -131,9 +131,22 @@ class ApiEndpoints {
     return regExp.hasMatch(cleanPath);
   }
 
-  /// Returns true if [path] is documented in Part 1, Part 2, Part 6, or Part 8.
+  // Legal: Rider Terms & Conditions and Privacy Policy
+  static const String terms = '/terms';
+
+  /// Returns true if [path] is the legal terms & privacy policy endpoint
+  static bool isLegalEndpoint(String path) {
+    final cleanPath = normalizePath(path);
+    return cleanPath == terms;
+  }
+
+  /// Returns true if [path] is documented in Part 1, Part 2, Part 6, Part 8, or Legal endpoints.
   static bool isDocumentedEndpoint(String path) {
-    return isPart1Endpoint(path) || isPart2Endpoint(path) || isPart6Endpoint(path) || isPart8Endpoint(path);
+    return isPart1Endpoint(path) ||
+        isPart2Endpoint(path) ||
+        isPart6Endpoint(path) ||
+        isPart8Endpoint(path) ||
+        isLegalEndpoint(path);
   }
 
   // 4. Forgot & Reset Password

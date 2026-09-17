@@ -26,6 +26,8 @@ import '../modules/profile/views/payout_info_view.dart';
 import '../modules/profile/views/vehicle_info_view.dart';
 import '../modules/notifications/bindings/notifications_binding.dart';
 import '../modules/notifications/views/notifications_view.dart';
+import '../modules/legal/bindings/legal_binding.dart';
+import '../modules/legal/views/legal_terms_privacy_view.dart';
 import 'app_routes.dart';
 import 'auth_guard.dart';
 
@@ -135,6 +137,11 @@ class AppPages {
       page: () => const NotificationsView(),
       binding: NotificationsBinding(),
       middlewares: [AuthGuard()],
+    ),
+    GetPage(
+      name: AppRoutes.termsPrivacy,
+      page: () => const LegalTermsPrivacyView(),
+      binding: LegalBinding(),
     ),
   ];
 }

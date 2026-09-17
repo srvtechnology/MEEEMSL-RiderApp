@@ -29,4 +29,6 @@ class AppRoutes {
   static const String payoutInfo = '/payout-info';
   
   static const String notifications = '/notifications';
+  
+  static const String termsPrivacy = '/terms-privacy';
 }

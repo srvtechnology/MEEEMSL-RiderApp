@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
@@ -212,10 +213,33 @@ class LoginView extends GetView<AuthController> {
               const SizedBox(height: 36),
               // Footnote
               Center(
-                child: Text(
-                  'By continuing, you agree to Meeem Terms of Service & Privacy Policy',
+                child: Text.rich(
+                  TextSpan(
+                    text: 'By continuing, you agree to Meeem ',
+                    style: AppTextStyles.bodySmall(),
+                    children: [
+                      TextSpan(
+                        text: 'Terms of Service',
+                        style: AppTextStyles.bodySmall(color: AppColors.primary).copyWith(
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                        ),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () => Get.toNamed(AppRoutes.termsPrivacy, arguments: {'tab': 'terms'}),
+                      ),
+                      const TextSpan(text: ' & '),
+                      TextSpan(
+                        text: 'Privacy Policy',
+                        style: AppTextStyles.bodySmall(color: AppColors.primary).copyWith(
+                          fontWeight: FontWeight.w700,
+                          decoration: TextDecoration.underline,
+                        ),
+                        recognizer: TapGestureRecognizer()
+                          ..onTap = () => Get.toNamed(AppRoutes.termsPrivacy, arguments: {'tab': 'privacy'}),
+                      ),
+                    ],
+                  ),
                   textAlign: TextAlign.center,
-                  style: AppTextStyles.bodySmall(),
                 ),
               ),
             ],
@@ -303,8 +327,8 @@ class LoginView extends GetView<AuthController> {
                       underline: const SizedBox(),
                       icon: const Icon(Icons.arrow_drop_down, size: 20),
                       items: const [
-                        DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
                         DropdownMenuItem(value: '+232', child: Text('🇸🇱 +232')),
+                        DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
                         DropdownMenuItem(value: '+1', child: Text('🇺🇸 +1')),
                         DropdownMenuItem(value: '+44', child: Text('🇬🇧 +44')),
                         DropdownMenuItem(value: '+971', child: Text('🇦🇪 +971')),

@@ -765,6 +765,12 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
+    // Legal: Terms & Conditions and Privacy Policy
+    if (path.endsWith(ApiEndpoints.terms) || path.contains('/terms')) {
+      final type = (options.queryParameters['type'] ?? options.queryParameters['tab'] ?? 'all').toString();
+      return _resolve(handler, _buildMockTermsResponse(options, type));
+    }
+
     // Default passthrough fallback
     return handler.next(options);
   }
@@ -777,6 +783,11 @@ class MockInterceptor extends Interceptor {
   /// used by ApiInterceptor to block non-Part 1 endpoints from making network calls.
   static Response getMockResponse(RequestOptions options) {
     final path = options.path;
+
+    if (path.endsWith(ApiEndpoints.terms) || path.contains('/terms')) {
+      final type = (options.queryParameters['type'] ?? options.queryParameters['tab'] ?? 'all').toString();
+      return _buildMockTermsResponse(options, type);
+    }
 
     if (path.contains(ApiEndpoints.earningsBreakdown)) {
       return Response(
@@ -1637,6 +1648,197 @@ class MockInterceptor extends Interceptor {
           'count': filtered.length,
           'deliveries': filtered,
         },
+      },
+    );
+  }
+
+  static Response _buildMockTermsResponse(RequestOptions options, String type) {
+    final Map<String, dynamic> termsDoc = {
+      'id': 'rider-terms-and-conditions',
+      'slug': 'rider-terms',
+      'title': 'Delivery Partner & Rider Terms and Conditions',
+      'version': '1.0',
+      'lastUpdated': 'September 2026',
+      'summary': 'Comprehensive delivery partner agreement governing operational rights, tip pass-through, safety protocols, and commercial obligations on the MEEEM Delivery Network.',
+      'highlights': [
+        {
+          'icon': 'Wallet',
+          'title': '100% Tips Pass-Through',
+          'description': 'Keep 100% of tips paid by customers in addition to standard delivery distance and base pay.'
+        },
+        {
+          'icon': 'Clock',
+          'title': 'Flexible Working Hours',
+          'description': 'Operate on your own schedule with complete freedom to toggle Online or Offline at any time.'
+        },
+        {
+          'icon': 'ShieldCheck',
+          'title': 'Rider Safety & Support',
+          'description': 'Dedicated courier safety assistance, real-time emergency protocol, and active order insurance.'
+        },
+        {
+          'icon': 'Smartphone',
+          'title': 'Direct Digital Payouts',
+          'description': 'Automated settlements directly to your registered bank account or verified mobile money wallet.'
+        }
+      ],
+      'sections': [
+        {
+          'id': 'eligibility',
+          'number': '1',
+          'title': 'Eligibility, Verification & Onboarding Requirements',
+          'summary': 'Minimum legal standards, vehicle roadworthiness, and KYC identity verification required before activation.',
+          'content': 'To register, operate, and maintain an active courier delivery profile on the MEEEM Platform, all delivery partners must satisfy the following verified standards:',
+          'bullets': [
+            'Be at least 18 years of age at the date of registration.',
+            'Possess a valid national identification document (National ID card, Voter\'s Card, or Passport) issued by the Government of Sierra Leone or authorized jurisdiction.',
+            'Hold a valid and unexpired Driver\'s License corresponding to your vehicle classification.',
+            'Submit current vehicle registration documents and valid Roadworthiness / Fitness Certificates.',
+            'Furnish proof of mandatory third-party motor vehicle insurance coverage where applicable.',
+            'Successfully pass background verification and police clearance checks to ensure customer safety.',
+            'Maintain a working smartphone running Android 8.0+ or iOS 13.0+ with cellular data, active GPS location hardware, and SMS/calling capability.'
+          ]
+        },
+        {
+          'id': 'relationship',
+          'number': '2',
+          'title': 'Independent Contractor Relationship',
+          'summary': 'Classification of riders as independent delivery partners rather than direct employees.',
+          'content': 'Your engagement with MEEEM operates under a mutual, arms-length independent commercial contractor framework:',
+          'bullets': [
+            'Couriers retain sole discretion over when, where, and how long they choose to log in and accept delivery orders.',
+            'Nothing in this agreement constitutes an employer-employee, agency, partnership, or joint venture relationship.',
+            'You are solely responsible for personal tax compliance, statutory social security, and self-employed licensing duties.'
+          ]
+        },
+        {
+          'id': 'orders-delivery',
+          'number': '3',
+          'title': 'Order Dispatch, Acceptance & Delivery Milestones',
+          'summary': 'Procedures governing incoming orders, mandatory OTP handoff, and photo proof of delivery.',
+          'content': 'Couriers must adhere to standard dispatch workflows and digital verification milestones:',
+          'bullets': [
+            'Incoming order offers must be accepted within the 60-second countdown window before automatic re-dispatch.',
+            'Pickup verification requires scanning or confirming package pickup from merchant stores.',
+            'Drop-off completion strictly requires customer OTP verification or digital proof of delivery upload.'
+          ]
+        },
+        {
+          'id': 'fare-tips-payout',
+          'number': '4',
+          'title': 'Delivery Fare Structure, 100% Tips & Payouts',
+          'summary': 'Earnings calculation, bonuses, weekly automated settlements, and tips guarantee.',
+          'content': 'Couriers receive guaranteed compensation based on transparent distance and milestone rates:',
+          'bullets': [
+            '100% of customer tips are passed directly to the delivering partner without any platform commission cuts.',
+            'Weekly payouts are automatically processed to your designated Sierra Leone Commercial Bank account or Mobile Money wallet.',
+            'Detailed earnings statements and transaction ledgers are accessible in real-time in the Rider App.'
+          ]
+        }
+      ],
+      'content': '<div class="legal-document">...</div>',
+      'rawText': 'DELIVERY PARTNER & RIDER TERMS AND CONDITIONS...'
+    };
+
+    final Map<String, dynamic> privacyDoc = {
+      'id': 'rider-privacy-policy',
+      'slug': 'rider-privacy',
+      'title': 'Delivery Partner & Rider Privacy Policy',
+      'version': '1.0',
+      'lastUpdated': 'September 2026',
+      'summary': 'Comprehensive privacy disclosures detailing continuous background GPS telemetry, personal data encryption, and courier rights.',
+      'highlights': [
+        {
+          'icon': 'MapPin',
+          'title': 'Background GPS Tracking',
+          'description': 'Continuous location collection while Online to assign nearby orders and calculate precise route ETA.'
+        },
+        {
+          'icon': 'Lock',
+          'title': 'Encrypted Payout Details',
+          'description': 'Bank details and mobile money wallet numbers are encrypted at rest with military-grade AES-256.'
+        },
+        {
+          'icon': 'PhoneCall',
+          'title': 'Masked Number Privacy',
+          'description': 'Phone numbers are masked when contacting customers to protect courier personal phone privacy.'
+        },
+        {
+          'icon': 'UserCheck',
+          'title': 'Your Data Rights',
+          'description': 'Full rights to access, inspect, export earnings logs, or request account and data deletion.'
+        }
+      ],
+      'sections': [
+        {
+          'id': 'scope-intro',
+          'number': '1',
+          'title': 'Scope & Purpose of this Policy',
+          'summary': 'Applicability to delivery drivers, bicycle couriers, and logistics partners.',
+          'content': 'This Rider Privacy Policy explains how MEEEM collects, uses, processes, and protects courier information.',
+          'bullets': [
+            'Applies to all registered delivery partners, applicants, and active contractors.',
+            'Governs mobile device permissions, telemetry data, and background services.'
+          ]
+        },
+        {
+          'id': 'info-collected',
+          'number': '2',
+          'title': 'Information We Collect',
+          'summary': 'Identity details, KYC vehicle records, location coordinates, and diagnostics.',
+          'content': 'We collect necessary operational data to facilitate safe and verifiable deliveries:',
+          'bullets': [
+            'Personal identification (Full Name, Phone Number, Email, National Identification Number).',
+            'Vehicle verification records and driver licensing details.',
+            'Payment disbursement destination details (bank account or mobile money number).'
+          ]
+        },
+        {
+          'id': 'background-location',
+          'number': '3',
+          'title': 'Background Location Tracking Disclosure',
+          'summary': 'Critical disclosure on continuous background location services.',
+          'content': 'MEEEM Rider App collects real-time, high-precision location data even when the app is in the background or screen is locked:',
+          'bullets': [
+            'Location is collected continuously while the Rider App is running in the background when status is \'ONLINE\'.',
+            'Used to assign nearby orders and calculate precise route ETA.',
+            'Enables customer and merchant live tracking of approaching deliveries.',
+            'Tracking immediately stops when marked \'OFFLINE\'.'
+          ]
+        },
+        {
+          'id': 'data-rights',
+          'number': '4',
+          'title': 'Courier Data Rights & Account Deletion',
+          'summary': 'Empowering couriers to inspect records and request permanent data removal.',
+          'content': 'Delivery partners retain comprehensive rights regarding their personal information:',
+          'bullets': [
+            'Inspect profile, vehicle records, and earnings statements directly in the Rider App.',
+            'Request immediate correction of outdated contact details.',
+            'Permanently request account and data deletion via the MEEEM Account Deletion page or in-app support.'
+          ]
+        }
+      ],
+      'content': '<div class="legal-document">...</div>',
+      'rawText': 'DELIVERY PARTNER & RIDER PRIVACY POLICY...'
+    };
+
+    Map<String, dynamic> data = {};
+    if (type == 'terms') {
+      data = {'terms': termsDoc};
+    } else if (type == 'privacy') {
+      data = {'privacy': privacyDoc};
+    } else {
+      data = {'terms': termsDoc, 'privacy': privacyDoc};
+    }
+
+    return Response(
+      requestOptions: options,
+      statusCode: 200,
+      data: {
+        'success': true,
+        'documentType': type,
+        'data': data,
       },
     );
   }
