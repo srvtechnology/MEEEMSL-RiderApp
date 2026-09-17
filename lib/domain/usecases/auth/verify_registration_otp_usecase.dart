@@ -9,10 +9,14 @@ class VerifyRegistrationOtpUseCase {
   VerifyRegistrationOtpUseCase(this.repository);
 
   Future<Either<Failure, VerifyRegistrationResultEntity>> call({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
     required String otp,
   }) {
     return repository.verifyRegistrationOtp(
+      phone: phone,
+      phoneCountryCode: phoneCountryCode,
       email: email,
       otp: otp,
     );

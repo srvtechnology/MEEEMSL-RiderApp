@@ -18,8 +18,24 @@ class RiderDrawer extends StatelessWidget {
     final rider = localDataSource?.getSavedRider();
     final user = localDataSource?.getSavedUser();
 
-    final name = rider?.name ?? user?.name ?? 'Ibrahim Koroma';
-    final email = rider?.email ?? user?.email ?? 'rider.ibrahim@example.com';
+    final name = (rider?.name != null && rider!.name.trim().isNotEmpty)
+        ? rider.name.trim()
+        : (user?.name != null && user!.name.trim().isNotEmpty)
+            ? user.name.trim()
+            : 'Alex Rider';
+    final email = (rider?.email != null && rider!.email.trim().isNotEmpty)
+        ? rider.email.trim()
+        : (user?.email != null && user!.email.trim().isNotEmpty)
+            ? user.email.trim()
+            : '';
+    final phone = (rider?.phone != null && rider!.phone.trim().isNotEmpty)
+        ? rider.phone.trim()
+        : (user?.phone != null && user!.phone.trim().isNotEmpty)
+            ? ((user.phoneCountryCode.isNotEmpty && !user.phone.startsWith('+'))
+                ? '${user.phoneCountryCode} ${user.phone}'
+                : user.phone)
+            : '';
+    final displaySubtitle = email.isNotEmpty ? email : (phone.isNotEmpty ? phone : 'Partner');
     final vehicle = rider?.vehicleType?.replaceAll('_', ' ') ?? '2-Wheeler Partner';
 
     return Drawer(
@@ -49,7 +65,7 @@ class RiderDrawer extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(email, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                Text(displaySubtitle, style: const TextStyle(fontSize: 12, color: Colors.white70)),
                 const SizedBox(height: 2),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),

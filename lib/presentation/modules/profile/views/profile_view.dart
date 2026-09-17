@@ -245,23 +245,42 @@ class ProfileView extends GetView<ProfileController> {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 2),
-                      Text(email, style: AppTextStyles.bodySmall()),
-                      Row(
-                        children: [
-                          Expanded(child: Text(phone, style: AppTextStyles.bodySmall())),
-                          TextButton.icon(
-                            onPressed: () => _showEditProfileBottomSheet(context, rider, name, phone),
-                            icon: const Icon(Icons.edit, size: 14),
-                            label: const Text('Edit', style: TextStyle(fontSize: 12)),
-                            style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              minimumSize: Size.zero,
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      if (email.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(email, style: AppTextStyles.bodySmall()),
+                        Row(
+                          children: [
+                            Expanded(child: Text(phone, style: AppTextStyles.bodySmall())),
+                            TextButton.icon(
+                              onPressed: () => _showEditProfileBottomSheet(context, rider, name, phone, email),
+                              icon: const Icon(Icons.edit, size: 14),
+                              label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
+                      ] else ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            Expanded(child: Text(phone, style: AppTextStyles.bodySmall())),
+                            TextButton.icon(
+                              onPressed: () => _showEditProfileBottomSheet(context, rider, name, phone, email),
+                              icon: const Icon(Icons.edit, size: 14),
+                              label: const Text('Edit', style: TextStyle(fontSize: 12)),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -361,10 +380,12 @@ class ProfileView extends GetView<ProfileController> {
     BuildContext context,
     dynamic rider,
     String initialName,
-    String initialPhone,
-  ) {
+    String initialPhone, [
+    String initialEmail = '',
+  ]) {
     final nameController = TextEditingController(text: initialName);
     final phoneController = TextEditingController(text: initialPhone);
+    final emailController = TextEditingController(text: initialEmail);
     final vehicleNameController = TextEditingController(
         text: rider?.vehicleName ?? rider?.vehicle?.model ?? '');
     final vehicleNumberController = TextEditingController(
@@ -410,6 +431,26 @@ class ProfileView extends GetView<ProfileController> {
                     controller: phoneController,
                     label: 'Phone Number',
                     prefixIcon: Icons.phone_outlined,
+                  ),
+                  const SizedBox(height: 12),
+                  CustomTextField(
+                    controller: emailController,
+                    label: 'Email Address',
+                    hintText: 'e.g. alex.rider@example.com',
+                    keyboardType: TextInputType.emailAddress,
+                    prefixIcon: Icons.email_outlined,
+                  ),
+                  const SizedBox(height: 4),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Text(
+                      'Add email to receive weekly earnings summaries and tax invoices',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondaryLight,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 14),
                   const Text(
@@ -458,6 +499,7 @@ class ProfileView extends GetView<ProfileController> {
                           controller.updateRiderProfile(
                             name: nameController.text.trim(),
                             phone: phoneController.text.trim(),
+                            email: emailController.text.trim(),
                             vehicleType: selectedVehicleType,
                             vehicleName: vehicleNameController.text.trim(),
                             vehicleNumber: vehicleNumberController.text.trim(),

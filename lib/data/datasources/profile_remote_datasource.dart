@@ -75,6 +75,7 @@ class ProfileRemoteDataSourceImpl implements ProfileRemoteDataSource {
       final patchData = {
         'name': rider.name,
         'phone': rider.phone,
+        'email': rider.email,
         if (rider.vehicleType != null) 'vehicleType': rider.vehicleType,
         if (rider.vehicleName != null) 'vehicleName': rider.vehicleName,
         if (rider.vehicleNumber != null) 'vehicleNumber': rider.vehicleNumber,

@@ -3,13 +3,14 @@ import '../../domain/entities/user_entity.dart';
 class UserModel extends UserEntity {
   const UserModel({
     required super.id,
-    required super.email,
+    super.email = '',
     required super.name,
     super.role = 'RIDER',
     required super.phone,
-    super.phoneCountryCode = '+232',
+    super.phoneCountryCode = '+91',
     super.image,
     super.isEmailVerified = true,
+    super.isPhoneVerified = true,
     super.createdAt,
   });
 
@@ -27,13 +28,15 @@ class UserModel extends UserEntity {
       name: json['name'] as String? ?? '',
       role: json['role'] as String? ?? 'RIDER',
       phone: json['phone'] as String? ?? '',
-      phoneCountryCode: json['phoneCountryCode'] as String? ?? '+232',
+      phoneCountryCode: json['phoneCountryCode'] as String? ?? '+91',
       image: json['image'] as String?,
       isEmailVerified: json['isEmailVerified'] as bool? ?? true,
+      isPhoneVerified: json['isPhoneVerified'] as bool? ?? true,
       createdAt: parsedDate,
     );
   }
 
+  @override
   UserModel copyWith({
     String? id,
     String? email,
@@ -43,6 +46,7 @@ class UserModel extends UserEntity {
     String? phoneCountryCode,
     String? image,
     bool? isEmailVerified,
+    bool? isPhoneVerified,
     DateTime? createdAt,
   }) {
     return UserModel(
@@ -54,6 +58,7 @@ class UserModel extends UserEntity {
       phoneCountryCode: phoneCountryCode ?? this.phoneCountryCode,
       image: image ?? this.image,
       isEmailVerified: isEmailVerified ?? this.isEmailVerified,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       createdAt: createdAt ?? this.createdAt,
     );
   }
@@ -68,6 +73,7 @@ class UserModel extends UserEntity {
       phoneCountryCode: entity.phoneCountryCode,
       image: entity.image,
       isEmailVerified: entity.isEmailVerified,
+      isPhoneVerified: entity.isPhoneVerified,
       createdAt: entity.createdAt,
     );
   }
@@ -82,6 +88,7 @@ class UserModel extends UserEntity {
       'phoneCountryCode': phoneCountryCode,
       'image': image,
       'isEmailVerified': isEmailVerified,
+      'isPhoneVerified': isPhoneVerified,
       'createdAt': createdAt?.toIso8601String(),
     };
   }

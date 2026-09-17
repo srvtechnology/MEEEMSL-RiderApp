@@ -9,8 +9,14 @@ class ResendRegistrationOtpUseCase {
   ResendRegistrationOtpUseCase(this.repository);
 
   Future<Either<Failure, ResendOtpResultEntity>> call({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
   }) {
-    return repository.resendRegistrationOtp(email: email);
+    return repository.resendRegistrationOtp(
+      phone: phone,
+      phoneCountryCode: phoneCountryCode,
+      email: email,
+    );
   }
 }

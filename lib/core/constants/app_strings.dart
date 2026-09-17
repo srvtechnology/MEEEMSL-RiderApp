@@ -21,7 +21,9 @@ class AppStrings {
   static const String loginSubtitle = 'Sign in to access your deliveries and earnings';
   static const String loginWithEmail = 'Email & Password';
   static const String loginWithPhone = 'Phone & OTP';
+  static const String emailOrPhone = 'Email or Mobile Number';
   static const String phoneNumber = 'Phone Number';
+  static const String phoneNumberRequired = 'Phone Number *';
   static const String password = 'Password';
   static const String forgotPassword = 'Forgot Password?';
   static const String resetPassword = 'Reset Password';
@@ -38,6 +40,13 @@ class AppStrings {
   static const String registerSubtitle = 'Complete your profile to start delivering';
   static const String fullName = 'Full Name';
   static const String email = 'Email Address';
+  static const String emailOptional = 'Email Address (Optional)';
+  static const String vehicleNumberRequired = 'Vehicle Number *';
+  static const String drivingLicenseOptional = 'Driving License (Optional)';
+  static const String accountPendingVerification = 'Account Pending Verification';
+  static const String accountPendingVerificationDesc = 'Your rider account is pending admin approval.';
+  static const String emailHelperNote = 'Add email to receive weekly earnings summaries and tax invoices';
+  static const String emailAlreadyInUse = 'Email already in use by another account';
 
   // Onboarding Wizard
   static const String onboardingTitle = 'Rider Onboarding';

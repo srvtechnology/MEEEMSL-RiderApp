@@ -15,7 +15,10 @@ abstract class AuthRemoteDataSource {
   Future<Map<String, dynamic>> loginWithPassword(String email, String password);
   Future<Map<String, dynamic>> verifyOtp(String phone, String otp);
   Future<LoginResponseModel> loginWithEmailPassword({
-    required String email,
+    String? email,
+    String? identifier,
+    String? phone,
+    String? phoneCountryCode,
     required String password,
     required String deviceId,
     required String platform,
@@ -59,20 +62,29 @@ abstract class AuthRemoteDataSource {
   });
   Future<RegistrationResultModel> selfRegister({
     required String name,
-    required String email,
-    required String password,
     required String phone,
-    required String phoneCountryCode,
+    String? phoneCountryCode,
+    String? email,
+    required String password,
+    String? vehicleType,
+    String? vehicleNumber,
+    String? drivingLicense,
+    String? deviceId,
+    String? platform,
   });
   Future<VerifyRegistrationResultModel> verifyRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
     required String otp,
   });
   Future<ResendOtpResultModel> resendRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
   });
-  Future<SendResetOtpResultModel> forgotPassword(String identity);
-  Future<bool> resetPassword(String identity, String otp, String newPassword);
+  Future<SendResetOtpResultModel> forgotPassword(String identity, [String? phoneCountryCode]);
+  Future<bool> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]);
   Future<String> refreshToken(String refreshToken);
   Future<void> logout();
   Future<bool> registerDeviceToken({
@@ -95,7 +107,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<LoginResponseModel> loginWithEmailPassword({
-    required String email,
+    String? email,
+    String? identifier,
+    String? phone,
+    String? phoneCountryCode,
     required String password,
     required String deviceId,
     required String platform,
@@ -103,16 +118,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String userAgent,
   }) async {
     try {
+      final effectiveIdentifier = identifier ?? email ?? phone ?? '';
+      final payload = <String, dynamic>{
+        'identifier': effectiveIdentifier,
+        if (effectiveIdentifier.contains('@')) 'email': effectiveIdentifier,
+        if (!effectiveIdentifier.contains('@') && effectiveIdentifier.isNotEmpty) 'phone': effectiveIdentifier,
+        if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
+        'password': password,
+        'deviceId': deviceId,
+        'platform': platform,
+        'deviceToken': deviceToken,
+        'userAgent': userAgent,
+      };
+
       final response = await _dioClient.dio.post(
         ApiEndpoints.login,
-        data: {
-          'email': email,
-          'password': password,
-          'deviceId': deviceId,
-          'platform': platform,
-          'deviceToken': deviceToken,
-          'userAgent': userAgent,
-        },
+        data: payload,
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
@@ -122,13 +143,32 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on DioException catch (e) {
       final respData = e.response?.data is Map ? e.response!.data as Map : {};
       final isSuspended = respData['isSuspended'] as bool? ?? false;
+      final isVerified = respData['isVerified'] as bool?;
+      final needsApproval = respData['needsApproval'] as bool? ?? false;
+      final approvalStatus = respData['approvalStatus']?.toString();
       final msg = respData['error'] ?? respData['message'] ?? 'Login failed';
 
-      if (e.response?.statusCode == 403 && isSuspended) {
-        throw SuspendedException(
-          message: msg.toString(),
-          authStatus: respData['authStatus']?.toString() ?? 'SUSPENDED',
-        );
+      if (e.response?.statusCode == 403) {
+        if (isSuspended) {
+          throw SuspendedException(
+            message: msg.toString(),
+            authStatus: respData['authStatus']?.toString() ?? 'SUSPENDED',
+          );
+        }
+        if (isVerified == false || msg.toString().toLowerCase().contains('verify')) {
+          throw UnverifiedAccountException(
+            message: msg.toString(),
+            phone: respData['phone']?.toString(),
+            email: respData['email']?.toString(),
+            verifyUrl: respData['verifyUrl']?.toString(),
+          );
+        }
+        if (needsApproval || approvalStatus == 'PENDING' || msg.toString().toLowerCase().contains('pending')) {
+          throw PendingApprovalException(
+            message: msg.toString(),
+            approvalStatus: approvalStatus ?? 'PENDING',
+          );
+        }
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
@@ -472,86 +512,122 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<RegistrationResultModel> selfRegister({
     required String name,
-    required String email,
-    required String password,
     required String phone,
-    required String phoneCountryCode,
+    String? phoneCountryCode,
+    String? email,
+    required String password,
+    String? vehicleType,
+    String? vehicleNumber,
+    String? drivingLicense,
+    String? deviceId,
+    String? platform,
   }) async {
     try {
+      final payload = <String, dynamic>{
+        'name': name,
+        'phone': phone,
+        'phoneCountryCode': (phoneCountryCode != null && phoneCountryCode.isNotEmpty) ? phoneCountryCode : '+91',
+        if (email != null && email.isNotEmpty) 'email': email,
+        'password': password,
+        'vehicleType': (vehicleType != null && vehicleType.isNotEmpty) ? vehicleType : 'BIKE',
+        'vehicleNumber': vehicleNumber ?? '',
+        if (drivingLicense != null && drivingLicense.isNotEmpty) 'drivingLicense': drivingLicense,
+        if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+        if (platform != null && platform.isNotEmpty) 'platform': platform,
+      };
+
       final response = await _dioClient.dio.post(
         ApiEndpoints.register,
-        data: {
-          'name': name,
-          'email': email,
-          'password': password,
-          'phone': phone,
-          'phoneCountryCode': phoneCountryCode,
-        },
+        data: payload,
       );
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final data = response.data['data'] as Map<String, dynamic>;
+        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
         return RegistrationResultModel.fromJson(data);
       }
       throw const ServerException(message: 'Registration failed');
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Registration failed';
-      throw ServerException(message: msg, statusCode: e.response?.statusCode);
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 
   @override
   Future<VerifyRegistrationResultModel> verifyRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
     required String otp,
   }) async {
     try {
+      final payload = <String, dynamic>{
+        'otp': otp,
+        if (phone != null && phone.isNotEmpty) ...{
+          'phone': phone,
+          if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
+        } else if (email != null && email.isNotEmpty) ...{
+          'email': email,
+        },
+      };
+
       final response = await _dioClient.dio.post(
         ApiEndpoints.verifyRegistrationOtp,
-        data: {
-          'email': email,
-          'otp': otp,
-        },
+        data: payload,
       );
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'] as Map<String, dynamic>;
+        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
         return VerifyRegistrationResultModel.fromJson(data);
       }
       throw const ServerException(message: 'Verification failed');
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Invalid or expired OTP code.';
-      throw ServerException(message: msg, statusCode: e.response?.statusCode);
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 
   @override
   Future<ResendOtpResultModel> resendRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
   }) async {
     try {
+      final payload = <String, dynamic>{
+        if (phone != null && phone.isNotEmpty) ...{
+          'phone': phone,
+          if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
+        } else if (email != null && email.isNotEmpty) ...{
+          'email': email,
+        },
+      };
+
       final response = await _dioClient.dio.post(
         ApiEndpoints.resendRegistrationOtp,
-        data: {'email': email},
+        data: payload,
       );
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'] as Map<String, dynamic>;
+        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
         return ResendOtpResultModel.fromJson(data);
       }
       throw const ServerException(message: 'Failed to resend verification code');
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to resend code';
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg, cooldownSeconds: 60);
+        throw RateLimitException(message: msg.toString(), cooldownSeconds: 60);
       }
-      throw ServerException(message: msg, statusCode: e.response?.statusCode);
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 
   @override
-  Future<SendResetOtpResultModel> forgotPassword(String identity) async {
+  Future<SendResetOtpResultModel> forgotPassword(String identity, [String? phoneCountryCode]) async {
     try {
       final response = await _dioClient.dio.post(
         ApiEndpoints.forgotPassword,
-        data: {'identity': identity},
+        data: {
+          'identifier': identity,
+          'identity': identity,
+          if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
+        },
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
@@ -561,19 +637,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to send reset code';
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg, cooldownSeconds: 45);
+        throw RateLimitException(message: msg.toString(), cooldownSeconds: 45);
       }
-      throw ServerException(message: msg, statusCode: e.response?.statusCode);
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 
   @override
-  Future<bool> resetPassword(String identity, String otp, String newPassword) async {
+  Future<bool> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]) async {
     try {
       final response = await _dioClient.dio.post(
         ApiEndpoints.resetPassword,
         data: {
+          'identifier': identity,
           'identity': identity,
+          if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
           'otp': otp,
           'newPassword': newPassword,
         },
@@ -582,9 +660,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to reset password';
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg, cooldownSeconds: 300);
+        throw RateLimitException(message: msg.toString(), cooldownSeconds: 300);
       }
-      throw ServerException(message: msg, statusCode: e.response?.statusCode);
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
   }
 

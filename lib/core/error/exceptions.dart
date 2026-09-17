@@ -56,3 +56,33 @@ class RateLimitException implements Exception {
   String toString() => 'RateLimitException: $message (cooldown: ${cooldownSeconds}s)';
 }
 
+class UnverifiedAccountException implements Exception {
+  final String message;
+  final String? phone;
+  final String? email;
+  final String? verifyUrl;
+
+  const UnverifiedAccountException({
+    this.message = 'Please verify your mobile number before logging in.',
+    this.phone,
+    this.email,
+    this.verifyUrl,
+  });
+
+  @override
+  String toString() => 'UnverifiedAccountException: $message (phone: $phone, email: $email)';
+}
+
+class PendingApprovalException implements Exception {
+  final String message;
+  final String approvalStatus;
+
+  const PendingApprovalException({
+    this.message = 'Your rider account is pending admin approval.',
+    this.approvalStatus = 'PENDING',
+  });
+
+  @override
+  String toString() => 'PendingApprovalException: $message (status: $approvalStatus)';
+}
+

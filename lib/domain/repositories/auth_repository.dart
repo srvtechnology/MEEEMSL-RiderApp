@@ -14,7 +14,10 @@ abstract class AuthRepository {
 
   // Section 3: Rider Login & Session Lifecycle
   Future<Either<Failure, LoginResponseEntity>> loginWithEmailPassword({
-    required String email,
+    String? email,
+    String? identifier,
+    String? phone,
+    String? phoneCountryCode,
     required String password,
     required String deviceId,
     required String platform,
@@ -56,20 +59,29 @@ abstract class AuthRepository {
   });
   Future<Either<Failure, RegistrationResultEntity>> selfRegister({
     required String name,
-    required String email,
-    required String password,
     required String phone,
-    required String phoneCountryCode,
+    String? phoneCountryCode,
+    String? email,
+    required String password,
+    String? vehicleType,
+    String? vehicleNumber,
+    String? drivingLicense,
+    String? deviceId,
+    String? platform,
   });
   Future<Either<Failure, VerifyRegistrationResultEntity>> verifyRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
     required String otp,
   });
   Future<Either<Failure, ResendOtpResultEntity>> resendRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
   });
-  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity);
-  Future<Either<Failure, bool>> resetPassword(String identity, String otp, String newPassword);
+  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity, [String? phoneCountryCode]);
+  Future<Either<Failure, bool>> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]);
   Future<Either<Failure, RiderEntity?>> getSavedRider();
   Future<Either<Failure, void>> logout();
   Future<Either<Failure, String>> refreshToken();

@@ -598,6 +598,7 @@ class ProfileController extends GetxController {
   Future<void> updateRiderProfile({
     required String name,
     required String phone,
+    String? email,
     String? vehicleType,
     String? vehicleName,
     String? vehicleNumber,
@@ -609,6 +610,7 @@ class ProfileController extends GetxController {
     final updated = current.copyWith(
       name: name,
       phone: phone,
+      email: email ?? current.email,
       vehicleType: vehicleType,
       vehicleName: vehicleName,
       vehicleNumber: vehicleNumber,
@@ -618,12 +620,17 @@ class ProfileController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (failure) {
+        final errorMsg = (failure.message.toLowerCase().contains('already in use') || failure.statusCode == 400 || failure.statusCode == 409)
+            ? 'Email already in use by another account'
+            : failure.message;
+        Get.snackbar('Error', errorMsg, snackPosition: SnackPosition.BOTTOM);
+      },
       (res) {
         riderProfile.value = res.copyWith(
           name: res.name.isNotEmpty ? res.name : name,
           phone: res.phone.isNotEmpty ? res.phone : phone,
-          email: res.email.isNotEmpty ? res.email : current.email,
+          email: email ?? (res.email.isNotEmpty ? res.email : current.email),
           avatar: res.avatar.isNotEmpty ? res.avatar : current.avatar,
         );
 
@@ -642,6 +649,56 @@ class ProfileController extends GetxController {
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
         );
+      },
+    );
+  }
+
+  Future<bool> updateRiderEmail(String newEmail) async {
+    if (riderProfile.value == null) return false;
+    isLoading.value = true;
+
+    final current = riderProfile.value!;
+    final updated = current.copyWith(email: newEmail.trim());
+
+    final result = await updateProfileUseCase(updated);
+    isLoading.value = false;
+
+    return result.fold(
+      (failure) {
+        final errorMsg = (failure.message.toLowerCase().contains('already in use') || failure.statusCode == 400 || failure.statusCode == 409)
+            ? 'Email already in use by another account'
+            : failure.message;
+        Get.snackbar('Update Failed', errorMsg, snackPosition: SnackPosition.BOTTOM);
+        return false;
+      },
+      (res) {
+        riderProfile.value = res.copyWith(
+          email: newEmail.trim(),
+        );
+
+        final settings = riderSettings.value;
+        if (settings.user != null) {
+          riderSettings.value = settings.copyWith(
+            user: settings.user!.copyWith(email: newEmail.trim()),
+            rider: res,
+          );
+        }
+
+        try {
+          final storage = GetStorage();
+          storage.write(
+            AppConstants.riderProfileKey,
+            jsonEncode(RiderModel.fromEntity(riderProfile.value!).toJson()),
+          );
+        } catch (_) {}
+
+        Get.snackbar(
+          'Email Updated',
+          'Your email address has been updated successfully.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFE8F8EE),
+        );
+        return true;
       },
     );
   }

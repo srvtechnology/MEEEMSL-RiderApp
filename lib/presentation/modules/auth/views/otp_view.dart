@@ -15,11 +15,14 @@ class OtpView extends GetView<AuthController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Obx(() => Text(
-              controller.otpFlowType.value == OtpFlowType.registration
-                  ? 'Email Verification'
-                  : AppStrings.verifyOtp,
-            )),
+        title: Obx(() {
+          if (controller.otpFlowType.value == OtpFlowType.registration) {
+            return Text(controller.phoneNumber.value.isNotEmpty
+                ? 'Phone Verification'
+                : 'Account Verification');
+          }
+          return const Text(AppStrings.verifyOtp);
+        }),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -28,18 +31,31 @@ class OtpView extends GetView<AuthController> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 16),
-              Obx(() => Text(
-                    controller.otpFlowType.value == OtpFlowType.registration
-                        ? 'Verify Your Email'
-                        : 'Enter Verification Code',
+              Obx(() {
+                if (controller.otpFlowType.value == OtpFlowType.registration) {
+                  return Text(
+                    controller.phoneNumber.value.isNotEmpty
+                        ? 'Verify Your Phone'
+                        : 'Verify Your Account',
                     style: AppTextStyles.headlineLarge(),
-                  )),
+                  );
+                }
+                return Text(
+                  'Enter Verification Code',
+                  style: AppTextStyles.headlineLarge(),
+                );
+              }),
               const SizedBox(height: 8),
               Obx(() {
                 final isReg = controller.otpFlowType.value == OtpFlowType.registration;
-                final target = isReg ? controller.registrationEmail.value : controller.phoneNumber.value;
+                final target = isReg
+                    ? (controller.phoneNumber.value.isNotEmpty
+                        ? controller.phoneNumber.value
+                        : controller.registrationEmail.value)
+                    : controller.phoneNumber.value;
+                final method = (isReg && controller.phoneNumber.value.isNotEmpty) ? 'via SMS ' : '';
                 return Text(
-                  'A 6-digit verification OTP was sent to $target',
+                  'A 6-digit verification OTP was sent ${method}to $target',
                   style: AppTextStyles.bodyMedium(),
                 );
               }),

@@ -9,7 +9,10 @@ class LoginWithEmailPasswordUseCase {
   LoginWithEmailPasswordUseCase(this.repository);
 
   Future<Either<Failure, LoginResponseEntity>> call({
-    required String email,
+    String? email,
+    String? identifier,
+    String? phone,
+    String? phoneCountryCode,
     required String password,
     required String deviceId,
     required String platform,
@@ -18,6 +21,9 @@ class LoginWithEmailPasswordUseCase {
   }) {
     return repository.loginWithEmailPassword(
       email: email,
+      identifier: identifier,
+      phone: phone,
+      phoneCountryCode: phoneCountryCode,
       password: password,
       deviceId: deviceId,
       platform: platform,

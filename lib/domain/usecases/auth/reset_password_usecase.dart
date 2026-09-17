@@ -8,11 +8,11 @@ class ResetPasswordUseCase {
 
   ResetPasswordUseCase(this.repository);
 
-  Future<Either<Failure, SendResetOtpResultEntity>> sendResetCode(String identity) {
-    return repository.forgotPassword(identity);
+  Future<Either<Failure, SendResetOtpResultEntity>> sendResetCode(String identity, [String? phoneCountryCode]) {
+    return repository.forgotPassword(identity, phoneCountryCode);
   }
 
-  Future<Either<Failure, bool>> confirmReset(String identity, String otp, String newPassword) {
-    return repository.resetPassword(identity, otp, newPassword);
+  Future<Either<Failure, bool>> confirmReset(String identity, String otp, String newPassword, [String? phoneCountryCode]) {
+    return repository.resetPassword(identity, otp, newPassword, phoneCountryCode);
   }
 }

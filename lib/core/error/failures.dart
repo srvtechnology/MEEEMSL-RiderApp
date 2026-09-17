@@ -59,3 +59,33 @@ class LocationFailure extends Failure {
   const LocationFailure({required super.message});
 }
 
+class UnverifiedAccountFailure extends Failure {
+  final String? phone;
+  final String? email;
+  final String? verifyUrl;
+
+  const UnverifiedAccountFailure({
+    required super.message,
+    this.phone,
+    this.email,
+    this.verifyUrl,
+    super.statusCode = 403,
+  });
+
+  @override
+  List<Object?> get props => [message, statusCode, phone, email, verifyUrl];
+}
+
+class PendingApprovalFailure extends Failure {
+  final String approvalStatus;
+
+  const PendingApprovalFailure({
+    super.message = 'Your rider account is pending admin approval.',
+    this.approvalStatus = 'PENDING',
+    super.statusCode = 403,
+  });
+
+  @override
+  List<Object?> get props => [message, statusCode, approvalStatus];
+}
+

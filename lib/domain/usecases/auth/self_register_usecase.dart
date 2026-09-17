@@ -10,17 +10,27 @@ class SelfRegisterUseCase {
 
   Future<Either<Failure, RegistrationResultEntity>> call({
     required String name,
-    required String email,
-    required String password,
     required String phone,
-    required String phoneCountryCode,
+    String? phoneCountryCode,
+    String? email,
+    required String password,
+    String? vehicleType,
+    String? vehicleNumber,
+    String? drivingLicense,
+    String? deviceId,
+    String? platform,
   }) {
     return repository.selfRegister(
       name: name,
-      email: email,
-      password: password,
       phone: phone,
       phoneCountryCode: phoneCountryCode,
+      email: email,
+      password: password,
+      vehicleType: vehicleType,
+      vehicleNumber: vehicleNumber,
+      drivingLicense: drivingLicense,
+      deviceId: deviceId,
+      platform: platform,
     );
   }
 }

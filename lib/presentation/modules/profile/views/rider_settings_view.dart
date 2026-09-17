@@ -8,6 +8,7 @@ import '../../../../core/widgets/custom_card.dart';
 import '../../../../core/widgets/custom_text_field.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../controllers/profile_controller.dart';
+import '../../../../domain/entities/user_entity.dart';
 import 'operating_zones_view.dart';
 
 class RiderSettingsView extends GetView<ProfileController> {
@@ -269,13 +270,75 @@ class RiderSettingsView extends GetView<ProfileController> {
     );
   }
 
+  void _showEditEmailDialog(BuildContext context, String currentEmail) {
+    final emailController = TextEditingController(text: currentEmail);
+    Get.dialog(
+      AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Edit Email Address', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CustomTextField(
+              controller: emailController,
+              label: 'Email Address',
+              hintText: 'e.g. alex.rider@example.com',
+              keyboardType: TextInputType.emailAddress,
+              prefixIcon: Icons.email_outlined,
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Add email to receive weekly earnings summaries and tax invoices',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondaryLight,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Cancel'),
+          ),
+          Obx(() => ElevatedButton(
+                onPressed: controller.isLoading.value
+                    ? null
+                    : () async {
+                        final success = await controller.updateRiderEmail(emailController.text);
+                        if (success) {
+                          Get.back();
+                        }
+                      },
+                child: controller.isLoading.value
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save'),
+              )),
+        ],
+      ),
+    );
+  }
+
   Widget _buildAccountOverviewCard(BuildContext context, dynamic user, dynamic rider) {
     final riderId = rider?.id ?? user?.id ?? 'cm7rider0001';
-    final riderName = user?.name ?? rider?.name ?? 'Ibrahim Koroma';
-    final riderEmail = user?.email ?? rider?.email ?? 'rider.ibrahim@example.com';
+    final riderName = user?.name ?? rider?.name ?? 'Alex Rider';
+    final rawEmail = user?.email ?? rider?.email ?? '';
+    final hasEmail = rawEmail.trim().isNotEmpty;
     final isEmailVerified = user?.isEmailVerified ?? true;
-    final phone = (user?.phoneCountryCode != null ? '${user.phoneCountryCode} ' : '+232 ') +
-        (user?.phone ?? rider?.phone ?? '76123456');
+    final rawPhone = (rider?.phone != null && rider!.phone.trim().isNotEmpty)
+        ? rider.phone.trim()
+        : (user?.phone != null && user!.phone.trim().isNotEmpty)
+            ? ((user is UserEntity && user.phoneCountryCode.isNotEmpty && !user.phone.startsWith('+'))
+                ? '${user.phoneCountryCode} ${user.phone}'
+                : user.phone.toString())
+            : '';
+    final phone = rawPhone.isNotEmpty ? rawPhone : '+91';
     final status = rider?.status ?? rider?.approvalStatus ?? 'APPROVED';
     final isApproved = status.toString().toUpperCase() == 'APPROVED';
 
@@ -305,13 +368,27 @@ class RiderSettingsView extends GetView<ProfileController> {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            riderEmail,
-                            style: AppTextStyles.bodySmall(),
-                            overflow: TextOverflow.ellipsis,
+                          child: InkWell(
+                            onTap: () => _showEditEmailDialog(context, rawEmail),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    hasEmail ? rawEmail : (phone.trim().isNotEmpty ? phone.trim() : 'Add Email Address'),
+                                    style: AppTextStyles.bodySmall().copyWith(
+                                      color: hasEmail ? null : AppColors.primary,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                const Icon(Icons.edit_outlined, size: 13, color: AppColors.primary),
+                              ],
+                            ),
                           ),
                         ),
-                        if (isEmailVerified) ...[
+                        if (hasEmail && isEmailVerified) ...[
                           const SizedBox(width: 4),
                           const Icon(Icons.verified_rounded, size: 14, color: AppColors.success),
                         ],

@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/app_strings.dart';
 import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../domain/entities/payout_info_entity.dart';
@@ -86,14 +87,20 @@ class AuthController extends GetxController {
   final registerPhoneController = TextEditingController();
   final registerCountryCode = AppConstants.defaultCountryCode.obs;
   final registerIsPasswordVisible = false.obs;
+  final registerVehicleType = 'BIKE'.obs;
+  final registerVehicleNumberController = TextEditingController();
+  final registerDrivingLicenseController = TextEditingController();
   final otpFlowType = OtpFlowType.registration.obs;
   final registrationEmail = ''.obs;
 
-  // Login Controllers
+  // Login Controllers & State
   final loginEmailController = TextEditingController();
+  TextEditingController get loginIdentifierController => loginEmailController;
   final loginPasswordController = TextEditingController();
   final phoneTextController = TextEditingController();
   final otpTextController = TextEditingController();
+  final isPendingApproval = false.obs;
+  final pendingApprovalMessage = ''.obs;
 
   // Forgot / Reset Password Controllers
   final resetIdentityController = TextEditingController();
@@ -173,6 +180,8 @@ class AuthController extends GetxController {
   void clearAuthFields() {
     loginPasswordController.clear();
     registerPasswordController.clear();
+    registerVehicleNumberController.clear();
+    registerDrivingLicenseController.clear();
     otpTextController.clear();
     resetOtpController.clear();
     newPasswordController.clear();
@@ -201,6 +210,11 @@ class AuthController extends GetxController {
     });
   }
 
+  void cancelResendTimer() {
+    _timer?.cancel();
+    _timer = null;
+  }
+
   // 2.1 Rider Self-Registration
   Future<void> selfRegisterRider() async {
     final name = registerNameController.text.trim();
@@ -208,34 +222,56 @@ class AuthController extends GetxController {
     final password = registerPasswordController.text.trim();
     final phone = registerPhoneController.text.trim();
     final countryCode = registerCountryCode.value;
+    final vehicleType = registerVehicleType.value;
+    final vehicleNumber = registerVehicleNumberController.text.trim();
+    final drivingLicense = registerDrivingLicenseController.text.trim();
 
     final nameError = Validators.validateName(name);
     if (nameError != null) {
       Get.snackbar('Validation', nameError, snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    final emailError = Validators.validateEmail(email);
-    if (emailError != null) {
-      Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
+    if (phone.isEmpty) {
+      Get.snackbar('Validation', AppStrings.phoneNumberRequired, snackPosition: SnackPosition.BOTTOM);
       return;
+    }
+    final phoneError = Validators.validatePhone(phone);
+    if (phoneError != null) {
+      Get.snackbar('Validation', phoneError, snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    if (email.isNotEmpty) {
+      final emailError = Validators.validateEmail(email);
+      if (emailError != null) {
+        Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
     }
     final passwordError = Validators.validatePassword(password);
     if (passwordError != null) {
       Get.snackbar('Validation', passwordError, snackPosition: SnackPosition.BOTTOM);
       return;
     }
-    if (phone.isEmpty) {
-      Get.snackbar('Validation', 'Please enter your phone number', snackPosition: SnackPosition.BOTTOM);
+    if (vehicleNumber.isEmpty) {
+      Get.snackbar('Validation', AppStrings.vehicleNumberRequired, snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
     isLoading.value = true;
+    final deviceId = await deviceInfoService.getDeviceId();
+    final platform = deviceInfoService.getPlatform();
+
     final result = await selfRegisterUseCase(
       name: name,
-      email: email,
-      password: password,
       phone: phone,
       phoneCountryCode: countryCode,
+      email: email.isNotEmpty ? email : null,
+      password: password,
+      vehicleType: vehicleType,
+      vehicleNumber: vehicleNumber,
+      drivingLicense: drivingLicense.isNotEmpty ? drivingLicense : null,
+      deviceId: deviceId,
+      platform: platform,
     );
     isLoading.value = false;
 
@@ -243,12 +279,13 @@ class AuthController extends GetxController {
       (failure) => Get.snackbar('Registration Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
       (data) {
         registrationEmail.value = email;
+        phoneNumber.value = '$countryCode$phone';
         otpFlowType.value = OtpFlowType.registration;
         otpTextController.clear();
         startResendTimer(seconds: data.resendCooldown);
         Get.snackbar(
           'Registration Successful',
-          'A 6-digit verification code has been sent to $email',
+          'A 6-digit verification code has been sent via SMS to $countryCode $phone',
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
           duration: const Duration(seconds: 4),
@@ -258,22 +295,35 @@ class AuthController extends GetxController {
     );
   }
 
-  // Resend current OTP (Registration Email OTP vs Phone SMS OTP)
+  // Resend current OTP (Registration Phone SMS OTP vs Phone SMS OTP)
   Future<void> resendCurrentOtp() async {
     if (!canResendOtp.value) return;
 
     isLoading.value = true;
     if (otpFlowType.value == OtpFlowType.registration) {
-      final result = await resendRegistrationOtpUseCase(email: registrationEmail.value);
+      final phone = registerPhoneController.text.trim().isNotEmpty
+          ? registerPhoneController.text.trim()
+          : (phoneNumber.value.isNotEmpty ? phoneNumber.value : null);
+      final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : '+91';
+      final email = registrationEmail.value.isNotEmpty ? registrationEmail.value : null;
+
+      final result = await resendRegistrationOtpUseCase(
+        phone: phone,
+        phoneCountryCode: countryCode,
+        email: email,
+      );
       isLoading.value = false;
 
       result.fold(
         (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
         (data) {
           startResendTimer(seconds: data.resendCooldown);
+          final destination = (phone != null && phone.isNotEmpty)
+              ? '$countryCode $phone'
+              : (email ?? 'your device');
           Get.snackbar(
             'New Code Sent',
-            'Verification code resent to ${registrationEmail.value}',
+            'Verification code resent via SMS to $destination',
             snackPosition: SnackPosition.TOP,
             backgroundColor: const Color(0xFFE8F8EE),
           );
@@ -299,13 +349,16 @@ class AuthController extends GetxController {
   }
 
   void _handleLoginSuccess(UserEntity user, RiderEntity rider) {
-    if (!user.isEmailVerified) {
+    if (!user.isPhoneVerified && !user.isEmailVerified) {
+      if (user.phone.isNotEmpty) {
+        phoneNumber.value = '${user.phoneCountryCode}${user.phone}';
+      }
       registrationEmail.value = user.email;
       otpFlowType.value = OtpFlowType.registration;
       startResendTimer();
       Get.snackbar(
         'Verification Required',
-        'Please verify your email address to proceed.',
+        'Please verify your phone number to proceed.',
         snackPosition: SnackPosition.TOP,
       );
       Get.toNamed(AppRoutes.otp);
@@ -353,21 +406,31 @@ class AuthController extends GetxController {
     Get.offAllNamed(AppRoutes.main);
   }
 
-  // 3.1 Rider Login with Email & Password (with Auto Device Token Registration)
+  // 3.1 Rider Login with Email/Phone & Password (with Auto Device Token Registration)
   Future<void> loginWithEmailPassword() async {
-    final email = loginEmailController.text.trim();
+    final identifier = loginEmailController.text.trim();
     final password = loginPasswordController.text.trim();
 
-    final emailError = Validators.validateEmail(email);
-    if (emailError != null) {
-      Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
+    if (identifier.isEmpty) {
+      Get.snackbar('Validation', 'Please enter your email or mobile number', snackPosition: SnackPosition.BOTTOM);
       return;
     }
+
+    final isEmail = identifier.contains('@');
+    if (isEmail) {
+      final emailError = Validators.validateEmail(identifier);
+      if (emailError != null) {
+        Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+    }
+
     if (password.isEmpty || password.length < 6) {
       Get.snackbar('Validation', 'Password must be at least 6 characters', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
+    isPendingApproval.value = false;
     isLoading.value = true;
     final deviceId = await deviceInfoService.getDeviceId();
     final platform = deviceInfoService.getPlatform();
@@ -376,7 +439,10 @@ class AuthController extends GetxController {
     final deviceToken = storage.read<String>(AppConstants.devicePushTokenKey) ?? 'fcm_mock_device_token';
 
     final result = await loginWithEmailPasswordUseCase(
-      email: email,
+      identifier: identifier,
+      email: isEmail ? identifier : null,
+      phone: !isEmail ? identifier : null,
+      phoneCountryCode: '+91',
       password: password,
       deviceId: deviceId,
       platform: platform,
@@ -389,6 +455,26 @@ class AuthController extends GetxController {
       (failure) {
         if (failure is SuspendedFailure) {
           SuspendedAccountDialog.show(message: failure.message);
+        } else if (failure is UnverifiedAccountFailure) {
+          otpFlowType.value = OtpFlowType.registration;
+          if (isEmail) {
+            registrationEmail.value = identifier;
+          } else {
+            phoneNumber.value = identifier;
+          }
+          startResendTimer();
+          Get.snackbar(
+            'Verification Required',
+            failure.message.isNotEmpty ? failure.message : 'Please verify your phone number to proceed.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFFFF4E5),
+          );
+          Get.toNamed(AppRoutes.otp);
+        } else if (failure is PendingApprovalFailure) {
+          isPendingApproval.value = true;
+          pendingApprovalMessage.value = failure.message.isNotEmpty
+              ? failure.message
+              : AppStrings.accountPendingVerification;
         } else {
           Get.snackbar('Sign In Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
         }
@@ -433,7 +519,7 @@ class AuthController extends GetxController {
     );
   }
 
-  // 3.2 (B) Verify Phone OTP & Obtain Session Tokens (or Email Registration OTP)
+  // 3.2 (B) Verify Phone OTP & Obtain Session Tokens (or Phone/Email Registration OTP)
   Future<void> verifyOtp() async {
     final otp = otpTextController.text.trim();
     final error = Validators.validateOtp(otp);
@@ -445,8 +531,16 @@ class AuthController extends GetxController {
     isLoading.value = true;
 
     if (otpFlowType.value == OtpFlowType.registration) {
+      final phone = registerPhoneController.text.trim().isNotEmpty
+          ? registerPhoneController.text.trim()
+          : (phoneNumber.value.isNotEmpty ? phoneNumber.value : null);
+      final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : '+91';
+      final email = registrationEmail.value.isNotEmpty ? registrationEmail.value : null;
+
       final result = await verifyRegistrationOtpUseCase(
-        email: registrationEmail.value,
+        phone: phone,
+        phoneCountryCode: countryCode,
+        email: email,
         otp: otp,
       );
       isLoading.value = false;
@@ -455,8 +549,8 @@ class AuthController extends GetxController {
         (failure) => Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
         (res) {
           Get.snackbar(
-            'Email Verified!',
-            'Email verified successfully! You can now log in to complete your rider onboarding.',
+            'Verification Successful!',
+            'Account verified successfully! You can now log in to complete your rider onboarding.',
             snackPosition: SnackPosition.TOP,
             backgroundColor: const Color(0xFFE8F8EE),
             duration: const Duration(seconds: 4),
@@ -503,7 +597,9 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await resetPasswordUseCase.sendResetCode(identity);
+    final isEmail = identity.contains('@');
+    final countryCode = !isEmail ? '+91' : null;
+    final result = await resetPasswordUseCase.sendResetCode(identity, countryCode);
     isLoading.value = false;
 
     result.fold(
@@ -550,7 +646,9 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final result = await resetPasswordUseCase.confirmReset(identity, otp, newPass);
+    final isEmail = identity.contains('@');
+    final countryCode = !isEmail ? '+91' : null;
+    final result = await resetPasswordUseCase.confirmReset(identity, otp, newPass, countryCode);
     isLoading.value = false;
 
     result.fold(

@@ -17,7 +17,7 @@ class AppConstants {
   static const String activeOrderKey = 'rider_active_order_cache';
 
   // Default Localization
-  static const String defaultCountryCode = '+232';
+  static const String defaultCountryCode = '+91';
 
   // Timers & Timeouts
   static const int incomingOrderTimeoutSeconds = 60;

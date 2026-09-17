@@ -23,7 +23,10 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, LoginResponseEntity>> loginWithEmailPassword({
-    required String email,
+    String? email,
+    String? identifier,
+    String? phone,
+    String? phoneCountryCode,
     required String password,
     required String deviceId,
     required String platform,
@@ -33,6 +36,9 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final response = await remoteDataSource.loginWithEmailPassword(
         email: email,
+        identifier: identifier,
+        phone: phone,
+        phoneCountryCode: phoneCountryCode,
         password: password,
         deviceId: deviceId,
         platform: platform,
@@ -60,6 +66,18 @@ class AuthRepositoryImpl implements AuthRepository {
       }
 
       return Right(response);
+    } on UnverifiedAccountException catch (e) {
+      return Left(UnverifiedAccountFailure(
+        message: e.message,
+        phone: e.phone,
+        email: e.email,
+        verifyUrl: e.verifyUrl,
+      ));
+    } on PendingApprovalException catch (e) {
+      return Left(PendingApprovalFailure(
+        message: e.message,
+        approvalStatus: e.approvalStatus,
+      ));
     } on SuspendedException catch (e) {
       return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on RateLimitException catch (e) {
@@ -171,9 +189,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity) async {
+  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity, [String? phoneCountryCode]) async {
     try {
-      final result = await remoteDataSource.forgotPassword(identity);
+      final result = await remoteDataSource.forgotPassword(identity, phoneCountryCode);
       return Right(result);
     } on RateLimitException catch (e) {
       return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
@@ -185,9 +203,9 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> resetPassword(String identity, String otp, String newPassword) async {
+  Future<Either<Failure, bool>> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]) async {
     try {
-      final result = await remoteDataSource.resetPassword(identity, otp, newPassword);
+      final result = await remoteDataSource.resetPassword(identity, otp, newPassword, phoneCountryCode);
       return Right(result);
     } on RateLimitException catch (e) {
       return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
@@ -302,18 +320,28 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<Either<Failure, RegistrationResultEntity>> selfRegister({
     required String name,
-    required String email,
-    required String password,
     required String phone,
-    required String phoneCountryCode,
+    String? phoneCountryCode,
+    String? email,
+    required String password,
+    String? vehicleType,
+    String? vehicleNumber,
+    String? drivingLicense,
+    String? deviceId,
+    String? platform,
   }) async {
     try {
       final result = await remoteDataSource.selfRegister(
         name: name,
-        email: email,
-        password: password,
         phone: phone,
         phoneCountryCode: phoneCountryCode,
+        email: email,
+        password: password,
+        vehicleType: vehicleType,
+        vehicleNumber: vehicleNumber,
+        drivingLicense: drivingLicense,
+        deviceId: deviceId,
+        platform: platform,
       );
       return Right(result);
     } on RateLimitException catch (e) {
@@ -329,11 +357,15 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, VerifyRegistrationResultEntity>> verifyRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
     required String otp,
   }) async {
     try {
       final result = await remoteDataSource.verifyRegistrationOtp(
+        phone: phone,
+        phoneCountryCode: phoneCountryCode,
         email: email,
         otp: otp,
       );
@@ -349,10 +381,16 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Either<Failure, ResendOtpResultEntity>> resendRegistrationOtp({
-    required String email,
+    String? phone,
+    String? phoneCountryCode,
+    String? email,
   }) async {
     try {
-      final result = await remoteDataSource.resendRegistrationOtp(email: email);
+      final result = await remoteDataSource.resendRegistrationOtp(
+        phone: phone,
+        phoneCountryCode: phoneCountryCode,
+        email: email,
+      );
       return Right(result);
     } on RateLimitException catch (e) {
       return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));

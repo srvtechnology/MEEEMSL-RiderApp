@@ -34,18 +34,20 @@ class LoginView extends GetView<AuthController> {
                     ),
                   ),
                   const SizedBox(width: 14),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppStrings.appName,
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primary),
-                      ),
-                      Text(
-                        'Delivery Partner App',
-                        style: AppTextStyles.labelSmall(color: AppColors.textSecondaryLight),
-                      ),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          AppStrings.appName,
+                          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.primary),
+                        ),
+                        Text(
+                          'Delivery Partner App',
+                          style: AppTextStyles.labelSmall(color: AppColors.textSecondaryLight),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -60,7 +62,54 @@ class LoginView extends GetView<AuthController> {
                 AppStrings.loginSubtitle,
                 style: AppTextStyles.bodyMedium(),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 20),
+
+              // Pending Approval Banner
+              Obx(() {
+                if (!controller.isPendingApproval.value) return const SizedBox.shrink();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFFB300), width: 1.5),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.hourglass_empty_rounded, color: Color(0xFFF57C00), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Account Pending Verification',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFE65100),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              controller.pendingApprovalMessage.value.isNotEmpty
+                                  ? controller.pendingApprovalMessage.value
+                                  : AppStrings.accountPendingVerification,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: Color(0xFF5D4037),
+                                height: 1.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
 
               // Login Mode Toggle Chips (Email & Password vs Phone & OTP)
               Obx(() => Container(
@@ -182,10 +231,10 @@ class LoginView extends GetView<AuthController> {
       children: [
         CustomTextField(
           controller: controller.loginEmailController,
-          label: AppStrings.email,
-          hintText: 'e.g. rider.ibrahim@example.com',
+          label: AppStrings.emailOrPhone,
+          hintText: 'e.g. rider@example.com or 9876543210',
           keyboardType: TextInputType.emailAddress,
-          prefixIcon: Icons.email_outlined,
+          prefixIcon: Icons.account_circle_outlined,
         ),
         const SizedBox(height: 16),
         Obx(() => CustomTextField(
@@ -254,8 +303,8 @@ class LoginView extends GetView<AuthController> {
                       underline: const SizedBox(),
                       icon: const Icon(Icons.arrow_drop_down, size: 20),
                       items: const [
-                        DropdownMenuItem(value: '+232', child: Text('🇸🇱 +232')),
                         DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
+                        DropdownMenuItem(value: '+232', child: Text('🇸🇱 +232')),
                         DropdownMenuItem(value: '+1', child: Text('🇺🇸 +1')),
                         DropdownMenuItem(value: '+44', child: Text('🇬🇧 +44')),
                         DropdownMenuItem(value: '+971', child: Text('🇦🇪 +971')),
@@ -270,7 +319,7 @@ class LoginView extends GetView<AuthController> {
             Expanded(
               child: CustomTextField(
                 controller: controller.phoneTextController,
-                hintText: '76123456',
+                hintText: '9876543210',
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone_outlined,
                 inputFormatters: [
