@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/services/camera_service.dart';
 import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
@@ -26,12 +27,28 @@ class PickupProofDialog extends StatefulWidget {
 }
 
 class _PickupProofDialogState extends State<PickupProofDialog> {
-  final _picker = ImagePicker();
   final List<String> _capturedPhotos = [];
   bool _isCompressing = false;
   bool _isSubmitting = false;
   static const int _minPhotos = 2;
   static const int _maxPhotos = 5;
+
+  @override
+  void initState() {
+    super.initState();
+    _recoverLostData();
+  }
+
+  Future<void> _recoverLostData() async {
+    final recovered = await CameraService.to.retrieveLostData(maxWidth: 1200, maxHeight: 1200, quality: 75);
+    if (recovered != null && mounted) {
+      if (_capturedPhotos.length < _maxPhotos) {
+        setState(() {
+          _capturedPhotos.add(recovered);
+        });
+      }
+    }
+  }
 
   Future<void> _pickSingleImage(ImageSource source) async {
     if (_capturedPhotos.length >= _maxPhotos) {
@@ -43,31 +60,30 @@ class _PickupProofDialogState extends State<PickupProofDialog> {
       return;
     }
 
+    setState(() => _isCompressing = true);
     try {
-      setState(() => _isCompressing = true);
-      final photo = await _picker.pickImage(
+      final photoPath = await CameraService.to.capturePhoto(
         source: source,
+        context: context,
         maxWidth: 1200,
         maxHeight: 1200,
-        imageQuality: 75,
+        quality: 75,
+        showGalleryFallback: true,
       );
-      if (photo != null) {
-        final compressed = await ImageCompressor.compressImage(
-          photo.path,
-          maxWidth: 1200,
-          maxHeight: 1200,
-          quality: 75,
-        );
+
+      if (mounted) {
         setState(() {
-          _capturedPhotos.add(compressed);
+          if (photoPath != null) {
+            _capturedPhotos.add(photoPath);
+          }
           _isCompressing = false;
         });
-      } else {
-        setState(() => _isCompressing = false);
       }
     } catch (e) {
       debugPrint('[PickupProofDialog] Error picking image: $e');
-      setState(() => _isCompressing = false);
+      if (mounted) {
+        setState(() => _isCompressing = false);
+      }
     }
   }
 
@@ -82,30 +98,26 @@ class _PickupProofDialogState extends State<PickupProofDialog> {
       return;
     }
 
+    setState(() => _isCompressing = true);
     try {
-      setState(() => _isCompressing = true);
-      final List<XFile> pickedList = await _picker.pickMultiImage(
+      final paths = await CameraService.to.pickMultiplePhotos(
+        maxPhotos: remaining,
         maxWidth: 1200,
         maxHeight: 1200,
-        imageQuality: 75,
-        limit: remaining,
+        quality: 75,
       );
 
-      if (pickedList.isNotEmpty) {
-        for (final xfile in pickedList.take(remaining)) {
-          final compressed = await ImageCompressor.compressImage(
-            xfile.path,
-            maxWidth: 1200,
-            maxHeight: 1200,
-            quality: 75,
-          );
-          _capturedPhotos.add(compressed);
-        }
+      if (mounted) {
+        setState(() {
+          _capturedPhotos.addAll(paths);
+          _isCompressing = false;
+        });
       }
-      setState(() => _isCompressing = false);
     } catch (e) {
       debugPrint('[PickupProofDialog] Error picking multi-images: $e');
-      setState(() => _isCompressing = false);
+      if (mounted) {
+        setState(() => _isCompressing = false);
+      }
     }
   }
 

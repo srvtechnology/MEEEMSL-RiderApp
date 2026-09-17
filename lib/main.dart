@@ -10,6 +10,7 @@ import 'core/network/api_client.dart';
 import 'core/network/dio_client.dart';
 import 'core/network/logger/api_logger.dart';
 import 'core/services/device_info_service.dart';
+import 'core/services/camera_service.dart';
 import 'core/services/socket_service.dart';
 import 'core/services/location_service.dart';
 import 'core/services/notification_service.dart';
@@ -64,6 +65,7 @@ void main() async {
   Get.put<SocketService>(SocketService(), permanent: true);
   Get.put<LocationService>(LocationService(), permanent: true);
   Get.put<NotificationService>(NotificationService(), permanent: true);
+  Get.put<CameraService>(CameraService(), permanent: true);
 
   runApp(const MeeemRiderApp());
 }

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../../core/services/camera_service.dart';
 import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -29,9 +30,23 @@ class DeliveryProofDialog extends StatefulWidget {
 
 class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
   final otpController = TextEditingController();
-  final _picker = ImagePicker();
   String? capturedPhotoPath;
   bool isCompressing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _recoverLostData();
+  }
+
+  Future<void> _recoverLostData() async {
+    final recovered = await CameraService.to.retrieveLostData();
+    if (recovered != null && mounted) {
+      setState(() {
+        capturedPhotoPath = recovered;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -40,34 +55,30 @@ class _DeliveryProofDialogState extends State<DeliveryProofDialog> {
   }
 
   Future<void> _pickProofPhoto(ImageSource source) async {
+    setState(() => isCompressing = true);
     try {
-      setState(() => isCompressing = true);
-      final photo = await _picker.pickImage(
+      final photoPath = await CameraService.to.capturePhoto(
         source: source,
+        context: context,
         maxWidth: 1024,
         maxHeight: 1024,
-        imageQuality: 70,
+        quality: 70,
+        showGalleryFallback: true,
       );
-      if (photo != null) {
-        final compressed = await ImageCompressor.compressImage(
-          photo.path,
-          maxWidth: 1024,
-          maxHeight: 1024,
-          quality: 70,
-        );
+
+      if (mounted) {
         setState(() {
-          capturedPhotoPath = compressed;
+          if (photoPath != null) {
+            capturedPhotoPath = photoPath;
+          }
           isCompressing = false;
         });
-      } else {
-        setState(() => isCompressing = false);
       }
     } catch (e) {
-      debugPrint('[DeliveryProofDialog] Image pick fallback: $e');
-      setState(() {
-        capturedPhotoPath = 'https://images.unsplash.com/photo-1526367790999-0150786686a2?w=400';
-        isCompressing = false;
-      });
+      debugPrint('[DeliveryProofDialog] Error picking photo: $e');
+      if (mounted) {
+        setState(() => isCompressing = false);
+      }
     }
   }
 
