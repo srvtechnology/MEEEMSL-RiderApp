@@ -70,8 +70,8 @@ class RegisterView extends GetView<AuthController> {
                             underline: const SizedBox(),
                             icon: const Icon(Icons.arrow_drop_down, size: 20),
                             items: const [
-                              DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
                               DropdownMenuItem(value: '+232', child: Text('🇸🇱 +232')),
+                              DropdownMenuItem(value: '+91', child: Text('🇮🇳 +91')),
                               DropdownMenuItem(value: '+1', child: Text('🇺🇸 +1')),
                               DropdownMenuItem(value: '+44', child: Text('🇬🇧 +44')),
                               DropdownMenuItem(value: '+971', child: Text('🇦🇪 +971')),

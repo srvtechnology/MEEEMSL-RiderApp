@@ -18,7 +18,7 @@ class UserEntity extends Equatable {
     required this.name,
     this.role = 'RIDER',
     required this.phone,
-    this.phoneCountryCode = '+91',
+    this.phoneCountryCode = '+232',
     this.image,
     this.isEmailVerified = true,
     this.isPhoneVerified = true,

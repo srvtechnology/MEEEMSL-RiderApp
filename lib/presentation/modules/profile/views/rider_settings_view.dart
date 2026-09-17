@@ -338,7 +338,7 @@ class RiderSettingsView extends GetView<ProfileController> {
                 ? '${user.phoneCountryCode} ${user.phone}'
                 : user.phone.toString())
             : '';
-    final phone = rawPhone.isNotEmpty ? rawPhone : '+91';
+    final phone = rawPhone.isNotEmpty ? rawPhone : '+232 76 123456';
     final status = rider?.status ?? rider?.approvalStatus ?? 'APPROVED';
     final isApproved = status.toString().toUpperCase() == 'APPROVED';
 

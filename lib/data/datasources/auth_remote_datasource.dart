@@ -526,7 +526,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final payload = <String, dynamic>{
         'name': name,
         'phone': phone,
-        'phoneCountryCode': (phoneCountryCode != null && phoneCountryCode.isNotEmpty) ? phoneCountryCode : '+91',
+        'phoneCountryCode': (phoneCountryCode != null && phoneCountryCode.isNotEmpty) ? phoneCountryCode : '+232',
         if (email != null && email.isNotEmpty) 'email': email,
         'password': password,
         'vehicleType': (vehicleType != null && vehicleType.isNotEmpty) ? vehicleType : 'BIKE',
