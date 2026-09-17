@@ -6,6 +6,7 @@ import 'package:get_storage/get_storage.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_strings.dart';
+import '../../../../core/services/camera_service.dart';
 import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../domain/entities/payout_info_entity.dart';
@@ -304,7 +305,7 @@ class AuthController extends GetxController {
       final phone = registerPhoneController.text.trim().isNotEmpty
           ? registerPhoneController.text.trim()
           : (phoneNumber.value.isNotEmpty ? phoneNumber.value : null);
-      final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : '+91';
+      final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : AppConstants.defaultCountryCode;
       final email = registrationEmail.value.isNotEmpty ? registrationEmail.value : null;
 
       final result = await resendRegistrationOtpUseCase(
@@ -442,7 +443,7 @@ class AuthController extends GetxController {
       identifier: identifier,
       email: isEmail ? identifier : null,
       phone: !isEmail ? identifier : null,
-      phoneCountryCode: '+91',
+      phoneCountryCode: AppConstants.defaultCountryCode,
       password: password,
       deviceId: deviceId,
       platform: platform,
@@ -534,7 +535,7 @@ class AuthController extends GetxController {
       final phone = registerPhoneController.text.trim().isNotEmpty
           ? registerPhoneController.text.trim()
           : (phoneNumber.value.isNotEmpty ? phoneNumber.value : null);
-      final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : '+91';
+      final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : AppConstants.defaultCountryCode;
       final email = registrationEmail.value.isNotEmpty ? registrationEmail.value : null;
 
       final result = await verifyRegistrationOtpUseCase(
@@ -598,7 +599,7 @@ class AuthController extends GetxController {
 
     isLoading.value = true;
     final isEmail = identity.contains('@');
-    final countryCode = !isEmail ? '+91' : null;
+    final countryCode = !isEmail ? AppConstants.defaultCountryCode : null;
     final result = await resetPasswordUseCase.sendResetCode(identity, countryCode);
     isLoading.value = false;
 
@@ -647,7 +648,7 @@ class AuthController extends GetxController {
 
     isLoading.value = true;
     final isEmail = identity.contains('@');
-    final countryCode = !isEmail ? '+91' : null;
+    final countryCode = !isEmail ? AppConstants.defaultCountryCode : null;
     final result = await resetPasswordUseCase.confirmReset(identity, otp, newPass, countryCode);
     isLoading.value = false;
 
@@ -673,20 +674,15 @@ class AuthController extends GetxController {
   // Image Picking for Onboarding & Documents with Compression
   Future<void> pickProfilePhoto(ImageSource source) async {
     try {
-      final file = await _imagePicker.pickImage(
+      final photoPath = await CameraService.to.capturePhoto(
         source: source,
         maxWidth: 800,
         maxHeight: 800,
-        imageQuality: 70,
+        quality: 70,
+        showGalleryFallback: true,
       );
-      if (file != null) {
-        final compressed = await ImageCompressor.compressImage(
-          file.path,
-          maxWidth: 800,
-          maxHeight: 800,
-          quality: 70,
-        );
-        profilePhotoPath.value = compressed;
+      if (photoPath != null) {
+        profilePhotoPath.value = photoPath;
       }
     } catch (_) {
       // Mock fallback if running without native camera permissions
@@ -696,21 +692,15 @@ class AuthController extends GetxController {
 
   Future<void> pickDocument(String docType, {ImageSource source = ImageSource.gallery}) async {
     try {
-      final file = await _imagePicker.pickImage(
+      final photoPath = await CameraService.to.capturePhoto(
         source: source,
         maxWidth: 1200,
         maxHeight: 1200,
-        imageQuality: 70,
+        quality: 70,
+        showGalleryFallback: true,
       );
-      final rawPath = file?.path;
-      if (rawPath != null) {
-        final compressed = await ImageCompressor.compressImage(
-          rawPath,
-          maxWidth: 1200,
-          maxHeight: 1200,
-          quality: 70,
-        );
-        _setDocPath(docType, compressed);
+      if (photoPath != null) {
+        _setDocPath(docType, photoPath);
       }
     } catch (_) {
       _setDocPath(docType, 'mock_doc_path_${DateTime.now().millisecondsSinceEpoch}.jpg');
@@ -909,39 +899,109 @@ class AuthController extends GetxController {
     }
   }
 
+  void _safeShowSnackbar(String title, String message, {SnackPosition snackPosition = SnackPosition.BOTTOM}) {
+    if (Get.overlayContext != null) {
+      Get.snackbar(title, message, snackPosition: snackPosition);
+    }
+  }
+
+  bool validatePayoutMethod() {
+    final selectedOpt = selectedPaymentOption.value;
+    if (selectedOpt == PaymentOption.bank) {
+      final bankName = bankNameController.text.trim();
+      final accountHolder = accountHolderController.text.trim();
+      final accountNumber = accountNumberController.text.trim();
+
+      if (bankName.isEmpty) {
+        _safeShowSnackbar('Payout Method Required', 'Please enter your bank name');
+        return false;
+      }
+      if (accountHolder.isEmpty) {
+        _safeShowSnackbar('Payout Method Required', 'Please enter the bank account holder name');
+        return false;
+      }
+      if (accountNumber.isEmpty) {
+        _safeShowSnackbar('Payout Method Required', 'Please enter your bank account number');
+        return false;
+      }
+    } else {
+      // Orange Money or AfriMoney
+      final mobilePhone = mobileNumberController.text.trim().isNotEmpty
+          ? mobileNumberController.text.trim()
+          : mobileMoneyNumberController.text.trim();
+      if (mobilePhone.isEmpty) {
+        _safeShowSnackbar('Payout Method Required', 'Please enter your ${selectedOpt.displayName} mobile number');
+        return false;
+      }
+      final digitsOnly = mobilePhone.replaceAll(RegExp(r'\D'), '');
+      if (digitsOnly.length < 6) {
+        _safeShowSnackbar('Payout Method Required', 'Please enter a valid mobile money number');
+        return false;
+      }
+    }
+    return true;
+  }
+
   // 5-Step Onboarding Wizard Navigation
   void nextOnboardingStep() {
     final current = onboardingStep.value;
     if (current == 0) {
+      if (profilePhotoPath.value.trim().isEmpty) {
+        _safeShowSnackbar(
+          'Profile Photo Required',
+          'Please upload your profile photo to continue',
+        );
+        return;
+      }
       final name = fullNameController.text.trim();
       final phone = onboardingPhoneController.text.trim();
       if (name.isEmpty) {
-        Get.snackbar('Personal Information', 'Please enter your legal full name', snackPosition: SnackPosition.BOTTOM);
+        _safeShowSnackbar('Personal Information', 'Please enter your legal full name');
         return;
       }
       if (phone.isEmpty) {
-        Get.snackbar('Personal Information', 'Please enter your phone number', snackPosition: SnackPosition.BOTTOM);
+        _safeShowSnackbar('Personal Information', 'Please enter your phone number');
         return;
       }
     } else if (current == 1) {
       final dlNo = drivingLicenseNoController.text.trim();
       if (dlNo.isEmpty) {
-        Get.snackbar('Documents Required', "Please enter your Driver's License ID Number", snackPosition: SnackPosition.BOTTOM);
+        _safeShowSnackbar('Documents Required', "Please enter your Driver's License ID Number");
+        return;
+      }
+      if (nationalIdFrontPath.value.trim().isEmpty) {
+        _safeShowSnackbar('Document Upload Required', 'Please upload National ID / Passport (Front)');
+        return;
+      }
+      if (nationalIdBackPath.value.trim().isEmpty) {
+        _safeShowSnackbar('Document Upload Required', 'Please upload National ID / Passport (Back)');
+        return;
+      }
+      if (driverLicensePath.value.trim().isEmpty) {
+        _safeShowSnackbar('Document Upload Required', "Please upload your Driver's License Document");
+        return;
+      }
+      if (vehicleInsurancePath.value.trim().isEmpty) {
+        _safeShowSnackbar('Document Upload Required', 'Please upload your Vehicle Insurance Certificate');
         return;
       }
     } else if (current == 2) {
       if (vehicleType.value.isEmpty) {
-        Get.snackbar('Vehicle Information', 'Please select your vehicle type', snackPosition: SnackPosition.BOTTOM);
+        _safeShowSnackbar('Vehicle Information', 'Please select your vehicle type');
         return;
       }
       final plate = licensePlateController.text.trim();
-      if (plate.isEmpty) {
-        Get.snackbar('Vehicle Information', 'Please enter your vehicle license plate / registration number', snackPosition: SnackPosition.BOTTOM);
+      if (vehicleType.value != 'BICYCLE' && plate.isEmpty) {
+        _safeShowSnackbar('Vehicle Information', 'Please enter your vehicle license plate / registration number');
         return;
       }
     } else if (current == 3) {
       if (selectedZones.isEmpty) {
-        Get.snackbar('Zones Required', 'Please select at least one operating delivery zone', snackPosition: SnackPosition.BOTTOM);
+        _safeShowSnackbar('Zones Required', 'Please select at least one operating delivery zone');
+        return;
+      }
+    } else if (current == 4) {
+      if (!validatePayoutMethod()) {
         return;
       }
     }
@@ -962,6 +1022,10 @@ class AuthController extends GetxController {
   }
 
   Future<void> submitFullOnboarding() async {
+    if (!validatePayoutMethod()) {
+      return;
+    }
+
     isLoading.value = true;
 
     // Vehicle Type per API doc: "2_WHEELER", "3_WHEELER", "4_WHEELER", "BICYCLE"
@@ -1079,6 +1143,9 @@ class AuthController extends GetxController {
     final compId = nationalIdFrontPath.value.isNotEmpty
         ? await ImageCompressor.compressImage(nationalIdFrontPath.value, maxWidth: 1200, maxHeight: 1200, quality: 70)
         : null;
+    final compIdBack = nationalIdBackPath.value.isNotEmpty
+        ? await ImageCompressor.compressImage(nationalIdBackPath.value, maxWidth: 1200, maxHeight: 1200, quality: 70)
+        : null;
     final compInsurance = vehicleInsurancePath.value.isNotEmpty
         ? await ImageCompressor.compressImage(vehicleInsurancePath.value, maxWidth: 1200, maxHeight: 1200, quality: 70)
         : null;
@@ -1100,6 +1167,7 @@ class AuthController extends GetxController {
       profileImagePath: compProfile,
       drivingLicenseDocPath: compDl,
       nationalIdDocPath: compId,
+      nationalIdPath: compIdBack,
       vehicleInsuranceDocPath: compInsurance,
     );
     isLoading.value = false;

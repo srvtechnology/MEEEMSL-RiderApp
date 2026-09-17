@@ -235,6 +235,7 @@ void main() {
       profileImagePath: any(named: 'profileImagePath'),
       drivingLicenseDocPath: any(named: 'drivingLicenseDocPath'),
       nationalIdDocPath: any(named: 'nationalIdDocPath'),
+      nationalIdPath: any(named: 'nationalIdPath'),
       vehicleInsuranceDocPath: any(named: 'vehicleInsuranceDocPath'),
     )).thenAnswer((_) async => const Right(testRider));
 
@@ -267,6 +268,7 @@ void main() {
       profileImagePath: any(named: 'profileImagePath'),
       drivingLicenseDocPath: any(named: 'drivingLicenseDocPath'),
       nationalIdDocPath: any(named: 'nationalIdDocPath'),
+      nationalIdPath: any(named: 'nationalIdPath'),
       vehicleInsuranceDocPath: any(named: 'vehicleInsuranceDocPath'),
     )).captured;
 
@@ -277,5 +279,108 @@ void main() {
     expect(payout['mobileMoneyOption'], 'Orange Money');
     expect(payout['mobileNumber'], '+23276123456');
     expect(payout['agentNumber'], 'AG-9081');
+  });
+
+  group('Onboarding Step Validations & Mandatory Payout', () {
+    test('Step 0 (Personal): blocks advance when profile photo is not uploaded', () {
+      controller.onboardingStep.value = 0;
+      controller.fullNameController.text = 'Samuel Taylor';
+      controller.onboardingPhoneController.text = '+23276145892';
+      controller.profilePhotoPath.value = '';
+
+      controller.nextOnboardingStep();
+
+      // Must not advance to Step 1
+      expect(controller.onboardingStep.value, 0);
+
+      // Once profile photo is provided, advances to Step 1
+      controller.profilePhotoPath.value = '/mock/path/profile.jpg';
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 1);
+    });
+
+    test('Step 1 (Documents): blocks advance if any document upload or DL number is missing', () {
+      controller.onboardingStep.value = 1;
+      controller.drivingLicenseNoController.text = '';
+      controller.nationalIdFrontPath.value = '';
+      controller.nationalIdBackPath.value = '';
+      controller.driverLicensePath.value = '';
+      controller.vehicleInsurancePath.value = '';
+
+      // Missing DL No
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 1);
+
+      controller.drivingLicenseNoController.text = 'DL-10928374';
+
+      // Missing National ID Front
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 1);
+
+      controller.nationalIdFrontPath.value = '/mock/nid_front.jpg';
+
+      // Missing National ID Back
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 1);
+
+      controller.nationalIdBackPath.value = '/mock/nid_back.jpg';
+
+      // Missing Driver's License Document
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 1);
+
+      controller.driverLicensePath.value = '/mock/dl_doc.jpg';
+
+      // Missing Vehicle Insurance
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 1);
+
+      controller.vehicleInsurancePath.value = '/mock/insurance.jpg';
+
+      // Now all 4 documents and DL number are present -> advances to Step 2
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+    });
+
+    test('Step 4 (Payout Method): Bank payout validation blocks when required fields are missing', () {
+      controller.onboardingStep.value = 4;
+      controller.selectedPaymentOption.value = PaymentOption.bank;
+
+      controller.bankNameController.text = '';
+      controller.accountHolderController.text = '';
+      controller.accountNumberController.text = '';
+
+      expect(controller.validatePayoutMethod(), isFalse);
+
+      controller.bankNameController.text = 'Sierra Leone Commercial Bank';
+      expect(controller.validatePayoutMethod(), isFalse);
+
+      controller.accountHolderController.text = 'Mohamed Kamara';
+      expect(controller.validatePayoutMethod(), isFalse);
+
+      controller.accountNumberController.text = '003001002345678';
+      expect(controller.validatePayoutMethod(), isTrue);
+    });
+
+    test('Step 4 (Payout Method): Mobile Money validation blocks when phone number is missing or too short', () {
+      controller.onboardingStep.value = 4;
+      controller.selectedPaymentOption.value = PaymentOption.orangeMoney;
+
+      controller.mobileNumberController.text = '';
+      expect(controller.validatePayoutMethod(), isFalse);
+
+      // Too short
+      controller.mobileNumberController.text = '123';
+      expect(controller.validatePayoutMethod(), isFalse);
+
+      // Valid phone
+      controller.mobileNumberController.text = '+23276123456';
+      expect(controller.validatePayoutMethod(), isTrue);
+
+      // AfriMoney option
+      controller.selectedPaymentOption.value = PaymentOption.afriMoney;
+      controller.mobileNumberController.text = '+23277987654';
+      expect(controller.validatePayoutMethod(), isTrue);
+    });
   });
 }

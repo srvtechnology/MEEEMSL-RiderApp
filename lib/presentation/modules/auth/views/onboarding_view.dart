@@ -324,10 +324,22 @@ class OnboardingView extends GetView<AuthController> {
                   onPressed: () => _showPhotoSourcePicker(context),
                   icon: const Icon(Icons.upload, size: 16),
                   label: Text(
-                    photoPath.isNotEmpty ? 'Change Photo' : AppStrings.uploadProfilePhoto,
+                    photoPath.isNotEmpty ? 'Change Photo' : '${AppStrings.uploadProfilePhoto} *',
                     style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                   ),
                 ),
+                if (photoPath.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 2),
+                    child: Text(
+                      'Profile photo required *',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error,
+                      ),
+                    ),
+                  ),
               ],
             );
           }),
@@ -336,7 +348,7 @@ class OnboardingView extends GetView<AuthController> {
 
         CustomTextField(
           controller: controller.fullNameController,
-          label: AppStrings.fullName,
+          label: '${AppStrings.fullName} *',
           hintText: 'e.g. Samuel Taylor',
           prefixIcon: Icons.person_outline,
         ),
@@ -355,7 +367,7 @@ class OnboardingView extends GetView<AuthController> {
         const SizedBox(height: 16),
         CustomTextField(
           controller: controller.onboardingPhoneController,
-          label: AppStrings.phoneNumber,
+          label: '${AppStrings.phoneNumber} *',
           hintText: 'e.g. +23276145892',
           keyboardType: TextInputType.phone,
           prefixIcon: Icons.phone_outlined,
@@ -437,7 +449,7 @@ class OnboardingView extends GetView<AuthController> {
 
         CustomTextField(
           controller: controller.drivingLicenseNoController,
-          label: "Driver's License ID Number",
+          label: "Driver's License ID Number *",
           hintText: 'e.g. DL-10928374',
           prefixIcon: Icons.badge_outlined,
         ),
@@ -446,7 +458,7 @@ class OnboardingView extends GetView<AuthController> {
         // 1. National ID / Passport
         _buildDocumentUploadCard(
           context: context,
-          title: 'National ID / Passport (Front)',
+          title: 'National ID / Passport (Front) *',
           docType: 'national_id_front',
           pathObservable: controller.nationalIdFrontPath,
           icon: Icons.badge_outlined,
@@ -454,7 +466,7 @@ class OnboardingView extends GetView<AuthController> {
         const SizedBox(height: 12),
         _buildDocumentUploadCard(
           context: context,
-          title: 'National ID / Passport (Back)',
+          title: 'National ID / Passport (Back) *',
           docType: 'national_id_back',
           pathObservable: controller.nationalIdBackPath,
           icon: Icons.badge_outlined,
@@ -464,7 +476,7 @@ class OnboardingView extends GetView<AuthController> {
         // 2. Driver's License
         _buildDocumentUploadCard(
           context: context,
-          title: "Driver's License Document",
+          title: "Driver's License Document *",
           docType: 'driver_license',
           pathObservable: controller.driverLicensePath,
           icon: Icons.credit_card_outlined,
@@ -474,7 +486,7 @@ class OnboardingView extends GetView<AuthController> {
         // 3. Vehicle Insurance
         _buildDocumentUploadCard(
           context: context,
-          title: 'Vehicle Insurance Certificate',
+          title: 'Vehicle Insurance Certificate *',
           docType: 'vehicle_insurance',
           pathObservable: controller.vehicleInsurancePath,
           icon: Icons.security_outlined,
@@ -552,7 +564,12 @@ class OnboardingView extends GetView<AuthController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     const SizedBox(height: 3),
                     Row(
                       children: [
@@ -565,12 +582,16 @@ class OnboardingView extends GetView<AuthController> {
                           ),
                         ),
                         const SizedBox(width: 5),
-                        Text(
-                          isAttached ? 'Ready to Submit' : 'Take Picture or Upload from Gallery',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: isAttached ? FontWeight.w600 : FontWeight.normal,
-                            color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
+                        Expanded(
+                          child: Text(
+                            isAttached ? 'Ready to Submit' : 'Take Picture or Upload from Gallery',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: isAttached ? FontWeight.w600 : FontWeight.normal,
+                              color: isAttached ? AppColors.successDark : AppColors.textSecondaryLight,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -578,6 +599,7 @@ class OnboardingView extends GetView<AuthController> {
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               TextButton.icon(
                 onPressed: () => _showDocumentSourcePicker(context, docType, title),
                 style: TextButton.styleFrom(
@@ -1125,8 +1147,29 @@ class OnboardingView extends GetView<AuthController> {
         ),
         const SizedBox(height: 20),
 
-        Text(AppStrings.payoutMethod, style: AppTextStyles.titleMedium()),
-        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('${AppStrings.payoutMethod} *', style: AppTextStyles.titleMedium()),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.warningLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Text(
+                'Required',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppColors.warningDark),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Configuring a valid payout method is required to receive your delivery earnings.',
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
+        ),
+        const SizedBox(height: 10),
 
         // Payout Method Selector (Bank / Orange Money / AfriMoney)
         Obx(() => Container(
