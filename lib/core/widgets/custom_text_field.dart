@@ -18,6 +18,7 @@ class CustomTextField extends StatelessWidget {
   final VoidCallback? onTap;
   final bool autofocus;
   final int? maxLength;
+  final Iterable<String>? autofillHints;
 
   const CustomTextField({
     super.key,
@@ -36,6 +37,7 @@ class CustomTextField extends StatelessWidget {
     this.onTap,
     this.autofocus = false,
     this.maxLength,
+    this.autofillHints,
   });
 
   @override
@@ -64,6 +66,7 @@ class CustomTextField extends StatelessWidget {
           readOnly: readOnly,
           autofocus: autofocus,
           maxLength: maxLength,
+          autofillHints: autofillHints,
           onTap: onTap,
           decoration: InputDecoration(
             hintText: hintText,

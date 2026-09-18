@@ -35,6 +35,7 @@ class SecureUtils {
         'password',
         'currentpassword',
         'newpassword',
+        'preauthtoken',
         'accesstoken',
         'refreshtoken',
         'devicetoken',

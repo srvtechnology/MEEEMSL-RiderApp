@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dartz/dartz.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
@@ -23,6 +24,7 @@ import 'package:meeem_rider/domain/usecases/profile/update_settings_usecase.dart
 import 'package:meeem_rider/presentation/modules/profile/controllers/profile_controller.dart';
 import 'package:meeem_rider/presentation/modules/profile/views/profile_view.dart';
 import 'package:meeem_rider/presentation/modules/profile/views/rider_settings_view.dart';
+import 'package:meeem_rider/presentation/routes/app_routes.dart';
 
 class MockGetProfileUseCase extends Mock implements GetProfileUseCase {}
 class MockUpdateProfileUseCase extends Mock implements UpdateProfileUseCase {}
@@ -195,7 +197,40 @@ void main() {
     expect(find.text('Settings & Preferences'), findsOneWidget);
     expect(find.text('Help & Support'), findsNothing);
     expect(find.text('Dark Mode'), findsNothing);
+    expect(find.text('Delete Account'), findsOneWidget);
     expect(find.text('Log Out'), findsOneWidget);
+  });
+
+  testWidgets('ProfileView renders Delete Account option and navigates to delete-account route on tap',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      GetMaterialApp(
+        initialRoute: AppRoutes.profile,
+        getPages: [
+          GetPage(
+            name: AppRoutes.profile,
+            page: () => const ProfileView(),
+          ),
+          GetPage(
+            name: AppRoutes.deleteAccount,
+            page: () => const Scaffold(body: Text('Delete Account Page Mock')),
+          ),
+        ],
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete Account'), findsOneWidget);
+    expect(find.text('Request permanent account and data deletion'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Delete Account'), 100);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Delete Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Delete Account Page Mock'), findsOneWidget);
   });
 
   testWidgets('ProfileView renders rider initials, name, email, phone, and status badge dynamically',

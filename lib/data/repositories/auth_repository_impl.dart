@@ -6,6 +6,7 @@ import '../../domain/entities/registration_result_entity.dart';
 import '../../domain/entities/login_response_entity.dart';
 import '../../domain/entities/phone_otp_result_entity.dart';
 import '../../domain/entities/reset_password_result_entity.dart';
+import '../../domain/entities/two_factor_resend_result_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/auth_local_datasource.dart';
 import '../datasources/auth_remote_datasource.dart';
@@ -46,6 +47,10 @@ class AuthRepositoryImpl implements AuthRepository {
         userAgent: userAgent,
       );
 
+      if (response.requiresOtp) {
+        return Right(response);
+      }
+
       await localDataSource.saveToken(response.accessToken);
       await localDataSource.saveRefreshToken(response.refreshToken);
       await localDataSource.saveRider(RiderModel.fromEntity(response.rider));
@@ -82,6 +87,90 @@ class AuthRepositoryImpl implements AuthRepository {
       return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on RateLimitException catch (e) {
       return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, LoginResponseEntity>> verify2faOtp({
+    required String preAuthToken,
+    required String otp,
+    String? deviceId,
+    String? platform,
+    String? deviceToken,
+    String? userAgent,
+  }) async {
+    try {
+      final response = await remoteDataSource.verify2faOtp(
+        preAuthToken: preAuthToken,
+        otp: otp,
+        deviceId: deviceId,
+        platform: platform,
+        deviceToken: deviceToken,
+        userAgent: userAgent,
+      );
+
+      await localDataSource.saveToken(response.accessToken);
+      await localDataSource.saveRefreshToken(response.refreshToken);
+      await localDataSource.saveRider(RiderModel.fromEntity(response.rider));
+      await localDataSource.saveUser(UserModel(
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.name,
+        role: response.user.role,
+        phone: response.user.phone,
+        phoneCountryCode: response.user.phoneCountryCode,
+        image: response.user.image,
+        isEmailVerified: response.user.isEmailVerified,
+        createdAt: response.user.createdAt,
+      ));
+      await localDataSource.setIsOnline(response.rider.isOnline);
+      if (deviceToken != null && deviceToken.isNotEmpty) {
+        await localDataSource.saveDeviceToken(deviceToken);
+      }
+
+      return Right(response);
+    } on TwoFactorSessionExpiredException catch (e) {
+      return Left(TwoFactorSessionExpiredFailure(
+        message: e.message,
+        sessionExpired: e.sessionExpired,
+      ));
+    } on TwoFactorCodeExpiredException catch (e) {
+      return Left(TwoFactorCodeExpiredFailure(
+        message: e.message,
+        codeExpired: e.codeExpired,
+      ));
+    } on SuspendedException catch (e) {
+      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, TwoFactorResendResultEntity>> resend2faOtp({
+    required String preAuthToken,
+  }) async {
+    try {
+      final response = await remoteDataSource.resend2faOtp(
+        preAuthToken: preAuthToken,
+      );
+      return Right(response);
+    } on TwoFactorSessionExpiredException catch (e) {
+      return Left(TwoFactorSessionExpiredFailure(
+        message: e.message,
+        sessionExpired: e.sessionExpired,
+      ));
+    } on RateLimitException catch (e) {
+      return Left(RateLimitFailure(
+        message: e.message,
+        cooldownSeconds: e.cooldownSeconds,
+      ));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {

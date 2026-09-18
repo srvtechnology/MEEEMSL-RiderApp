@@ -24,6 +24,7 @@ import '../modules/profile/views/documents_view.dart';
 import '../modules/profile/views/operating_zones_view.dart';
 import '../modules/profile/views/payout_info_view.dart';
 import '../modules/profile/views/vehicle_info_view.dart';
+import '../modules/profile/views/delete_account_webview.dart';
 import '../modules/notifications/bindings/notifications_binding.dart';
 import '../modules/notifications/views/notifications_view.dart';
 import '../modules/legal/bindings/legal_binding.dart';
@@ -142,6 +143,10 @@ class AppPages {
       name: AppRoutes.termsPrivacy,
       page: () => const LegalTermsPrivacyView(),
       binding: LegalBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.deleteAccount,
+      page: () => const DeleteAccountWebView(),
     ),
   ];
 }

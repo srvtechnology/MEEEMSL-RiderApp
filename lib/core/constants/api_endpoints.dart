@@ -24,8 +24,10 @@ class ApiEndpoints {
   static const String verifyRegistrationOtp = '/auth/verify-otp';
   static const String resendRegistrationOtp = '/auth/resend-otp';
 
-  // 3. Rider Login & Session Lifecycle
+  // 3. Rider Login & Session Lifecycle (including 2FA OTP login)
   static const String login = '/auth/login';
+  static const String verify2fa = '/auth/verify-2fa';
+  static const String resend2fa = '/auth/resend-2fa';
   static const String phoneOtpSend = '/auth/phone-otp/send-otp';
   static const String phoneOtpVerify = '/auth/phone-otp/verify-otp';
   static const String refreshToken = '/auth/refresh';
@@ -54,6 +56,8 @@ class ApiEndpoints {
     resendRegistrationOtp,
     // 3. Rider Login & Session Lifecycle
     login,
+    verify2fa,
+    resend2fa,
     phoneOtpSend,
     phoneOtpVerify,
     refreshToken,

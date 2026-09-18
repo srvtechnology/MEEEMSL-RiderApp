@@ -66,6 +66,9 @@ dependencies:
   google_maps_flutter: ^2.18.0
   permission_handler: ^12.0.3
 
+  # In-App WebView (Account deletion, Web portals)
+  webview_flutter: ^4.14.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

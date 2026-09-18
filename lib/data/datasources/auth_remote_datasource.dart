@@ -9,6 +9,7 @@ import '../models/registration_result_model.dart';
 import '../models/login_response_model.dart';
 import '../models/phone_otp_result_model.dart';
 import '../models/reset_password_result_model.dart';
+import '../models/two_factor_resend_result_model.dart';
 
 abstract class AuthRemoteDataSource {
   Future<bool> login(String phone);
@@ -24,6 +25,17 @@ abstract class AuthRemoteDataSource {
     required String platform,
     required String deviceToken,
     required String userAgent,
+  });
+  Future<LoginResponseModel> verify2faOtp({
+    required String preAuthToken,
+    required String otp,
+    String? deviceId,
+    String? platform,
+    String? deviceToken,
+    String? userAgent,
+  });
+  Future<TwoFactorResendResultModel> resend2faOtp({
+    required String preAuthToken,
   });
   Future<SendPhoneOtpResultModel> sendPhoneOtp({
     required String phone,
@@ -136,8 +148,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         data: payload,
       );
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
-        return LoginResponseModel.fromJson(data);
+        final respMap = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : Map<String, dynamic>.from(response.data as Map);
+        return LoginResponseModel.fromJson(respMap);
       }
       throw const ServerException(message: 'Login failed');
     } on DioException catch (e) {
@@ -169,6 +183,90 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
             approvalStatus: approvalStatus ?? 'PENDING',
           );
         }
+      }
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
+  }
+
+  @override
+  Future<LoginResponseModel> verify2faOtp({
+    required String preAuthToken,
+    required String otp,
+    String? deviceId,
+    String? platform,
+    String? deviceToken,
+    String? userAgent,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'preAuthToken': preAuthToken,
+        'otp': otp,
+        if (deviceId != null && deviceId.isNotEmpty) 'deviceId': deviceId,
+        if (platform != null && platform.isNotEmpty) 'platform': platform,
+        if (deviceToken != null && deviceToken.isNotEmpty) 'deviceToken': deviceToken,
+        if (userAgent != null && userAgent.isNotEmpty) 'userAgent': userAgent,
+      };
+
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.verify2fa,
+        data: payload,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final respMap = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : Map<String, dynamic>.from(response.data as Map);
+        return LoginResponseModel.fromJson(respMap);
+      }
+      throw const ServerException(message: '2FA Verification failed');
+    } on DioException catch (e) {
+      final respData = e.response?.data is Map ? e.response!.data as Map : {};
+      final msg = respData['error'] ?? respData['message'] ?? 'Verification failed';
+      final isSuspended = respData['isSuspended'] as bool? ?? false;
+      final sessionExpired = respData['sessionExpired'] as bool? ?? false;
+      final codeExpired = respData['codeExpired'] as bool? ?? false;
+
+      if (sessionExpired || msg.toString().toLowerCase().contains('session has expired')) {
+        throw TwoFactorSessionExpiredException(message: msg.toString());
+      }
+      if (codeExpired || msg.toString().toLowerCase().contains('code has expired')) {
+        throw TwoFactorCodeExpiredException(message: msg.toString());
+      }
+      if (e.response?.statusCode == 403 || isSuspended) {
+        throw SuspendedException(message: msg.toString());
+      }
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
+  }
+
+  @override
+  Future<TwoFactorResendResultModel> resend2faOtp({
+    required String preAuthToken,
+  }) async {
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.resend2fa,
+        data: {'preAuthToken': preAuthToken},
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final respMap = response.data is Map<String, dynamic>
+            ? response.data as Map<String, dynamic>
+            : Map<String, dynamic>.from(response.data as Map);
+        return TwoFactorResendResultModel.fromJson(respMap);
+      }
+      throw const ServerException(message: 'Failed to resend verification code');
+    } on DioException catch (e) {
+      final respData = e.response?.data is Map ? e.response!.data as Map : {};
+      final msg = respData['error'] ?? respData['message'] ?? 'Failed to resend code';
+      final sessionExpired = respData['sessionExpired'] as bool? ?? false;
+      final cooldownRemaining = respData['cooldownRemaining'] as int?;
+
+      if (sessionExpired || msg.toString().toLowerCase().contains('session has expired')) {
+        throw TwoFactorSessionExpiredException(message: msg.toString());
+      }
+      if (cooldownRemaining != null && cooldownRemaining > 0) {
+        throw RateLimitException(message: msg.toString(), cooldownSeconds: cooldownRemaining);
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }

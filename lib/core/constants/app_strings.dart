@@ -186,6 +186,8 @@ class AppStrings {
   static const String darkMode = 'Dark Mode';
   static const String helpSupport = 'Help & Support';
   static const String termsPrivacy = 'Terms & Privacy';
+  static const String deleteAccount = 'Delete Account';
+  static const String deleteAccountUrl = 'https://www.meeemsl.com/delete-account';
   static const String logout = 'Log Out';
   static const String logoutConfirm = 'Are you sure you want to log out?';
 

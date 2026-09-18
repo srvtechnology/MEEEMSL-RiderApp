@@ -89,3 +89,29 @@ class PendingApprovalFailure extends Failure {
   List<Object?> get props => [message, statusCode, approvalStatus];
 }
 
+class TwoFactorSessionExpiredFailure extends Failure {
+  final bool sessionExpired;
+
+  const TwoFactorSessionExpiredFailure({
+    super.message = 'Verification session has expired. Please log in again.',
+    super.statusCode = 400,
+    this.sessionExpired = true,
+  });
+
+  @override
+  List<Object?> get props => [message, statusCode, sessionExpired];
+}
+
+class TwoFactorCodeExpiredFailure extends Failure {
+  final bool codeExpired;
+
+  const TwoFactorCodeExpiredFailure({
+    super.message = 'Verification code has expired. Please request a new one.',
+    super.statusCode = 400,
+    this.codeExpired = true,
+  });
+
+  @override
+  List<Object?> get props => [message, statusCode, codeExpired];
+}
+

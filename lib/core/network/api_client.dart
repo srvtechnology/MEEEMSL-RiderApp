@@ -147,6 +147,8 @@ class ApiClient extends GetConnect {
       // Headers setup
       final path = uri.path;
       final isAuthEndpoint = path.contains('/auth/login') ||
+          path.contains('/auth/verify-2fa') ||
+          path.contains('/auth/resend-2fa') ||
           path.contains('/auth/register') ||
           path.contains('/auth/verify-otp') ||
           path.contains('/auth/resend-otp') ||

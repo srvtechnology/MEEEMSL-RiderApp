@@ -86,3 +86,29 @@ class PendingApprovalException implements Exception {
   String toString() => 'PendingApprovalException: $message (status: $approvalStatus)';
 }
 
+class TwoFactorSessionExpiredException implements Exception {
+  final String message;
+  final bool sessionExpired;
+
+  const TwoFactorSessionExpiredException({
+    this.message = 'Verification session has expired. Please log in again.',
+    this.sessionExpired = true,
+  });
+
+  @override
+  String toString() => 'TwoFactorSessionExpiredException: $message';
+}
+
+class TwoFactorCodeExpiredException implements Exception {
+  final String message;
+  final bool codeExpired;
+
+  const TwoFactorCodeExpiredException({
+    this.message = 'Verification code has expired. Please request a new one.',
+    this.codeExpired = true,
+  });
+
+  @override
+  String toString() => 'TwoFactorCodeExpiredException: $message';
+}
+

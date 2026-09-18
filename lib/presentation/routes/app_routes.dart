@@ -31,4 +31,5 @@ class AppRoutes {
   static const String notifications = '/notifications';
   
   static const String termsPrivacy = '/terms-privacy';
+  static const String deleteAccount = '/delete-account';
 }

@@ -23,6 +23,8 @@ class ApiInterceptor extends Interceptor {
     }
 
     final isAuthEndpoint = path.contains('/auth/login') ||
+        path.contains(ApiEndpoints.verify2fa) ||
+        path.contains(ApiEndpoints.resend2fa) ||
         path.contains('/auth/register') ||
         path.contains('/auth/verify-otp') ||
         path.contains('/auth/resend-otp') ||
@@ -54,7 +56,9 @@ class ApiInterceptor extends Interceptor {
     if (statusCode == 401 &&
         err.requestOptions.extra['isRetry'] != true &&
         !err.requestOptions.path.contains(ApiEndpoints.refreshToken) &&
-        !err.requestOptions.path.contains(ApiEndpoints.login)) {
+        !err.requestOptions.path.contains(ApiEndpoints.login) &&
+        !err.requestOptions.path.contains(ApiEndpoints.verify2fa) &&
+        !err.requestOptions.path.contains(ApiEndpoints.resend2fa)) {
       final refreshToken = _storage.read<String>(AppConstants.refreshTokenKey);
       if (refreshToken != null && refreshToken.isNotEmpty) {
         try {

@@ -24,6 +24,8 @@ import '../../../../domain/usecases/auth/verify_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/resend_registration_otp_usecase.dart';
 import '../../../../domain/usecases/auth/reset_password_usecase.dart';
 import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
+import '../../../../domain/usecases/auth/verify_2fa_otp_usecase.dart';
+import '../../../../domain/usecases/auth/resend_2fa_otp_usecase.dart';
 import '../../../../domain/usecases/profile/get_operating_zones_usecase.dart';
 import '../../../../domain/entities/operating_zone_entity.dart';
 import '../../../../data/datasources/auth_local_datasource.dart';
@@ -35,6 +37,7 @@ import '../../../routes/app_routes.dart';
 enum OtpFlowType {
   registration,
   phoneLogin,
+  twoFactorLogin,
 }
 
 class AuthController extends GetxController {
@@ -52,6 +55,8 @@ class AuthController extends GetxController {
   final ResetPasswordUseCase resetPasswordUseCase;
   final DeviceInfoService deviceInfoService;
   final GetOperatingZonesUseCase? getOperatingZonesUseCase;
+  final Verify2faOtpUseCase? verify2faOtpUseCase;
+  final Resend2faOtpUseCase? resend2faOtpUseCase;
 
   AuthController({
     required this.loginUseCase,
@@ -68,6 +73,8 @@ class AuthController extends GetxController {
     required this.resetPasswordUseCase,
     required this.deviceInfoService,
     this.getOperatingZonesUseCase,
+    this.verify2faOtpUseCase,
+    this.resend2faOtpUseCase,
   });
 
   // State Observables
@@ -102,6 +109,17 @@ class AuthController extends GetxController {
   final otpTextController = TextEditingController();
   final isPendingApproval = false.obs;
   final pendingApprovalMessage = ''.obs;
+
+  // 2FA Challenge Memory State (Strictly in-memory, never persisted to disk or GetStorage)
+  final _preAuthToken = RxnString();
+  String? get preAuthToken => _preAuthToken.value;
+  void clearPreAuthToken() => _preAuthToken.value = null;
+
+  final twoFactorMaskedPhone = ''.obs;
+  final twoFactorMaskedEmail = ''.obs;
+  final twoFactorChannels = <String>[].obs;
+  final twoFactorCodeExpirySeconds = 300.obs;
+  Timer? _twoFactorExpiryTimer;
 
   // Forgot / Reset Password Controllers
   final resetIdentityController = TextEditingController();
@@ -164,8 +182,6 @@ class AuthController extends GetxController {
   TextEditingController get mobileMoneyNumberController => mobileNumberController;
   final beneficiaryNameController = TextEditingController();
 
-  final _imagePicker = ImagePicker();
-
   @override
   void onInit() {
     super.onInit();
@@ -175,6 +191,8 @@ class AuthController extends GetxController {
   @override
   void onClose() {
     _timer?.cancel();
+    _twoFactorExpiryTimer?.cancel();
+    clearPreAuthToken();
     super.onClose();
   }
 
@@ -214,6 +232,49 @@ class AuthController extends GetxController {
   void cancelResendTimer() {
     _timer?.cancel();
     _timer = null;
+  }
+
+  void startTwoFactorExpiryTimer({int? seconds}) {
+    _twoFactorExpiryTimer?.cancel();
+    twoFactorCodeExpirySeconds.value = seconds ?? 300;
+    _twoFactorExpiryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (twoFactorCodeExpirySeconds.value > 0) {
+        twoFactorCodeExpirySeconds.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void cancelTwoFactorExpiryTimer() {
+    _twoFactorExpiryTimer?.cancel();
+    _twoFactorExpiryTimer = null;
+  }
+
+  void _safeNavigate(String route, {bool offAll = false}) {
+    if (Get.testMode && Get.key.currentState == null) return;
+    if (offAll) {
+      Get.offAllNamed(route);
+    } else {
+      Get.toNamed(route);
+    }
+  }
+
+  void _showSnackbar(
+    String title,
+    String message, {
+    SnackPosition snackPosition = SnackPosition.BOTTOM,
+    Color? backgroundColor,
+    Duration duration = const Duration(seconds: 3),
+  }) {
+    if (Get.testMode) return;
+    Get.snackbar(
+      title,
+      message,
+      snackPosition: snackPosition,
+      backgroundColor: backgroundColor,
+      duration: duration,
+    );
   }
 
   // 2.1 Rider Self-Registration
@@ -296,11 +357,71 @@ class AuthController extends GetxController {
     );
   }
 
-  // Resend current OTP (Registration Phone SMS OTP vs Phone SMS OTP)
+  // Resend current OTP (Registration Phone SMS OTP vs Phone SMS OTP vs 2FA Challenge OTP)
   Future<void> resendCurrentOtp() async {
     if (!canResendOtp.value) return;
 
     isLoading.value = true;
+    if (otpFlowType.value == OtpFlowType.twoFactorLogin) {
+      final token = _preAuthToken.value;
+      if (token == null || token.isEmpty) {
+        isLoading.value = false;
+        _showSnackbar(
+          'Session Expired',
+          'Verification session has expired. Please log in again.',
+          snackPosition: SnackPosition.TOP,
+        );
+        _safeNavigate(AppRoutes.login, offAll: true);
+        return;
+      }
+
+      final useCase = resend2faOtpUseCase ?? (Get.isRegistered<Resend2faOtpUseCase>() ? Get.find<Resend2faOtpUseCase>() : null);
+      if (useCase != null) {
+        final result = await useCase(preAuthToken: token);
+        isLoading.value = false;
+
+        result.fold(
+          (failure) {
+            if (failure is TwoFactorSessionExpiredFailure) {
+              clearPreAuthToken();
+              cancelResendTimer();
+              cancelTwoFactorExpiryTimer();
+              _showSnackbar(
+                'Session Expired',
+                failure.message,
+                snackPosition: SnackPosition.TOP,
+                backgroundColor: const Color(0xFFFFEBEE),
+              );
+              _safeNavigate(AppRoutes.login, offAll: true);
+            } else if (failure is RateLimitFailure) {
+              startResendTimer(seconds: failure.cooldownSeconds);
+              _showSnackbar(
+                'Cooldown Active',
+                failure.message,
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            } else {
+              _showSnackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+            }
+          },
+          (res) {
+            _preAuthToken.value = res.preAuthToken;
+            startResendTimer(seconds: res.resendCooldown);
+            startTwoFactorExpiryTimer(seconds: 300);
+            _showSnackbar(
+              'Code Resent',
+              res.message.isNotEmpty ? res.message : 'Verification code resent successfully.',
+              snackPosition: SnackPosition.TOP,
+              backgroundColor: const Color(0xFFE8F8EE),
+            );
+          },
+        );
+      } else {
+        isLoading.value = false;
+      }
+      return;
+    }
+
     if (otpFlowType.value == OtpFlowType.registration) {
       final phone = registerPhoneController.text.trim().isNotEmpty
           ? registerPhoneController.text.trim()
@@ -349,6 +470,8 @@ class AuthController extends GetxController {
     }
   }
 
+  Future<void> resend2faOtp() => resendCurrentOtp();
+
   void _handleLoginSuccess(UserEntity user, RiderEntity rider) {
     if (!user.isPhoneVerified && !user.isEmailVerified) {
       if (user.phone.isNotEmpty) {
@@ -394,17 +517,17 @@ class AuthController extends GetxController {
     }
 
     if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
-      Get.offAllNamed(AppRoutes.pendingApproval);
+      _safeNavigate(AppRoutes.pendingApproval, offAll: true);
       return;
     }
 
-    Get.snackbar(
+    _showSnackbar(
       'Welcome Back!',
       'Signed in as ${user.name.isNotEmpty ? user.name : rider.name}',
       snackPosition: SnackPosition.BOTTOM,
       backgroundColor: const Color(0xFFE8F8EE),
     );
-    Get.offAllNamed(AppRoutes.main);
+    _safeNavigate(AppRoutes.main, offAll: true);
   }
 
   // 3.1 Rider Login with Email/Phone & Password (with Auto Device Token Registration)
@@ -480,7 +603,36 @@ class AuthController extends GetxController {
           Get.snackbar('Sign In Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
         }
       },
-      (res) => _handleLoginSuccess(res.user, res.rider),
+      (res) {
+        if (res.requiresOtp) {
+          _preAuthToken.value = res.preAuthToken;
+          twoFactorMaskedPhone.value = res.maskedPhone ?? '';
+          twoFactorMaskedEmail.value = res.maskedEmail ?? '';
+          twoFactorChannels.assignAll(res.channels);
+          otpFlowType.value = OtpFlowType.twoFactorLogin;
+          otpTextController.clear();
+          startResendTimer(seconds: res.resendCooldown);
+          startTwoFactorExpiryTimer(seconds: res.expiresIn > 0 ? res.expiresIn : 300);
+
+          final destination = [
+            if (res.maskedPhone != null && res.maskedPhone!.isNotEmpty) res.maskedPhone,
+            if (res.maskedEmail != null && res.maskedEmail!.isNotEmpty) res.maskedEmail,
+          ].join(' and ');
+
+          _showSnackbar(
+            'Two-Factor Verification',
+            destination.isNotEmpty
+                ? 'Verification code sent to $destination'
+                : 'Verification code sent to your registered mobile number and email.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+            duration: const Duration(seconds: 4),
+          );
+          _safeNavigate(AppRoutes.otp);
+        } else {
+          _handleLoginSuccess(res.user, res.rider);
+        }
+      },
     );
   }
 
@@ -520,16 +672,98 @@ class AuthController extends GetxController {
     );
   }
 
-  // 3.2 (B) Verify Phone OTP & Obtain Session Tokens (or Phone/Email Registration OTP)
+  Future<void> verify2faOtp(String otp) {
+    otpTextController.text = otp;
+    return verifyOtp();
+  }
+
+  // 3.2 (B) Verify Phone OTP & Obtain Session Tokens (or Phone/Email Registration OTP, 2FA Challenge)
   Future<void> verifyOtp() async {
     final otp = otpTextController.text.trim();
     final error = Validators.validateOtp(otp);
     if (error != null) {
-      Get.snackbar('Invalid OTP', error, snackPosition: SnackPosition.BOTTOM);
+      _showSnackbar('Invalid OTP', error, snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
     isLoading.value = true;
+
+    if (otpFlowType.value == OtpFlowType.twoFactorLogin) {
+      final token = _preAuthToken.value;
+      if (token == null || token.isEmpty) {
+        isLoading.value = false;
+        _showSnackbar(
+          'Session Expired',
+          'Verification session has expired. Please log in again.',
+          snackPosition: SnackPosition.TOP,
+        );
+        _safeNavigate(AppRoutes.login, offAll: true);
+        return;
+      }
+
+      final useCase = verify2faOtpUseCase ?? (Get.isRegistered<Verify2faOtpUseCase>() ? Get.find<Verify2faOtpUseCase>() : null);
+      if (useCase != null) {
+        final deviceId = await deviceInfoService.getDeviceId();
+        final platform = deviceInfoService.getPlatform();
+        final userAgent = await deviceInfoService.getUserAgent();
+        final storage = GetStorage();
+        final deviceToken = storage.read<String>(AppConstants.devicePushTokenKey) ?? 'fcm_mock_device_token';
+
+        final result = await useCase(
+          preAuthToken: token,
+          otp: otp,
+          deviceId: deviceId,
+          platform: platform,
+          deviceToken: deviceToken,
+          userAgent: userAgent,
+        );
+        isLoading.value = false;
+
+        result.fold(
+          (failure) {
+            if (failure is TwoFactorSessionExpiredFailure) {
+              clearPreAuthToken();
+              cancelResendTimer();
+              cancelTwoFactorExpiryTimer();
+              _showSnackbar(
+                'Session Expired',
+                failure.message,
+                snackPosition: SnackPosition.TOP,
+                backgroundColor: const Color(0xFFFFEBEE),
+              );
+              _safeNavigate(AppRoutes.login, offAll: true);
+            } else if (failure is TwoFactorCodeExpiredFailure) {
+              resendTimerSeconds.value = 0;
+              canResendOtp.value = true;
+              twoFactorCodeExpirySeconds.value = 0;
+              _showSnackbar(
+                'Code Expired',
+                failure.message,
+                snackPosition: SnackPosition.BOTTOM,
+                backgroundColor: const Color(0xFFFFF4E5),
+              );
+            } else if (failure is SuspendedFailure) {
+              SuspendedAccountDialog.show(message: failure.message);
+            } else {
+              _showSnackbar(
+                'Verification Failed',
+                failure.message,
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            }
+          },
+          (res) {
+            clearPreAuthToken();
+            cancelResendTimer();
+            cancelTwoFactorExpiryTimer();
+            _handleLoginSuccess(res.user, res.rider);
+          },
+        );
+      } else {
+        isLoading.value = false;
+      }
+      return;
+    }
 
     if (otpFlowType.value == OtpFlowType.registration) {
       final phone = registerPhoneController.text.trim().isNotEmpty

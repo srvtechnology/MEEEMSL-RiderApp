@@ -19,6 +19,8 @@ import '../../../../domain/usecases/auth/reset_password_usecase.dart';
 import '../../../../domain/usecases/auth/submit_onboarding_usecase.dart';
 import '../../../../domain/usecases/auth/register_device_token_usecase.dart';
 import '../../../../domain/usecases/auth/unregister_device_token_usecase.dart';
+import '../../../../domain/usecases/auth/verify_2fa_otp_usecase.dart';
+import '../../../../domain/usecases/auth/resend_2fa_otp_usecase.dart';
 import '../../../../data/datasources/profile_remote_datasource.dart';
 import '../../../../data/repositories/profile_repository_impl.dart';
 import '../../../../domain/repositories/profile_repository.dart';
@@ -68,6 +70,8 @@ class AuthBinding extends Bindings {
     Get.lazyPut(() => ResetPasswordUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => RegisterDeviceTokenUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => UnregisterDeviceTokenUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => Verify2faOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => Resend2faOtpUseCase(Get.find<AuthRepository>()), fenix: true);
     if (!Get.isRegistered<GetOperatingZonesUseCase>()) {
       Get.lazyPut(() => GetOperatingZonesUseCase(Get.find<ProfileRepository>()), fenix: true);
     }
@@ -90,6 +94,8 @@ class AuthBinding extends Bindings {
           resetPasswordUseCase: Get.find<ResetPasswordUseCase>(),
           deviceInfoService: Get.find<DeviceInfoService>(),
           getOperatingZonesUseCase: Get.find<GetOperatingZonesUseCase>(),
+          verify2faOtpUseCase: Get.find<Verify2faOtpUseCase>(),
+          resend2faOtpUseCase: Get.find<Resend2faOtpUseCase>(),
         ),
         permanent: true,
       );

@@ -15,6 +15,7 @@ import 'operating_zones_view.dart';
 import 'payout_info_view.dart';
 import 'vehicle_info_view.dart';
 import 'rider_settings_view.dart';
+import 'delete_account_webview.dart';
 
 class ProfileView extends GetView<ProfileController> {
   const ProfileView({super.key});
@@ -91,6 +92,27 @@ class ProfileView extends GetView<ProfileController> {
                   title: const Text(AppStrings.termsPrivacy),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                   onTap: () => Get.toNamed(AppRoutes.termsPrivacy),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Delete Account
+              CustomCard(
+                child: ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                  title: const Text(
+                    AppStrings.deleteAccount,
+                    style: TextStyle(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Request permanent account and data deletion',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
+                  onTap: () => Get.toNamed(AppRoutes.deleteAccount),
                 ),
               ),
               const SizedBox(height: 20),
