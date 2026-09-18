@@ -226,6 +226,8 @@ void main() {
       vehicleTypes: any(named: 'vehicleTypes'),
       vehicleName: any(named: 'vehicleName'),
       vehicleNumber: any(named: 'vehicleNumber'),
+      vehicleColor: any(named: 'vehicleColor'),
+      vehicleYear: any(named: 'vehicleYear'),
       drivingLicenseNo: any(named: 'drivingLicenseNo'),
       selectedZones: any(named: 'selectedZones'),
       selectedLocations: any(named: 'selectedLocations'),
@@ -259,6 +261,8 @@ void main() {
       vehicleTypes: any(named: 'vehicleTypes'),
       vehicleName: any(named: 'vehicleName'),
       vehicleNumber: any(named: 'vehicleNumber'),
+      vehicleColor: any(named: 'vehicleColor'),
+      vehicleYear: any(named: 'vehicleYear'),
       drivingLicenseNo: any(named: 'drivingLicenseNo'),
       selectedZones: any(named: 'selectedZones'),
       selectedLocations: any(named: 'selectedLocations'),
@@ -340,6 +344,76 @@ void main() {
       // Now all 4 documents and DL number are present -> advances to Step 2
       controller.nextOnboardingStep();
       expect(controller.onboardingStep.value, 2);
+    });
+
+    test('Step 2 (Vehicle): blocks advance if vehicleType, licensePlate, make & model, color, or year is missing or invalid', () {
+      controller.onboardingStep.value = 2;
+      controller.vehicleType.value = '';
+      controller.licensePlateController.text = '';
+      controller.vehicleModelController.text = '';
+      controller.vehicleColorController.text = '';
+      controller.vehicleYearController.text = '';
+
+      // Missing vehicle type
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      controller.vehicleType.value = '2_WHEELER';
+
+      // Missing license plate
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      controller.licensePlateController.text = 'SL-AA-9988';
+
+      // Missing vehicle make & model
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      controller.vehicleModelController.text = 'Honda CB Shine 125';
+
+      // Missing vehicle color
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      controller.vehicleColorController.text = 'Sapphire Blue';
+
+      // Missing model year
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      // Invalid model year (non-4-digit or non-number)
+      controller.vehicleYearController.text = '23';
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      controller.vehicleYearController.text = 'ABCD';
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      // Valid 4-digit model year
+      controller.vehicleYearController.text = '2023';
+
+      // All 4 required fields and vehicle type are provided -> advances to Step 3 (Zones)
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 3);
+    });
+
+    test('Step 2 (Vehicle): Bicycle also requires licensePlate, make & model, color, and year', () {
+      controller.onboardingStep.value = 2;
+      controller.vehicleType.value = 'BICYCLE';
+      controller.licensePlateController.text = '';
+      controller.vehicleModelController.text = 'Trek Marlin 7';
+      controller.vehicleColorController.text = 'Matte Black';
+      controller.vehicleYearController.text = '2022';
+
+      // Missing license plate / bike identifier
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 2);
+
+      controller.licensePlateController.text = 'BIKE-001';
+      controller.nextOnboardingStep();
+      expect(controller.onboardingStep.value, 3);
     });
 
     test('Step 4 (Payout Method): Bank payout validation blocks when required fields are missing', () {

@@ -58,6 +58,8 @@ abstract class AuthRemoteDataSource {
     List<String>? vehicleTypes,
     String? vehicleName,
     String? vehicleNumber,
+    String? vehicleColor,
+    String? vehicleYear,
     String? drivingLicenseNo,
     required List<String> selectedZones,
     required List<String> selectedLocations,
@@ -437,6 +439,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     List<String>? vehicleTypes,
     String? vehicleName,
     String? vehicleNumber,
+    String? vehicleColor,
+    String? vehicleYear,
     String? drivingLicenseNo,
     required List<String> selectedZones,
     required List<String> selectedLocations,
@@ -478,6 +482,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       if (vehicleNumber != null && vehicleNumber.isNotEmpty) {
         formDataMap['vehicleNumber'] = vehicleNumber;
+      }
+      if (vehicleColor != null && vehicleColor.isNotEmpty) {
+        formDataMap['vehicleColor'] = vehicleColor;
+      }
+      if (vehicleYear != null && vehicleYear.isNotEmpty) {
+        formDataMap['vehicleYear'] = vehicleYear;
       }
       if (drivingLicenseNo != null && drivingLicenseNo.isNotEmpty) {
         formDataMap['drivingLicenseNo'] = drivingLicenseNo;

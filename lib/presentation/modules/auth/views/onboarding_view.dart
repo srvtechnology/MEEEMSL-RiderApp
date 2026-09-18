@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_strings.dart';
@@ -768,14 +769,14 @@ class OnboardingView extends GetView<AuthController> {
 
         CustomTextField(
           controller: controller.licensePlateController,
-          label: AppStrings.vehiclePlate,
+          label: '${AppStrings.vehiclePlate} *',
           hintText: 'e.g. SL-AA-9988',
           prefixIcon: Icons.badge_outlined,
         ),
         const SizedBox(height: 16),
         CustomTextField(
           controller: controller.vehicleModelController,
-          label: AppStrings.vehicleModel,
+          label: '${AppStrings.vehicleModel} *',
           hintText: 'e.g. Honda CB Shine 125',
           prefixIcon: Icons.minor_crash_outlined,
         ),
@@ -785,7 +786,7 @@ class OnboardingView extends GetView<AuthController> {
             Expanded(
               child: CustomTextField(
                 controller: controller.vehicleColorController,
-                label: 'Vehicle Color',
+                label: 'Vehicle Color *',
                 hintText: 'e.g. Sapphire Blue',
                 prefixIcon: Icons.color_lens_outlined,
               ),
@@ -794,9 +795,13 @@ class OnboardingView extends GetView<AuthController> {
             Expanded(
               child: CustomTextField(
                 controller: controller.vehicleYearController,
-                label: 'Model Year',
+                label: 'Model Year *',
                 hintText: 'e.g. 2023',
                 keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(4),
+                ],
                 prefixIcon: Icons.calendar_today_outlined,
               ),
             ),

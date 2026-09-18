@@ -55,6 +55,8 @@ abstract class AuthRepository {
     List<String>? vehicleTypes,
     String? vehicleName,
     String? vehicleNumber,
+    String? vehicleColor,
+    String? vehicleYear,
     String? drivingLicenseNo,
     required List<String> selectedZones,
     required List<String> selectedLocations,

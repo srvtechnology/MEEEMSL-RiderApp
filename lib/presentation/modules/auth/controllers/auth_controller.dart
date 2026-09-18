@@ -1225,8 +1225,27 @@ class AuthController extends GetxController {
         return;
       }
       final plate = licensePlateController.text.trim();
-      if (vehicleType.value != 'BICYCLE' && plate.isEmpty) {
-        _safeShowSnackbar('Vehicle Information', 'Please enter your vehicle license plate / registration number');
+      if (plate.isEmpty) {
+        _safeShowSnackbar('Vehicle Information', 'Please enter your vehicle license plate number');
+        return;
+      }
+      final model = vehicleModelController.text.trim();
+      if (model.isEmpty) {
+        _safeShowSnackbar('Vehicle Information', 'Please enter your vehicle make and model');
+        return;
+      }
+      final color = vehicleColorController.text.trim();
+      if (color.isEmpty) {
+        _safeShowSnackbar('Vehicle Information', 'Please enter your vehicle color');
+        return;
+      }
+      final year = vehicleYearController.text.trim();
+      if (year.isEmpty) {
+        _safeShowSnackbar('Vehicle Information', 'Please enter your vehicle model year');
+        return;
+      }
+      if (year.length != 4 || int.tryParse(year) == null) {
+        _safeShowSnackbar('Vehicle Information', 'Please enter a valid 4-digit model year (e.g. 2023)');
         return;
       }
     } else if (current == 3) {
@@ -1392,6 +1411,8 @@ class AuthController extends GetxController {
       vehicleTypes: [mappedVehicleType],
       vehicleName: vehicleModelController.text.trim().isNotEmpty ? vehicleModelController.text.trim() : null,
       vehicleNumber: licensePlateController.text.trim().isNotEmpty ? licensePlateController.text.trim() : null,
+      vehicleColor: vehicleColorController.text.trim().isNotEmpty ? vehicleColorController.text.trim() : null,
+      vehicleYear: vehicleYearController.text.trim().isNotEmpty ? vehicleYearController.text.trim() : null,
       drivingLicenseNo: dlNo.isNotEmpty ? dlNo : null,
       selectedZones: selectedZones.toList(),
       selectedLocations: locationsToSubmit,
