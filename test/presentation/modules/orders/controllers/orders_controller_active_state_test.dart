@@ -1,7 +1,10 @@
 import 'package:dartz/dartz.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:meeem_rider/core/constants/app_constants.dart';
 import 'package:meeem_rider/core/error/failures.dart';
 import 'package:meeem_rider/domain/entities/order_entity.dart';
 import 'package:meeem_rider/domain/usecases/orders/get_active_orders_usecase.dart';
@@ -37,6 +40,16 @@ void main() {
   late MockGetOrderHistoryUseCase mockGetHistory;
   late MockGetOrderDetailsUseCase mockGetDetails;
   late OrdersController ordersController;
+  late GetStorage storage;
+
+  setUpAll(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('plugins.flutter.io/path_provider'),
+      (MethodCall methodCall) async => '.',
+    );
+    await GetStorage.init();
+  });
 
   OrderEntity buildTestOrder({
     required String id,
@@ -72,6 +85,9 @@ void main() {
     Get.reset();
     Get.testMode = true;
 
+    storage = GetStorage();
+    Get.put<GetStorage>(storage);
+
     mockGetActiveOrders = MockGetActiveOrdersUseCase();
     mockUpdateStatus = MockUpdateOrderStatusUseCase();
     mockCancelTrip = MockCancelTripUseCase();
@@ -92,6 +108,7 @@ void main() {
   });
 
   tearDown(() {
+    storage.erase();
     Get.reset();
   });
 
@@ -194,6 +211,35 @@ void main() {
 
       expect(ordersController.selectedOrder.value?.status, OrderStatus.atPickup);
       expect(ordersController.isLoading.value, isFalse);
+    });
+
+    test('transitioning order to pickedUp maintains DashboardController.isOnline and storage isOnline = true', () async {
+      final currentOrder = buildTestOrder(id: 'ord_64', assignmentId: 'asgn_64', status: OrderStatus.atPickup);
+      ordersController.setActiveOrder(currentOrder);
+
+      final mockSummary = MockGetDashboardSummaryUseCase();
+      when(() => mockSummary()).thenAnswer((_) async => const Right({}));
+      final dashController = DashboardController(
+        toggleOnlineStatusUseCase: MockToggleOnlineStatusUseCase(),
+        getDashboardSummaryUseCase: mockSummary,
+        getActiveOrdersUseCase: mockGetActiveOrders,
+        getIncomingOrderUseCase: MockGetIncomingOrderUseCase(),
+        acceptOrderUseCase: MockAcceptOrderUseCase(),
+        declineOrderUseCase: MockDeclineOrderUseCase(),
+      );
+      dashController.activeOrder.value = currentOrder;
+      dashController.isOnline.value = true;
+      Get.put<DashboardController>(dashController);
+
+      final pickedUpOrder = currentOrder.copyWith(status: OrderStatus.pickedUp);
+      when(() => mockUpdateStatus('asgn_64', OrderStatus.pickedUp))
+          .thenAnswer((_) async => Right(pickedUpOrder));
+
+      await ordersController.advanceActiveOrderStatus();
+
+      expect(ordersController.selectedOrder.value?.status, OrderStatus.pickedUp);
+      expect(dashController.isOnline.value, isTrue);
+      expect(storage.read<bool>(AppConstants.isOnlineKey), isTrue);
     });
   });
 }

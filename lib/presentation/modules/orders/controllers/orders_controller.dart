@@ -283,7 +283,17 @@ class OrdersController extends GetxController {
       (updated) {
         setActiveOrder(updated);
         if (Get.isRegistered<DashboardController>()) {
-          Get.find<DashboardController>().activeOrder.value = updated;
+          final dash = Get.find<DashboardController>();
+          dash.activeOrder.value = updated;
+          dash.isOnline.value = true;
+        }
+        if (Get.isRegistered<LocationService>()) {
+          Get.find<LocationService>().startTracking();
+        }
+        if (Get.isRegistered<GetStorage>()) {
+          try {
+            Get.find<GetStorage>().write(AppConstants.isOnlineKey, true);
+          } catch (_) {}
         }
         _loadActiveOrders();
         if (Get.overlayContext != null) {
@@ -344,10 +354,17 @@ class OrdersController extends GetxController {
       (updated) {
         setActiveOrder(updated);
         if (Get.isRegistered<DashboardController>()) {
-          Get.find<DashboardController>().activeOrder.value = updated;
+          final dash = Get.find<DashboardController>();
+          dash.activeOrder.value = updated;
+          dash.isOnline.value = true;
         }
-        if (Get.isDialogOpen == true) {
-          Get.back();
+        if (Get.isRegistered<LocationService>()) {
+          Get.find<LocationService>().startTracking();
+        }
+        if (Get.isRegistered<GetStorage>()) {
+          try {
+            Get.find<GetStorage>().write(AppConstants.isOnlineKey, true);
+          } catch (_) {}
         }
         _loadActiveOrders();
         if (Get.overlayContext != null) {

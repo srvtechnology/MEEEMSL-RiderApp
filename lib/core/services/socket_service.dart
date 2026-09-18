@@ -93,10 +93,12 @@ class SocketService extends GetxService {
         // Checklist Point 4: Socket.IO Real-Time Cross-Device Sync
         _socket?.on('rider:status_changed', (data) {
           debugPrint('[SocketService] Received rider:status_changed: $data');
-          final isOnline = (data is Map && data['isOnline'] != null)
-              ? (data['isOnline'] as bool)
-              : false;
-          onRiderStatusChanged?.call(isOnline);
+          if (data is Map && data.containsKey('isOnline') && data['isOnline'] != null) {
+            final isOnline = data['isOnline'] is bool
+                ? (data['isOnline'] as bool)
+                : (data['isOnline'].toString().toLowerCase() == 'true');
+            onRiderStatusChanged?.call(isOnline);
+          }
         });
 
         _socket?.on('rider:active_device_changed', (data) {

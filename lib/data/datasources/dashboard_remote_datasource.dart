@@ -76,14 +76,37 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'] ?? response.data;
         if (data is Map<String, dynamic>) {
-          final isOnline = data['isOnline'] as bool? ?? false;
+          final opStatus = data['operationalStatus']?.toString().toUpperCase();
+          final isDelivering = opStatus == 'ON_DELIVERY' || opStatus == 'DELIVERING' || opStatus == 'BUSY';
+          final hasActiveAssignment = data['activeAssignmentId'] != null && data['activeAssignmentId'].toString().isNotEmpty;
+
+          // Check if local cache has an active order
+          bool hasCachedActive = false;
+          try {
+            final raw = _storage.read(AppConstants.activeOrderKey);
+            if (raw != null && raw is Map) {
+              final statusStr = raw['status']?.toString().toLowerCase();
+              if (statusStr != 'delivered' && statusStr != 'cancelled') {
+                hasCachedActive = true;
+              }
+            }
+          } catch (_) {}
+
+          bool isOnline = data['isOnline'] as bool? ?? false;
+          if (isDelivering || hasActiveAssignment || hasCachedActive) {
+            isOnline = true;
+          }
+
+          final updatedData = Map<String, dynamic>.from(data);
+          updatedData['isOnline'] = isOnline;
+
           await _storage.write(AppConstants.isOnlineKey, isOnline);
           if (isOnline) {
             await _storage.write('online_since_timestamp', DateTime.now().toIso8601String());
           } else {
             await _storage.remove('online_since_timestamp');
           }
-          return data;
+          return updatedData;
         }
       }
     } catch (_) {}

@@ -148,6 +148,12 @@ class DashboardController extends GetxController {
     return false;
   }
 
+  /// Returns true if the rider currently has an active delivery in progress
+  bool get hasActiveDelivery =>
+      activeOrder.value != null &&
+      activeOrder.value!.status != OrderStatus.delivered &&
+      activeOrder.value!.status != OrderStatus.cancelled;
+
   void _recordAcceptedOrder(OrderEntity order) {
     if (order.id.isNotEmpty) _acceptedOrderIds.add(order.id);
     if (order.assignmentId != null && order.assignmentId!.isNotEmpty) {
@@ -184,6 +190,9 @@ class DashboardController extends GetxController {
           final cached = OrderModel.fromJson(Map<String, dynamic>.from(raw));
           if (cached.status != OrderStatus.delivered && cached.status != OrderStatus.cancelled) {
             activeOrder.value = cached;
+            isOnline.value = true;
+            _authLocalDataSource?.setIsOnline(true);
+            _locationService?.startTracking();
             debugPrint('[DashboardController] onInit: Restored cached active order ${cached.id} (assignment: ${cached.assignmentId}, status: ${cached.status.name})');
           }
         }
@@ -194,9 +203,18 @@ class DashboardController extends GetxController {
 
     // Checklist Point 4: Cross-Device Socket Sync (Single Active Driving Device policy)
     SocketService.onRiderStatusChanged = (bool isServerOnline) {
-      if (!isServerOnline) {
-        isOnline.value = false;
-        _authLocalDataSource?.setIsOnline(false);
+      if (hasActiveDelivery) {
+        debugPrint('[DashboardController] Active delivery in progress; keeping rider online despite server socket event ($isServerOnline)');
+        isOnline.value = true;
+        _authLocalDataSource?.setIsOnline(true);
+        _locationService?.startTracking();
+        return;
+      }
+      isOnline.value = isServerOnline;
+      _authLocalDataSource?.setIsOnline(isServerOnline);
+      if (isServerOnline) {
+        _locationService?.startTracking();
+      } else {
         _locationService?.stopTracking();
       }
     };
@@ -281,7 +299,17 @@ class DashboardController extends GetxController {
       statusResult.fold(
         (failure) => null,
         (data) {
-          final backendOnline = data['isOnline'] as bool? ?? false;
+          final opStatus = data['operationalStatus']?.toString().toUpperCase();
+          final isDelivering = opStatus == 'ON_DELIVERY' || opStatus == 'DELIVERING' || opStatus == 'BUSY';
+          final hasActive = hasActiveDelivery ||
+              isDelivering ||
+              (data['activeAssignmentId'] != null && data['activeAssignmentId'].toString().isNotEmpty);
+
+          bool backendOnline = data['isOnline'] as bool? ?? false;
+          if (hasActive) {
+            backendOnline = true;
+          }
+
           isOnline.value = backendOnline;
           _authLocalDataSource?.setIsOnline(backendOnline);
           if (backendOnline) {
@@ -413,6 +441,19 @@ class DashboardController extends GetxController {
   }
 
   Future<void> toggleOnline() async {
+    if (hasActiveDelivery && isOnline.value) {
+      if (Get.overlayContext != null) {
+        Get.snackbar(
+          'Active Delivery in Progress',
+          'You cannot go offline while delivering an active order.',
+          snackPosition: SnackPosition.TOP,
+          backgroundColor: const Color(0xFFFEE2E2),
+          colorText: const Color(0xFFB91C1C),
+        );
+      }
+      return;
+    }
+
     final newStatus = !isOnline.value;
 
     // If attempting to go online, verify/request location permissions first
@@ -646,6 +687,9 @@ class DashboardController extends GetxController {
           snackPosition: SnackPosition.TOP),
       (updated) {
         activeOrder.value = updated;
+        isOnline.value = true;
+        _authLocalDataSource?.setIsOnline(true);
+        _locationService?.startTracking();
         if (Get.isRegistered<OrdersController>()) {
           Get.find<OrdersController>().setActiveOrder(updated);
         }

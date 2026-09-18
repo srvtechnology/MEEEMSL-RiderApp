@@ -15,6 +15,7 @@ import 'package:meeem_rider/domain/usecases/orders/decline_order_usecase.dart';
 import 'package:meeem_rider/domain/usecases/orders/get_active_orders_usecase.dart';
 import 'package:meeem_rider/domain/usecases/orders/get_incoming_order_usecase.dart';
 import 'package:meeem_rider/domain/usecases/orders/get_order_details_usecase.dart';
+import 'package:meeem_rider/core/services/socket_service.dart';
 import 'package:meeem_rider/presentation/modules/dashboard/controllers/dashboard_controller.dart';
 
 class MockToggleOnlineStatusUseCase extends Mock implements ToggleOnlineStatusUseCase {}
@@ -214,5 +215,82 @@ void main() {
 
     // Local storage key must be removed
     expect(storage.read(AppConstants.activeOrderKey), isNull);
+  });
+
+  test('SocketService.onRiderStatusChanged(false) is ignored when rider has active delivery', () async {
+    storage.write(AppConstants.activeOrderKey, sampleOrderModel.toJson());
+
+    final controller = DashboardController(
+      toggleOnlineStatusUseCase: mockToggleOnline,
+      getRiderStatusUseCase: mockGetRiderStatus,
+      getDashboardSummaryUseCase: mockGetSummary,
+      getActiveOrdersUseCase: mockGetActiveOrders,
+      getIncomingOrderUseCase: mockGetIncomingOrder,
+      acceptOrderUseCase: mockAcceptOrder,
+      declineOrderUseCase: mockDeclineOrder,
+    );
+    Get.put<DashboardController>(controller);
+
+    expect(controller.hasActiveDelivery, isTrue);
+    expect(controller.isOnline.value, isTrue);
+
+    // Server emits offline status event
+    SocketService.onRiderStatusChanged?.call(false);
+
+    // Rider must remain online because active delivery is in progress
+    expect(controller.isOnline.value, isTrue);
+  });
+
+  test('loadDashboardData enforces isOnline = true when rider has active delivery or ON_DELIVERY', () async {
+    storage.write(AppConstants.activeOrderKey, sampleOrderModel.toJson());
+
+    // Backend status reports isOnline: false but operationalStatus: ON_DELIVERY
+    when(() => mockGetRiderStatus()).thenAnswer(
+      (_) async => const Right({
+        'isOnline': false,
+        'operationalStatus': 'ON_DELIVERY',
+        'activeAssignmentId': 'ord_active_123',
+      }),
+    );
+
+    final controller = DashboardController(
+      toggleOnlineStatusUseCase: mockToggleOnline,
+      getRiderStatusUseCase: mockGetRiderStatus,
+      getDashboardSummaryUseCase: mockGetSummary,
+      getActiveOrdersUseCase: mockGetActiveOrders,
+      getIncomingOrderUseCase: mockGetIncomingOrder,
+      acceptOrderUseCase: mockAcceptOrder,
+      declineOrderUseCase: mockDeclineOrder,
+    );
+    Get.put<DashboardController>(controller);
+
+    await controller.loadDashboardData();
+
+    // isOnline must be true despite backend reporting isOnline: false
+    expect(controller.isOnline.value, isTrue);
+  });
+
+  test('toggleOnline prevents rider from going offline during active delivery', () async {
+    storage.write(AppConstants.activeOrderKey, sampleOrderModel.toJson());
+
+    final controller = DashboardController(
+      toggleOnlineStatusUseCase: mockToggleOnline,
+      getRiderStatusUseCase: mockGetRiderStatus,
+      getDashboardSummaryUseCase: mockGetSummary,
+      getActiveOrdersUseCase: mockGetActiveOrders,
+      getIncomingOrderUseCase: mockGetIncomingOrder,
+      acceptOrderUseCase: mockAcceptOrder,
+      declineOrderUseCase: mockDeclineOrder,
+    );
+    Get.put<DashboardController>(controller);
+
+    expect(controller.isOnline.value, isTrue);
+
+    // Try to toggle offline
+    await controller.toggleOnline();
+
+    // Should still be online, mockToggleOnline should not be called
+    expect(controller.isOnline.value, isTrue);
+    verifyNever(() => mockToggleOnline(false));
   });
 }
