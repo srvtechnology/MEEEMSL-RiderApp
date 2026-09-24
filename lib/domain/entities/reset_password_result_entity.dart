@@ -4,6 +4,8 @@ class SendResetOtpResultEntity extends Equatable {
   final String identity;
   final String identityType; // EMAIL or PHONE
   final String maskedDestination;
+  final String? email;
+  final String? phone;
   final int expiresIn;
   final int resendCooldown;
 
@@ -11,6 +13,8 @@ class SendResetOtpResultEntity extends Equatable {
     required this.identity,
     required this.identityType,
     required this.maskedDestination,
+    this.email,
+    this.phone,
     this.expiresIn = 600,
     this.resendCooldown = 60,
   });
@@ -20,6 +24,8 @@ class SendResetOtpResultEntity extends Equatable {
         identity,
         identityType,
         maskedDestination,
+        email,
+        phone,
         expiresIn,
         resendCooldown,
       ];

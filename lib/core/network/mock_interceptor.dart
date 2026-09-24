@@ -171,15 +171,17 @@ class MockInterceptor extends Interceptor {
 
     // 4.1 Forgot Password Send OTP
     if (path.endsWith(ApiEndpoints.forgotPasswordSendOtp)) {
-      final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
+      final identifier = (options.data is Map ? options.data['identifier'] ?? options.data['email'] ?? options.data['phone'] : null)?.toString() ?? 'rider.ibrahim@example.com';
+      final isEmail = identifier.contains('@');
       return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
         data: {
           'success': true,
-          'message': 'If an active rider account exists, a reset OTP has been sent.',
+          'message': 'Password reset OTP has been sent to your email and phone.',
           'data': {
-            'email': email,
+            'email': isEmail ? identifier : 'rider.ibrahim@example.com',
+            'phone': !isEmail ? identifier : '+23276123456',
             'expiresIn': 600,
             'resendCooldown': 60,
           }
@@ -189,6 +191,7 @@ class MockInterceptor extends Interceptor {
 
     // 4.2 Reset Password
     if (path.endsWith(ApiEndpoints.forgotPasswordReset)) {
+      final identifier = (options.data is Map ? options.data['identifier'] ?? options.data['email'] ?? options.data['phone'] : null)?.toString() ?? 'rider.ibrahim@example.com';
       return _resolve(handler, Response(
         requestOptions: options,
         statusCode: 200,
@@ -196,6 +199,7 @@ class MockInterceptor extends Interceptor {
           'success': true,
           'message': 'Password reset successful. You can now log in with your new password.',
           'data': {
+            'email': identifier,
             'loginAvailable': true,
           }
         },

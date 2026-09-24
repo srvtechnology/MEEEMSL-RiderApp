@@ -9,6 +9,7 @@ import '../modules/auth/views/onboarding_view.dart';
 import '../modules/auth/views/pending_approval_view.dart';
 import '../modules/auth/bindings/pending_approval_binding.dart';
 import '../modules/auth/views/forgot_password_view.dart';
+import '../modules/auth/views/reset_password_view.dart';
 import '../modules/main_layout/bindings/main_layout_binding.dart';
 import '../modules/main_layout/views/main_layout_view.dart';
 import '../modules/orders/bindings/orders_binding.dart';
@@ -71,6 +72,11 @@ class AppPages {
     GetPage(
       name: AppRoutes.forgotPassword,
       page: () => const ForgotPasswordView(),
+      binding: AuthBinding(),
+    ),
+    GetPage(
+      name: AppRoutes.resetPassword,
+      page: () => const ResetPasswordView(),
       binding: AuthBinding(),
     ),
     GetPage(

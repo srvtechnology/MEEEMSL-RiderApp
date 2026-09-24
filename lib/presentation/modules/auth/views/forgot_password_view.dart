@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/custom_text_field.dart';
+import '../../../routes/app_routes.dart';
 import '../controllers/auth_controller.dart';
 
+/// Screen 1: Forgot Password (Initiate Password Reset)
+/// Conforms to MOBILE_RIDER_FORGOT_PASSWORD_API_DOC.md (Screen 1)
 class ForgotPasswordView extends GetView<AuthController> {
   const ForgotPasswordView({super.key});
 
@@ -15,110 +17,94 @@ class ForgotPasswordView extends GetView<AuthController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(AppStrings.resetPassword),
+        title: const Text('Forgot Password'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Get.back(),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Obx(() {
-            final isCodeSent = controller.isResetCodeSent.value;
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
 
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SizedBox(height: 12),
-                Text(
-                  isCodeSent ? 'Create New Password' : AppStrings.resetPassword,
-                  style: AppTextStyles.headlineMedium(),
+              // Security Icon Badge
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  isCodeSent
-                      ? 'Enter the 6-digit reset code sent to ${controller.resetMaskedDestination.value.isNotEmpty ? controller.resetMaskedDestination.value : controller.resetIdentityController.text} and choose a new password.'
-                      : 'Enter your registered email address or phone number to receive a 6-digit password reset code.',
-                  style: AppTextStyles.bodyMedium(),
+                child: const Icon(
+                  Icons.lock_reset_rounded,
+                  color: AppColors.primary,
+                  size: 32,
                 ),
-                const SizedBox(height: 32),
+              ),
+              const SizedBox(height: 20),
 
-                if (!isCodeSent) ...[
-                  // Step 1: Request Reset Code
-                  CustomTextField(
-                    controller: controller.resetIdentityController,
-                    label: 'Email or Phone Number',
-                    hintText: 'e.g. rider.ibrahim@example.com or +23276123456',
-                    prefixIcon: Icons.account_circle_outlined,
-                  ),
-                  const SizedBox(height: 28),
-                  CustomButton(
-                    text: AppStrings.sendResetCode,
+              // Title & Subtitle
+              Text(
+                'Forgot Password?',
+                style: AppTextStyles.headlineLarge(),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Enter your registered email address or phone number to receive a 6-digit password reset code.',
+                style: AppTextStyles.bodyMedium(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 32),
+
+              // Identifier Input Field (Email or Phone)
+              CustomTextField(
+                controller: controller.resetIdentityController,
+                label: 'Email or Mobile Number',
+                hintText: 'e.g. rider@example.com or +23276123456',
+                prefixIcon: Icons.account_circle_outlined,
+                keyboardType: TextInputType.emailAddress,
+                autofocus: true,
+                autofillHints: const [
+                  AutofillHints.email,
+                  AutofillHints.telephoneNumber,
+                ],
+              ),
+              const SizedBox(height: 28),
+
+              // Submit Action Button: "Send 6-Digit OTP"
+              Obx(() => CustomButton(
+                    text: AppStrings.send6DigitOtp,
                     isLoading: controller.isLoading.value,
                     onPressed: () => controller.sendResetCode(),
-                  ),
-                ] else ...[
-                  // Step 2: Confirm OTP & Set New Password
-                  CustomTextField(
-                    controller: controller.resetOtpController,
-                    label: 'Reset Verification Code',
-                    hintText: '• • • • • •',
-                    keyboardType: TextInputType.number,
-                    prefixIcon: Icons.lock_reset,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(6),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: controller.newPasswordController,
-                    label: AppStrings.newPassword,
-                    hintText: 'Minimum 6 characters',
-                    obscureText: true,
-                    prefixIcon: Icons.lock_outline,
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    controller: controller.confirmPasswordController,
-                    label: AppStrings.confirmPassword,
-                    hintText: 'Re-enter your new password',
-                    obscureText: true,
-                    prefixIcon: Icons.check_circle_outline,
-                  ),
-                  const SizedBox(height: 20),
+                  )),
+              const SizedBox(height: 24),
 
-                  // Timer & Resend button
-                  Center(
-                    child: Obx(() {
-                      if (controller.canResendOtp.value) {
-                        return TextButton.icon(
-                          onPressed: () => controller.sendResetCode(),
-                          icon: const Icon(Icons.refresh_rounded, size: 18),
-                          label: const Text('Resend Reset Code'),
-                        );
-                      }
-                      return Text(
-                        'Resend code in ${controller.resendTimerSeconds.value}s',
-                        style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryLight),
-                      );
-                    }),
+              // Back to Login Link
+              Center(
+                child: TextButton.icon(
+                  onPressed: () {
+                    if (Get.previousRoute.isNotEmpty) {
+                      Get.back();
+                    } else {
+                      Get.offAllNamed(AppRoutes.login);
+                    }
+                  },
+                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                  label: const Text(
+                    'Back to Sign In',
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
-                  const SizedBox(height: 24),
-
-                  CustomButton(
-                    text: 'Update Password',
-                    isLoading: controller.isLoading.value,
-                    onPressed: () => controller.confirmPasswordReset(),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => controller.isResetCodeSent.value = false,
-                      child: const Text('Change email/phone'),
-                    ),
-                  ),
-                ],
-              ],
-            );
-          }),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

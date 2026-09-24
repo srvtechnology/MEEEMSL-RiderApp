@@ -729,10 +729,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<SendResetOtpResultModel> forgotPassword(String identity, [String? phoneCountryCode]) async {
     try {
+      final isEmail = identity.contains('@');
       final response = await _dioClient.dio.post(
         ApiEndpoints.forgotPassword,
         data: {
           'identifier': identity,
+          if (isEmail) 'email': identity else 'phone': identity,
           'identity': identity,
           if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
         },
@@ -745,7 +747,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to send reset code';
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: 45);
+        final match = RegExp(r'(\d+)').firstMatch(msg.toString());
+        final cooldown = match != null ? int.tryParse(match.group(1)!) ?? 45 : 45;
+        throw RateLimitException(message: msg.toString(), cooldownSeconds: cooldown);
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
@@ -754,10 +758,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<bool> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]) async {
     try {
+      final isEmail = identity.contains('@');
       final response = await _dioClient.dio.post(
         ApiEndpoints.resetPassword,
         data: {
           'identifier': identity,
+          if (isEmail) 'email': identity else 'phone': identity,
           'identity': identity,
           if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
           'otp': otp,
@@ -768,7 +774,9 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } on DioException catch (e) {
       final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to reset password';
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: 300);
+        final match = RegExp(r'(\d+)').firstMatch(msg.toString());
+        final cooldown = match != null ? int.tryParse(match.group(1)!) ?? 300 : 300;
+        throw RateLimitException(message: msg.toString(), cooldownSeconds: cooldown);
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }

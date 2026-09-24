@@ -5,17 +5,36 @@ class SendResetOtpResultModel extends SendResetOtpResultEntity {
     required super.identity,
     required super.identityType,
     required super.maskedDestination,
+    super.email,
+    super.phone,
     super.expiresIn,
     super.resendCooldown,
   });
 
   factory SendResetOtpResultModel.fromJson(Map<String, dynamic> json) {
+    final email = json['email'] as String?;
+    final phone = json['phone'] as String?;
+    final rawIdentity = json['identity'] as String? ?? json['identifier'] as String? ?? email ?? phone ?? '';
+    final isEmail = rawIdentity.contains('@');
+    final identityType = json['identityType'] as String? ?? (isEmail ? 'EMAIL' : 'PHONE');
+
+    String destination = json['maskedDestination'] as String? ?? '';
+    if (destination.isEmpty) {
+      if (email != null && phone != null) {
+        destination = '$email & $phone';
+      } else {
+        destination = email ?? phone ?? rawIdentity;
+      }
+    }
+
     return SendResetOtpResultModel(
-      identity: json['identity'] as String? ?? '',
-      identityType: json['identityType'] as String? ?? 'EMAIL',
-      maskedDestination: json['maskedDestination'] as String? ?? json['identity'] as String? ?? '',
-      expiresIn: json['expiresIn'] as int? ?? 600,
-      resendCooldown: json['resendCooldown'] as int? ?? 60,
+      identity: rawIdentity,
+      identityType: identityType,
+      maskedDestination: destination,
+      email: email,
+      phone: phone,
+      expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 600,
+      resendCooldown: (json['resendCooldown'] as num?)?.toInt() ?? 60,
     );
   }
 }

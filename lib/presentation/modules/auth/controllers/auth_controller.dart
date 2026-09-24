@@ -128,6 +128,18 @@ class AuthController extends GetxController {
   final confirmPasswordController = TextEditingController();
   final isResetCodeSent = false.obs;
   final resetMaskedDestination = ''.obs;
+  final resetEmail = ''.obs;
+  final resetPhone = ''.obs;
+  final isNewPasswordVisible = false.obs;
+  final isConfirmPasswordVisible = false.obs;
+
+  void toggleNewPasswordVisibility() {
+    isNewPasswordVisible.value = !isNewPasswordVisible.value;
+  }
+
+  void toggleConfirmPasswordVisibility() {
+    isConfirmPasswordVisible.value = !isConfirmPasswordVisible.value;
+  }
 
   // 5-Step Onboarding Wizard State
   final onboardingStep = 0.obs;
@@ -824,7 +836,7 @@ class AuthController extends GetxController {
   }
 
   // Password Reset Flow
-  Future<void> sendResetCode() async {
+  Future<void> sendResetCode({bool isResend = false}) async {
     final identity = resetIdentityController.text.trim();
     if (identity.isEmpty) {
       Get.snackbar('Input Required', 'Please enter your registered email or phone', snackPosition: SnackPosition.BOTTOM);
@@ -848,17 +860,27 @@ class AuthController extends GetxController {
       },
       (res) {
         resetMaskedDestination.value = res.maskedDestination;
+        resetEmail.value = res.email ?? (isEmail ? identity : '');
+        resetPhone.value = res.phone ?? (!isEmail ? identity : '');
         isResetCodeSent.value = true;
         startResendTimer(seconds: res.resendCooldown);
         Get.snackbar(
           'Code Sent',
-          'Password reset code sent to ${res.maskedDestination}',
+          'Password reset code sent to ${res.maskedDestination.isNotEmpty ? res.maskedDestination : identity}',
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
           duration: const Duration(seconds: 4),
         );
+        if (!isResend) {
+          Get.toNamed(AppRoutes.resetPassword);
+        }
       },
     );
+  }
+
+  Future<void> resendResetOtp() async {
+    if (!canResendOtp.value) return;
+    await sendResetCode(isResend: true);
   }
 
   Future<void> confirmPasswordReset() async {
@@ -867,8 +889,12 @@ class AuthController extends GetxController {
     final newPass = newPasswordController.text.trim();
     final confirmPass = confirmPasswordController.text.trim();
 
-    if (otp.length < 4) {
-      Get.snackbar('Validation', 'Please enter the verification code sent to you', snackPosition: SnackPosition.BOTTOM);
+    if (identity.isEmpty) {
+      Get.snackbar('Validation', 'Identifier is missing. Please restart the reset process.', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+    if (otp.length != 6) {
+      Get.snackbar('Validation', 'Please enter the 6-digit verification code', snackPosition: SnackPosition.BOTTOM);
       return;
     }
     if (newPass.length < 6) {
@@ -887,11 +913,17 @@ class AuthController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Reset Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (failure) {
+        if (failure is RateLimitFailure) {
+          Get.snackbar('Cooldown Active', failure.message, snackPosition: SnackPosition.BOTTOM);
+        } else {
+          Get.snackbar('Reset Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
+        }
+      },
       (success) {
         Get.snackbar(
           'Password Reset Successful',
-          'Password has been successfully reset. Please log in with your new credentials.',
+          AppStrings.passwordResetSuccess,
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
           duration: const Duration(seconds: 4),

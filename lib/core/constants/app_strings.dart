@@ -28,9 +28,14 @@ class AppStrings {
   static const String forgotPassword = 'Forgot Password?';
   static const String resetPassword = 'Reset Password';
   static const String resetPasswordSubtitle = 'Enter your email or phone to receive a reset code';
+  static const String createPassword = 'Create New Password';
   static const String newPassword = 'New Password';
   static const String confirmPassword = 'Confirm Password';
   static const String sendResetCode = 'Send Reset Code';
+  static const String send6DigitOtp = 'Send 6-Digit OTP';
+  static const String resetPasswordAndSignIn = 'Reset Password & Sign In';
+  static const String passwordResetSuccess = 'Password reset successfully. You can now log in.';
+  static const String enter6DigitOtp = 'Enter 6-Digit OTP';
   static const String sendOtp = 'Send Verification Code';
   static const String verifyOtp = 'Verify OTP';
   static const String otpSubtitle = 'Enter the 6-digit code sent to';
