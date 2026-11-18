@@ -734,7 +734,28 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
-    // Part 6: Rider Revenue Endpoint
+    // Part 6: Rider Revenue, Balance Ledger & Payout Requests Endpoints
+    if (path.contains(ApiEndpoints.balanceTransactions) ||
+        path.endsWith('/balance-transactions')) {
+      return _resolve(handler, _handleBalanceTransactionsEndpoint(options));
+    }
+
+    if (path.contains(ApiEndpoints.payoutRequests) ||
+        path.endsWith('/payout-requests')) {
+      final resp = _handlePayoutRequestsEndpoint(options);
+      if ((resp.statusCode ?? 200) >= 400) {
+        return handler.reject(
+          DioException(
+            requestOptions: options,
+            response: resp,
+            type: DioExceptionType.badResponse,
+          ),
+          true,
+        );
+      }
+      return _resolve(handler, resp);
+    }
+
     if (path.contains(ApiEndpoints.revenue) || path.endsWith('/revenue')) {
       return _resolve(handler, _handleRevenueEndpoint(options));
     }
@@ -926,7 +947,17 @@ class MockInterceptor extends Interceptor {
       );
     }
 
-    // Part 6: Rider Revenue Endpoint
+    // Part 6: Rider Revenue, Balance Ledger & Payout Requests Endpoints
+    if (path.contains(ApiEndpoints.balanceTransactions) ||
+        path.endsWith('/balance-transactions')) {
+      return _handleBalanceTransactionsEndpoint(options);
+    }
+
+    if (path.contains(ApiEndpoints.payoutRequests) ||
+        path.endsWith('/payout-requests')) {
+      return _handlePayoutRequestsEndpoint(options);
+    }
+
     if (path.contains(ApiEndpoints.revenue) || path.endsWith('/revenue')) {
       return _handleRevenueEndpoint(options);
     }
@@ -1418,6 +1449,121 @@ class MockInterceptor extends Interceptor {
     };
   }
 
+  static Map<String, dynamic> get _mockRiderBankDetails => {
+        'paymentOption': 'Mobile Money',
+        'preferredPayoutMethod': 'AfriMoney',
+        'bankName': null,
+        'accountHolderName': 'Ibrahim Koroma',
+        'accountNumber': null,
+        'mobileNumber': '077123456',
+        'mobileMoneyOption': 'AfriMoney',
+      };
+
+  static const String _mockPayoutAccountSnapshot =
+      'Method: Mobile Money • Holder: Ibrahim Koroma • Mobile: 077123456 • Wallet: AfriMoney';
+
+  static Map<String, dynamic>? _mockPendingPayoutRequest;
+  static double? _mockNetBalanceOverride;
+
+  static final List<Map<String, dynamic>> _mockPayoutHistory = [
+    {
+      'id': 'req-uuid-1',
+      'sellerSector': 'RIDER',
+      'sellerId': 'rider-uuid-1',
+      'requestedAmount': 30000.0,
+      'status': 'DISBURSED',
+      'sellerNote': 'Weekly delivery fee withdrawal',
+      'payoutMethod': 'AfriMoney',
+      'payoutAccountSnapshot': _mockPayoutAccountSnapshot,
+      'payoutReference': 'AFRI-PAY-99881',
+      'adminNote': 'Sent to AfriMoney 077123456',
+      'requestedAt': DateTime.now()
+          .subtract(const Duration(days: 2, hours: 3))
+          .toUtc()
+          .toIso8601String(),
+      'disbursedAt': DateTime.now()
+          .subtract(const Duration(days: 2, hours: 1))
+          .toUtc()
+          .toIso8601String(),
+    },
+  ];
+
+  static final List<Map<String, dynamic>> _mockBalanceTransactions = [
+    {
+      'id': 'tx-uuid-1',
+      'amount': 25000.0,
+      'kind': 'CREDIT',
+      'reason': 'DELIVERY_FULFILLED',
+      'note':
+          'Prepaid AfriMoney delivery fee credited for Order #meeem00000042',
+      'createdAt': DateTime.now()
+          .subtract(const Duration(hours: 2))
+          .toUtc()
+          .toIso8601String(),
+      'assignmentId': 'cly1234567890',
+      'orderId': 'order_abc123',
+      'orderNumber': 'meeem00000042',
+      'paymentMethod': 'AFRIMONEY',
+      'settlementStatus': 'YET_TO_PAY',
+    },
+    {
+      'id': 'tx-uuid-2',
+      'amount': 20000.0,
+      'kind': 'CREDIT',
+      'reason': 'COD_DELIVERY_COLLECTED',
+      'note':
+          'COD delivery completed. Delivery fee NLe 20,000 collected in cash from customer for Order #meeem00000038 (Cash in Hand)',
+      'createdAt': DateTime.now()
+          .subtract(const Duration(days: 1, hours: 2, minutes: 40))
+          .toUtc()
+          .toIso8601String(),
+      'assignmentId': 'cly5554443322',
+      'orderId': 'order_ghi789',
+      'orderNumber': 'meeem00000038',
+      'paymentMethod': 'COD',
+      'settlementStatus': 'COD_COLLECTED_BY_RIDER',
+    },
+    {
+      'id': 'tx-uuid-3',
+      'amount': 30000.0,
+      'kind': 'DEBIT',
+      'reason': 'PAYOUT_DISBURSED',
+      'note': 'Disbursed NLe 30,000 via AfriMoney. Ref: AFRI-PAY-99881',
+      'createdAt': DateTime.now()
+          .subtract(const Duration(days: 2, hours: 1))
+          .toUtc()
+          .toIso8601String(),
+      'assignmentId': null,
+      'orderId': null,
+      'orderNumber': null,
+      'paymentMethod': null,
+      'settlementStatus': null,
+    },
+    {
+      'id': 'tx-uuid-4',
+      'amount': 30000.0,
+      'kind': 'CREDIT',
+      'reason': 'DELIVERY_FULFILLED',
+      'note':
+          'Prepaid AfriMoney delivery fee credited for Order #meeem00000031',
+      'createdAt': DateTime.now()
+          .subtract(const Duration(days: 2, hours: 5))
+          .toUtc()
+          .toIso8601String(),
+      'assignmentId': 'cly3131313131',
+      'orderId': 'order_jkl012',
+      'orderNumber': 'meeem00000031',
+      'paymentMethod': 'AFRIMONEY',
+      'settlementStatus': 'PAID_OUT',
+    },
+  ];
+
+  static void resetPayoutMockState({double? netBalanceOverride}) {
+    _mockPendingPayoutRequest = null;
+    _mockNetBalanceOverride = netBalanceOverride;
+    _mockPayoutHistory.removeWhere((item) => item['status'] == 'PENDING');
+  }
+
   static final List<Map<String, dynamic>> _mockRevenueDeliveries = [
     {
       'id': 'cly1234567890',
@@ -1427,6 +1573,12 @@ class MockInterceptor extends Interceptor {
       'status': 'DELIVERED',
       'statusCategory': 'DELIVERED',
       'isDelivered': true,
+      'paymentMethod': 'AFRIMONEY',
+      'settlementStatus': 'YET_TO_PAY',
+      'codAmountCollected': null,
+      'payoutDisbursedAt': null,
+      'payoutReference': null,
+      'payoutMethod': null,
       'offeredAt': DateTime.now().subtract(const Duration(hours: 3)).toUtc().toIso8601String(),
       'acceptedAt': DateTime.now().subtract(const Duration(hours: 2, minutes: 55)).toUtc().toIso8601String(),
       'pickedUpAt': DateTime.now().subtract(const Duration(hours: 2, minutes: 30)).toUtc().toIso8601String(),
@@ -1480,6 +1632,12 @@ class MockInterceptor extends Interceptor {
       'status': 'OUT_FOR_DELIVERY',
       'statusCategory': 'IN_PROGRESS',
       'isDelivered': false,
+      'paymentMethod': 'AFRIMONEY',
+      'settlementStatus': 'PENDING',
+      'codAmountCollected': null,
+      'payoutDisbursedAt': null,
+      'payoutReference': null,
+      'payoutMethod': null,
       'offeredAt': DateTime.now().subtract(const Duration(minutes: 45)).toUtc().toIso8601String(),
       'acceptedAt': DateTime.now().subtract(const Duration(minutes: 40)).toUtc().toIso8601String(),
       'pickedUpAt': DateTime.now().subtract(const Duration(minutes: 20)).toUtc().toIso8601String(),
@@ -1523,6 +1681,12 @@ class MockInterceptor extends Interceptor {
       'status': 'DELIVERED',
       'statusCategory': 'DELIVERED',
       'isDelivered': true,
+      'paymentMethod': 'COD',
+      'settlementStatus': 'COD_COLLECTED_BY_RIDER',
+      'codAmountCollected': 190000.0,
+      'payoutDisbursedAt': null,
+      'payoutReference': null,
+      'payoutMethod': null,
       'offeredAt': DateTime.now().subtract(const Duration(days: 1, hours: 4)).toUtc().toIso8601String(),
       'acceptedAt': DateTime.now().subtract(const Duration(days: 1, hours: 3, minutes: 50)).toUtc().toIso8601String(),
       'pickedUpAt': DateTime.now().subtract(const Duration(days: 1, hours: 3, minutes: 20)).toUtc().toIso8601String(),
@@ -1558,14 +1722,81 @@ class MockInterceptor extends Interceptor {
       ],
       'totalItemsCount': 2,
     },
+    {
+      'id': 'cly3131313131',
+      'assignmentId': 'cly3131313131',
+      'orderId': 'order_jkl012',
+      'orderNumber': 'meeem00000031',
+      'status': 'DELIVERED',
+      'statusCategory': 'DELIVERED',
+      'isDelivered': true,
+      'paymentMethod': 'AFRIMONEY',
+      'settlementStatus': 'PAID_OUT',
+      'codAmountCollected': null,
+      'payoutDisbursedAt': DateTime.now()
+          .subtract(const Duration(days: 2, hours: 1))
+          .toUtc()
+          .toIso8601String(),
+      'payoutReference': 'AFRI-PAY-99881',
+      'payoutMethod': 'AfriMoney',
+      'offeredAt': DateTime.now().subtract(const Duration(days: 2, hours: 6)).toUtc().toIso8601String(),
+      'acceptedAt': DateTime.now().subtract(const Duration(days: 2, hours: 5, minutes: 50)).toUtc().toIso8601String(),
+      'pickedUpAt': DateTime.now().subtract(const Duration(days: 2, hours: 5, minutes: 30)).toUtc().toIso8601String(),
+      'deliveredAt': DateTime.now().subtract(const Duration(days: 2, hours: 5)).toUtc().toIso8601String(),
+      'deliveryOtp': '774120',
+      'deliveryProofImage': 'https://development.meeemsl.com/uploads/delivery-proofs/proof-118.jpg',
+      'distanceKm': 5.0,
+      'deliveryCharge': 30000.0,
+      'totalAmount': 30000.0,
+      'store': {
+        'id': 'seller_home',
+        'name': 'Freetown Home Appliances',
+        'phone': '+23277554411',
+        'address': '19 Pademba Road, Freetown',
+      },
+      'customer': {
+        'id': 'user_cust_04',
+        'name': 'Mariama Bangura',
+        'phone': '+23278441122',
+        'dropAddress': '10 Spur Road, Freetown',
+      },
+      'items': [
+        {
+          'id': 'item_line_05',
+          'productId': 'prod_kettle',
+          'name': 'Stainless Electric Kettle 1.7L',
+          'variantName': 'Silver',
+          'quantity': 1,
+          'price': 320000.0,
+          'shippingAmount': 30000.0,
+          'image': null,
+        },
+      ],
+      'totalItemsCount': 1,
+    },
   ];
+
+  static double _computeMockNetBalance() {
+    if (_mockNetBalanceOverride != null) return _mockNetBalanceOverride!;
+    double balance = 0.0;
+    for (final del in _mockRevenueDeliveries) {
+      if (del['isDelivered'] == true &&
+          del['paymentMethod'] == 'AFRIMONEY' &&
+          del['settlementStatus'] == 'YET_TO_PAY') {
+        balance += (del['deliveryCharge'] as num?)?.toDouble() ?? 0.0;
+      }
+    }
+    return balance;
+  }
 
   static void _markMockRevenueDelivered(String assignmentId, String? proofImage, String? otp) {
     for (final del in _mockRevenueDeliveries) {
       if (del['assignmentId'] == assignmentId || del['id'] == assignmentId || del['isDelivered'] == false) {
+        final isPrepaid = del['paymentMethod'] == 'AFRIMONEY';
         del['status'] = 'DELIVERED';
         del['statusCategory'] = 'DELIVERED';
         del['isDelivered'] = true;
+        del['settlementStatus'] = isPrepaid ? 'YET_TO_PAY' : 'COD_COLLECTED_BY_RIDER';
         del['totalAmount'] = del['deliveryCharge'];
         del['deliveredAt'] = DateTime.now().toUtc().toIso8601String();
         if (proofImage != null) del['deliveryProofImage'] = proofImage;
@@ -1615,6 +1846,9 @@ class MockInterceptor extends Interceptor {
     }).toList();
 
     double totalDeliveredRevenue = 0.0;
+    double prepaidDeliveredRevenue = 0.0;
+    double codDeliveredRevenue = 0.0;
+    double codCashCollectedTotal = 0.0;
     double pendingInProgressRevenue = 0.0;
     int deliveredCount = 0;
     int inProgressCount = 0;
@@ -1624,9 +1858,66 @@ class MockInterceptor extends Interceptor {
       if (del['isDelivered'] == true) {
         totalDeliveredRevenue += charge;
         deliveredCount++;
+        if (del['paymentMethod'] == 'AFRIMONEY') {
+          prepaidDeliveredRevenue += charge;
+        } else {
+          codDeliveredRevenue += charge;
+          codCashCollectedTotal +=
+              (del['codAmountCollected'] as num?)?.toDouble() ?? charge;
+        }
       } else {
         pendingInProgressRevenue += charge;
         inProgressCount++;
+      }
+    }
+
+    final netBalance = _computeMockNetBalance();
+
+    return Response(
+      requestOptions: options,
+      statusCode: 200,
+      data: {
+        'success': true,
+        'data': {
+          'summary': {
+            'netBalance': netBalance,
+            'availablePayoutBalance': netBalance,
+            'totalDeliveredRevenue': totalDeliveredRevenue,
+            'prepaidDeliveredRevenue': prepaidDeliveredRevenue,
+            'codDeliveredRevenue': codDeliveredRevenue,
+            'codCashCollectedTotal': codCashCollectedTotal,
+            'pendingInProgressRevenue': pendingInProgressRevenue,
+            'deliveredCount': deliveredCount,
+            'inProgressCount': inProgressCount,
+            'totalDeliveriesCount': _mockRevenueDeliveries.length,
+            'currency': 'NLe',
+            'hasPendingPayoutRequest': _mockPendingPayoutRequest != null,
+            'pendingPayoutRequest': _mockPendingPayoutRequest,
+          },
+          'riderBankDetails': _mockRiderBankDetails,
+          'filters': {
+            'status': statusFilter,
+            'period': periodFilter,
+            'search': searchFilter,
+          },
+          'count': filtered.length,
+          'deliveries': filtered,
+        },
+      },
+    );
+  }
+
+  static Response _handleBalanceTransactionsEndpoint(RequestOptions options) {
+    final netBalance = _computeMockNetBalance();
+    double creditsTotal = 0.0;
+    double debitsTotal = 0.0;
+
+    for (final tx in _mockBalanceTransactions) {
+      final amount = (tx['amount'] as num?)?.toDouble() ?? 0.0;
+      if (tx['kind'] == 'CREDIT') {
+        creditsTotal += amount;
+      } else if (tx['kind'] == 'DEBIT') {
+        debitsTotal += amount;
       }
     }
 
@@ -1636,22 +1927,82 @@ class MockInterceptor extends Interceptor {
       data: {
         'success': true,
         'data': {
-          'summary': {
-            'totalDeliveredRevenue': totalDeliveredRevenue,
-            'pendingInProgressRevenue': pendingInProgressRevenue,
-            'deliveredCount': deliveredCount,
-            'inProgressCount': inProgressCount,
-            'totalDeliveriesCount': _mockRevenueDeliveries.length,
-            'currency': 'NLe',
-          },
-          'filters': {
-            'status': statusFilter,
-            'period': periodFilter,
-            'search': searchFilter,
-          },
-          'count': filtered.length,
-          'deliveries': filtered,
+          'netBalance': netBalance,
+          'balanceCreditsTotal': creditsTotal,
+          'balanceDebitsTotal': debitsTotal,
+          'transactions': _mockBalanceTransactions,
         },
+      },
+    );
+  }
+
+  static Response _handlePayoutRequestsEndpoint(RequestOptions options) {
+    final method = options.method.toUpperCase();
+    final netBalance = _computeMockNetBalance();
+
+    if (method == 'POST') {
+      if (netBalance <= 0) {
+        return Response(
+          requestOptions: options,
+          statusCode: 400,
+          data: {
+            'success': false,
+            'error':
+                'Insufficient balance. Your current net balance must be greater than SLE 0.00.',
+          },
+        );
+      }
+
+      if (_mockPendingPayoutRequest != null) {
+        return Response(
+          requestOptions: options,
+          statusCode: 400,
+          data: {
+            'success': false,
+            'error': 'A payout request is already pending disbursement by Admin.',
+          },
+        );
+      }
+
+      final body = options.data is Map ? options.data as Map : const {};
+      final sellerNote = body['sellerNote']?.toString().trim();
+      final newRequest = {
+        'id': 'req-uuid-${DateTime.now().millisecondsSinceEpoch}',
+        'sellerSector': 'RIDER',
+        'sellerId': 'rider-uuid-1',
+        'requestedAmount': netBalance,
+        'status': 'PENDING',
+        'sellerNote': (sellerNote != null && sellerNote.isNotEmpty) ? sellerNote : null,
+        'payoutMethod': 'AfriMoney',
+        'payoutAccountSnapshot': _mockPayoutAccountSnapshot,
+        'payoutReference': null,
+        'adminNote': null,
+        'requestedAt': DateTime.now().toUtc().toIso8601String(),
+        'disbursedAt': null,
+      };
+      _mockPendingPayoutRequest = newRequest;
+      _mockPayoutHistory.insert(0, newRequest);
+
+      return Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'payoutRequest': newRequest,
+        },
+      );
+    }
+
+    return Response(
+      requestOptions: options,
+      statusCode: 200,
+      data: {
+        'success': true,
+        'netBalance': netBalance,
+        'payoutMethod': 'AfriMoney',
+        'payoutAccountSnapshot': _mockPayoutAccountSnapshot,
+        'pendingRequest': _mockPendingPayoutRequest,
+        'history': List<Map<String, dynamic>>.from(_mockPayoutHistory),
       },
     );
   }

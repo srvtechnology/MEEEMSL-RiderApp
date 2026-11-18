@@ -184,33 +184,46 @@ class RiderDrawer extends StatelessWidget {
     required BuildContext context,
     bool isHighlighted = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
     final hasMainController = Get.isRegistered<MainLayoutController>();
     final isSelected = hasMainController && Get.find<MainLayoutController>().currentIndex.value == tabIndex;
 
     return ListTile(
       leading: Icon(
         isSelected ? activeIcon : icon,
-        color: isSelected || isHighlighted ? AppColors.primary : AppColors.textSecondaryLight,
+        color: isSelected || isHighlighted
+            ? (isDark ? AppColors.primaryLight : AppColors.primary)
+            : textSecondary,
       ),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 14,
           fontWeight: isSelected || isHighlighted ? FontWeight.w700 : FontWeight.w500,
-          color: isSelected ? AppColors.primary : AppColors.textPrimaryLight,
+          color: isSelected
+              ? (isDark ? AppColors.primaryLight : AppColors.primary)
+              : textPrimary,
         ),
       ),
       trailing: isHighlighted
           ? Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFECFDF5),
+                color: isDark
+                    ? const Color(0xFF064E3B).withAlpha(150)
+                    : const Color(0xFFECFDF5),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: const Color(0xFF10B981)),
               ),
-              child: const Text(
-                'Engine',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Color(0xFF047857)),
+              child: Text(
+                'Wallet',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? const Color(0xFF6EE7B7) : const Color(0xFF047857),
+                ),
               ),
             )
           : null,

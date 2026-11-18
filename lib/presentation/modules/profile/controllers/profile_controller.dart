@@ -196,8 +196,11 @@ class ProfileController extends GetxController {
           if (count > 0 && totalDeliveries.value == 0) {
             totalDeliveries.value = count;
           }
-          if (summary.totalDeliveredRevenue > 0 && walletBalance.value == 0.0) {
-            walletBalance.value = summary.totalDeliveredRevenue;
+          final preferredBalance = summary.withdrawableBalance > 0
+              ? summary.withdrawableBalance
+              : summary.totalDeliveredRevenue;
+          if (preferredBalance > 0 && walletBalance.value == 0.0) {
+            walletBalance.value = preferredBalance;
           }
         }
       }
@@ -239,7 +242,9 @@ class ProfileController extends GetxController {
             final count = revenueData.summary.deliveredCount > 0
                 ? revenueData.summary.deliveredCount
                 : revenueData.summary.totalDeliveriesCount;
-            final balance = revenueData.summary.totalDeliveredRevenue;
+            final balance = revenueData.summary.withdrawableBalance > 0
+                ? revenueData.summary.withdrawableBalance
+                : revenueData.summary.totalDeliveredRevenue;
             if (count > 0 && totalDeliveries.value == 0) {
               totalDeliveries.value = count;
             }
@@ -562,6 +567,9 @@ class ProfileController extends GetxController {
       (failure) => Get.snackbar('Error', failure.message),
       (updated) {
         payoutInfo.value = updated;
+        if (Get.isRegistered<EarningsController>()) {
+          Get.find<EarningsController>().loadAll(showLoading: false);
+        }
         Get.back();
         Get.snackbar('Payout Info Saved', 'Your payout destination details have been updated.',
             snackPosition: SnackPosition.TOP, backgroundColor: const Color(0xFFE8F8EE));

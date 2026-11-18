@@ -4,6 +4,7 @@ import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
 import '../../domain/entities/earnings_entity.dart';
 import '../models/earnings_model.dart';
+import '../models/rider_ledger_model.dart';
 import '../models/rider_revenue_model.dart';
 import '../models/transaction_model.dart';
 
@@ -15,12 +16,39 @@ abstract class EarningsRemoteDataSource {
     String period = 'all',
     String search = '',
   });
+  Future<RiderBalanceLedgerModel> getBalanceTransactions();
+  Future<RiderPayoutStatusModel> getPayoutRequests();
+  Future<RiderPayoutRequestModel> submitPayoutRequest({String? sellerNote});
 }
 
 class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
   final DioClient _dioClient;
 
   EarningsRemoteDataSourceImpl(this._dioClient);
+
+  Never _rethrowDioError(DioException e, String fallbackMessage) {
+    if (e.error is RateLimitException) {
+      throw e.error as RateLimitException;
+    }
+    final respData = e.response?.data is Map ? e.response!.data as Map : const {};
+    final message = respData['error']?.toString() ??
+        respData['message']?.toString() ??
+        e.message ??
+        fallbackMessage;
+    throw ServerException(
+      message: message.isNotEmpty ? message : fallbackMessage,
+      statusCode: e.response?.statusCode,
+    );
+  }
+
+  Map<String, dynamic>? _extractMapPayload(dynamic rawData) {
+    if (rawData is! Map) return null;
+    final map = Map<String, dynamic>.from(rawData);
+    if (map['data'] is Map) {
+      return Map<String, dynamic>.from(map['data'] as Map);
+    }
+    return map;
+  }
 
   @override
   Future<EarningsModel> getEarnings(String period) async {
@@ -137,6 +165,9 @@ class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
 
   @override
   Future<bool> requestPayout(double amount, String paymentMethod) async {
+    await submitPayoutRequest(
+      sellerNote: paymentMethod.trim().isNotEmpty ? 'Payout via $paymentMethod' : null,
+    );
     return true;
   }
 
@@ -159,23 +190,117 @@ class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
       );
 
       if (response.statusCode == 200 && response.data != null) {
-        final data = response.data['data'] ?? response.data;
-        if (data is Map<String, dynamic>) {
-          return RiderRevenueDataModel.fromJson(data);
+        final payload = _extractMapPayload(response.data);
+        if (payload != null) {
+          return RiderRevenueDataModel.fromJson(payload);
         }
       }
       throw const ServerException(message: 'Invalid response from revenue API');
     } on DioException catch (e) {
-      final respData = e.response?.data is Map ? e.response!.data as Map : {};
-      throw ServerException(
-        message: respData['error']?.toString() ??
-            respData['message']?.toString() ??
-            e.message ??
-            'Failed to load revenue',
-        statusCode: e.response?.statusCode,
-      );
+      _rethrowDioError(e, 'Failed to load revenue');
     } catch (e) {
-      if (e is ServerException) rethrow;
+      if (e is ServerException || e is RateLimitException) rethrow;
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<RiderBalanceLedgerModel> getBalanceTransactions() async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.balanceTransactions,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final payload = _extractMapPayload(response.data);
+        if (payload != null) {
+          return RiderBalanceLedgerModel.fromJson(payload);
+        }
+      }
+      throw const ServerException(
+        message: 'Invalid response from balance transactions API',
+      );
+    } on DioException catch (e) {
+      _rethrowDioError(e, 'Failed to load balance ledger');
+    } catch (e) {
+      if (e is ServerException || e is RateLimitException) rethrow;
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<RiderPayoutStatusModel> getPayoutRequests() async {
+    try {
+      final response = await _dioClient.dio.get(
+        ApiEndpoints.payoutRequests,
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final payload = _extractMapPayload(response.data);
+        if (payload != null) {
+          return RiderPayoutStatusModel.fromJson(payload);
+        }
+      }
+      throw const ServerException(
+        message: 'Invalid response from payout requests API',
+      );
+    } on DioException catch (e) {
+      _rethrowDioError(e, 'Failed to load payout requests');
+    } catch (e) {
+      if (e is ServerException || e is RateLimitException) rethrow;
+      throw ServerException(message: e.toString());
+    }
+  }
+
+  @override
+  Future<RiderPayoutRequestModel> submitPayoutRequest({String? sellerNote}) async {
+    try {
+      final trimmedNote = sellerNote?.trim();
+      final body = <String, dynamic>{
+        if (trimmedNote != null && trimmedNote.isNotEmpty) 'sellerNote': trimmedNote,
+      };
+
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.payoutRequests,
+        data: body,
+      );
+
+      if ((response.statusCode == 200 || response.statusCode == 201) &&
+          response.data != null) {
+        final raw = response.data;
+        if (raw is Map) {
+          final map = Map<String, dynamic>.from(raw);
+          if (map['success'] == false) {
+            throw ServerException(
+              message: map['error']?.toString() ??
+                  map['message']?.toString() ??
+                  'Failed to submit payout request',
+              statusCode: response.statusCode,
+            );
+          }
+          Map<String, dynamic>? reqMap;
+          if (map['payoutRequest'] is Map) {
+            reqMap = Map<String, dynamic>.from(map['payoutRequest'] as Map);
+          } else if (map['data'] is Map) {
+            final dataMap = Map<String, dynamic>.from(map['data'] as Map);
+            if (dataMap['payoutRequest'] is Map) {
+              reqMap = Map<String, dynamic>.from(dataMap['payoutRequest'] as Map);
+            } else {
+              reqMap = dataMap;
+            }
+          }
+          if (reqMap != null) {
+            return RiderPayoutRequestModel.fromJson(reqMap);
+          }
+        }
+      }
+      throw const ServerException(
+        message: 'Invalid response from submit payout request API',
+      );
+    } on DioException catch (e) {
+      _rethrowDioError(e, 'Failed to submit payout request');
+    } catch (e) {
+      if (e is ServerException || e is RateLimitException) rethrow;
       throw ServerException(message: e.toString());
     }
   }

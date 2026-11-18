@@ -41,8 +41,10 @@ class ApiEndpoints {
   static String declineOrderOffer(String id) => '/orders/$id/decline';
   static String updateDeliveryStatus(String id) => '/orders/$id/status';
   
-  // Part 6: Rider "My Revenue" & Delivery Earnings Engine
+  // Part 6: Rider "My Revenue", Payment Ledger, Wallet & Payouts Engine
   static const String revenue = '/revenue';
+  static const String balanceTransactions = '/balance-transactions';
+  static const String payoutRequests = '/payout-requests';
 
   /// Whitelist of endpoints strictly specified in MOBILE_RIDER_APP_API_DOC (Part 1)
   static const Set<String> part1Endpoints = {
@@ -122,10 +124,12 @@ class ApiEndpoints {
     return regExp.hasMatch(cleanPath);
   }
 
-  /// Returns true if [path] is documented in Part 6 (Rider My Revenue & Delivery Earnings Engine)
+  /// Returns true if [path] is documented in Part 6 (Rider My Revenue, Balance Ledger & Payout Requests)
   static bool isPart6Endpoint(String path) {
     final cleanPath = normalizePath(path);
-    return cleanPath == revenue;
+    return cleanPath == revenue ||
+        cleanPath == balanceTransactions ||
+        cleanPath == payoutRequests;
   }
 
   /// Returns true if [path] is documented in Part 8 (Rider Mobile App — Dispatch, Acceptance, Lifecycle & Cancellation API)

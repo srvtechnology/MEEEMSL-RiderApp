@@ -13,7 +13,7 @@ class MainLayoutController extends GetxController {
     if (index == 1 && Get.isRegistered<OrdersController>()) {
       Get.find<OrdersController>().loadOrders();
     } else if (index == 2 && Get.isRegistered<EarningsController>()) {
-      Get.find<EarningsController>().loadRevenue(showLoading: false);
+      Get.find<EarningsController>().loadAll(showLoading: false);
     } else if (index == 3 && Get.isRegistered<ProfileController>()) {
       Get.find<ProfileController>().loadAllProfileData();
     }

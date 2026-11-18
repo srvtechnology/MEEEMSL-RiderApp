@@ -25,9 +25,12 @@ import '../../../../domain/usecases/orders/update_order_status_usecase.dart';
 import '../../../../domain/usecases/orders/cancel_trip_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_history_usecase.dart';
 import '../../../../domain/usecases/orders/get_order_details_usecase.dart';
+import '../../../../domain/usecases/earnings/get_balance_transactions_usecase.dart';
 import '../../../../domain/usecases/earnings/get_earnings_breakdown_usecase.dart';
+import '../../../../domain/usecases/earnings/get_payout_requests_usecase.dart';
 import '../../../../domain/usecases/earnings/get_rider_revenue_usecase.dart';
 import '../../../../domain/usecases/earnings/request_payout_usecase.dart';
+import '../../../../domain/usecases/earnings/submit_payout_request_usecase.dart';
 import '../../../../domain/usecases/profile/get_profile_usecase.dart';
 import '../../../../domain/usecases/profile/update_profile_usecase.dart';
 import '../../../../domain/usecases/profile/get_documents_usecase.dart';
@@ -93,6 +96,9 @@ class MainLayoutBinding extends Bindings {
     Get.lazyPut(() => GetEarningsBreakdownUseCase(Get.find<EarningsRepository>()));
     Get.lazyPut(() => GetRiderRevenueUseCase(Get.find<EarningsRepository>()));
     Get.lazyPut(() => RequestPayoutUseCase(Get.find<EarningsRepository>()));
+    Get.lazyPut(() => GetBalanceTransactionsUseCase(Get.find<EarningsRepository>()));
+    Get.lazyPut(() => GetPayoutRequestsUseCase(Get.find<EarningsRepository>()));
+    Get.lazyPut(() => SubmitPayoutRequestUseCase(Get.find<EarningsRepository>()));
 
     Get.lazyPut(() => GetProfileUseCase(Get.find<ProfileRepository>()));
     Get.lazyPut(() => UpdateProfileUseCase(Get.find<ProfileRepository>()));
@@ -129,6 +135,9 @@ class MainLayoutBinding extends Bindings {
           getRiderRevenueUseCase: Get.find<GetRiderRevenueUseCase>(),
           getEarningsBreakdownUseCase: Get.find<GetEarningsBreakdownUseCase>(),
           requestPayoutUseCase: Get.find<RequestPayoutUseCase>(),
+          getBalanceTransactionsUseCase: Get.find<GetBalanceTransactionsUseCase>(),
+          getPayoutRequestsUseCase: Get.find<GetPayoutRequestsUseCase>(),
+          submitPayoutRequestUseCase: Get.find<SubmitPayoutRequestUseCase>(),
         ));
 
     Get.lazyPut<ProfileController>(() => ProfileController(

@@ -412,10 +412,13 @@ class OrdersController extends GetxController {
           dash.loadDashboardData();
         }
 
-        // Immediately refresh Rider Revenue & Earnings Engine (Part 6 Section 6 & 8 #8)
+        // Immediately refresh Rider Revenue, Balance Ledger & Payouts (Part 6 & Payment Ledger Guide)
         if (Get.isRegistered<EarningsController>()) {
-          Get.find<EarningsController>().loadRevenue(showLoading: false);
-          Get.find<EarningsController>().loadEarnings();
+          final earnings = Get.find<EarningsController>();
+          earnings.loadRevenue(showLoading: false);
+          earnings.loadBalanceTransactions(showLoading: false);
+          earnings.loadPayoutRequests(showLoading: false);
+          earnings.loadEarnings();
         }
 
         // Immediately refresh Profile stats as well

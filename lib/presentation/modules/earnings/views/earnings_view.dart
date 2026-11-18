@@ -5,6 +5,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
 import '../../../../domain/entities/rider_revenue_entity.dart';
 import '../controllers/earnings_controller.dart';
+import '../widgets/balance_ledger_list.dart';
+import '../widgets/payout_requests_list.dart';
 import '../widgets/revenue_delivery_card.dart';
 import '../widgets/revenue_kpi_card.dart';
 
@@ -13,15 +15,29 @@ class EarningsView extends GetView<EarningsController> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final surfaceVariant = isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant;
+    final borderColor = isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(AppStrings.myRevenue),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Refresh',
-            onPressed: () => controller.loadRevenue(),
-          ),
+          Obx(() => IconButton(
+                icon: controller.isLoading.value && controller.revenueData.value != null
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+                tooltip: 'Refresh',
+                onPressed: controller.isLoading.value
+                    ? null
+                    : () => controller.loadAll(),
+              )),
         ],
       ),
       body: Obx(() {
@@ -32,7 +48,11 @@ class EarningsView extends GetView<EarningsController> {
 
         final summary = revenue?.summary ??
             const RiderRevenueSummaryEntity(
+              netBalance: 0,
               totalDeliveredRevenue: 0,
+              prepaidDeliveredRevenue: 0,
+              codDeliveredRevenue: 0,
+              codCashCollectedTotal: 0,
               pendingInProgressRevenue: 0,
               deliveredCount: 0,
               inProgressCount: 0,
@@ -40,21 +60,90 @@ class EarningsView extends GetView<EarningsController> {
               currency: 'NLe',
             );
 
+        final effectiveNetBalance = controller.effectiveNetBalance;
+        final hasPendingPayout = controller.hasPendingPayout;
+        final activePendingReq = controller.activePendingPayoutRequest;
+        final selectedSection = controller.selectedSectionIndex.value;
+
         return RefreshIndicator(
-          onRefresh: () => controller.loadRevenue(),
+          onRefresh: () => controller.loadAll(showLoading: false),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 1. Top KPI Summary Cards (Section 5.1)
+                if (controller.isLoading.value && revenue != null) ...[
+                  const ClipRRect(
+                    borderRadius: BorderRadius.all(Radius.circular(2)),
+                    child: LinearProgressIndicator(minHeight: 2.5),
+                  ),
+                  const SizedBox(height: 10),
+                ],
+                // =============================================================
+                // 1. FOUR TOP-LEVEL KPI CARDS (Guide Section 8.1)
+                // =============================================================
+
+                // KPI (a): Withdrawable Wallet (`summary.netBalance`) + "Request Payout" CTA
+                WithdrawableWalletCard(
+                  balance: effectiveNetBalance,
+                  currency: summary.currency,
+                  hasPendingPayoutRequest: hasPendingPayout,
+                  isSubmittingPayout: controller.isSubmittingPayout.value,
+                  payoutMethodLabel: controller.effectivePayoutMethod,
+                  onRequestPayout: controller.canRequestPayout
+                      ? () => controller.openPayoutModal()
+                      : null,
+                ),
+
+                // Amber Pending Payout Request Banner (Guide Section 8.3)
+                if (hasPendingPayout) ...[
+                  const SizedBox(height: 12),
+                  PendingPayoutBanner(
+                    pendingRequest: activePendingReq,
+                    fallbackAmount: effectiveNetBalance,
+                    currency: summary.currency,
+                    onViewPayouts: selectedSection != 2
+                        ? () => controller.selectSection(2)
+                        : null,
+                  ),
+                ],
+                const SizedBox(height: 12),
+
+                // KPI (b): Total Delivery Earnings (`summary.totalDeliveredRevenue`)
                 RevenueKpiCard.delivered(
                   amount: summary.totalDeliveredRevenue,
                   count: summary.deliveredCount,
                   currency: summary.currency,
                 ),
                 const SizedBox(height: 12),
+
+                // KPI (c) & KPI (d): Prepaid (AfriMoney) vs COD Earnings & Cash Collected
+                IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Expanded(
+                        child: RevenueKpiCard.prepaid(
+                          amount: summary.prepaidDeliveredRevenue,
+                          currency: summary.currency,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: RevenueKpiCard.cod(
+                          codDeliveryEarnings: summary.codDeliveredRevenue,
+                          codCashCollectedTotal: summary.codCashCollectedTotal,
+                          currency: summary.currency,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // In-Progress Potential Card (Active In-Transit Drops)
                 RevenueKpiCard.inProgress(
                   amount: summary.pendingInProgressRevenue,
                   count: summary.inProgressCount,
@@ -62,43 +151,59 @@ class EarningsView extends GetView<EarningsController> {
                 ),
                 const SizedBox(height: 18),
 
-                // 2. Search Bar
-                _buildSearchBar(context),
-                const SizedBox(height: 14),
-
-                // 3. Status Tabs (Section 5.2)
-                _buildStatusTabs(summary),
-                const SizedBox(height: 12),
-
-                // 4. Period Filter Chips (Section 5.2)
-                _buildPeriodFilterChips(),
+                // =============================================================
+                // 2. THREE TRANSPARENCY SECTION TABS (Guide Section 8.2)
+                // =============================================================
+                _buildMainSectionTabs(
+                  selectedIndex: selectedSection,
+                  deliveriesCount: summary.totalDeliveriesCount,
+                  ledgerCount: controller.ledgerData.value?.transactions.length,
+                  payoutsCount: controller.payoutStatus.value?.history.length,
+                  hasPendingPayout: hasPendingPayout,
+                  surfaceVariant: surfaceVariant,
+                  textPrimary: textPrimary,
+                  borderColor: borderColor,
+                ),
                 const SizedBox(height: 16),
 
-                // 5. Deliveries List Header
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Deliveries & Package Items',
-                      style: AppTextStyles.titleMedium(),
-                    ),
-                    if (controller.isFilterLoading.value)
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      Text(
-                        '${revenue?.deliveries.length ?? 0} shown',
-                        style: AppTextStyles.bodySmall(color: AppColors.textSecondaryLight),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                // 6. Deliveries Cards
-                _buildDeliveriesList(revenue?.deliveries ?? [], summary.currency),
+                // =============================================================
+                // 3. ACTIVE SECTION CONTENT
+                // =============================================================
+                if (selectedSection == 0)
+                  _buildDeliveryBreakdownSection(
+                    context: context,
+                    revenue: revenue,
+                    summary: summary,
+                    isDark: isDark,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                    surfaceVariant: surfaceVariant,
+                    borderColor: borderColor,
+                  )
+                else if (selectedSection == 1)
+                  BalanceLedgerList(
+                    ledger: controller.ledgerData.value,
+                    filteredTransactions: controller.filteredLedgerTransactions,
+                    selectedFilter: controller.selectedLedgerFilter.value,
+                    currency: summary.currency,
+                    isLoading: controller.isLedgerLoading.value,
+                    errorMessage: controller.ledgerError.value,
+                    onFilterChanged: controller.setLedgerFilter,
+                    onRetry: () => controller.loadBalanceTransactions(),
+                  )
+                else
+                  PayoutRequestsList(
+                    payoutStatus: controller.payoutStatus.value,
+                    fallbackPayoutMethod: controller.effectivePayoutMethod,
+                    fallbackAccountSnapshot: controller.effectivePayoutAccountSnapshot,
+                    currency: summary.currency,
+                    isLoading: controller.isPayoutsLoading.value,
+                    errorMessage: controller.payoutsError.value,
+                    canRequestPayout: controller.canRequestPayout,
+                    onRequestPayout: () => controller.openPayoutModal(),
+                    onRetry: () => controller.loadPayoutRequests(),
+                    onManagePayoutAccount: () => controller.openManagePayoutAccount(),
+                  ),
 
                 const SizedBox(height: 24),
               ],
@@ -109,57 +214,336 @@ class EarningsView extends GetView<EarningsController> {
     );
   }
 
-  Widget _buildSearchBar(BuildContext context) {
+  Widget _buildMainSectionTabs({
+    required int selectedIndex,
+    required int deliveriesCount,
+    required int? ledgerCount,
+    required int? payoutsCount,
+    required bool hasPendingPayout,
+    required Color surfaceVariant,
+    required Color textPrimary,
+    required Color borderColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: surfaceVariant,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          _buildMainTabItem(
+            key: const Key('section_tab_deliveries'),
+            index: 0,
+            selectedIndex: selectedIndex,
+            icon: Icons.local_shipping_outlined,
+            label: AppStrings.deliverySettlements,
+            badgeText: '$deliveriesCount',
+            textPrimary: textPrimary,
+          ),
+          _buildMainTabItem(
+            key: const Key('section_tab_ledger'),
+            index: 1,
+            selectedIndex: selectedIndex,
+            icon: Icons.menu_book_outlined,
+            label: 'Ledger',
+            badgeText: ledgerCount != null ? '$ledgerCount' : null,
+            textPrimary: textPrimary,
+          ),
+          _buildMainTabItem(
+            key: const Key('section_tab_payouts'),
+            index: 2,
+            selectedIndex: selectedIndex,
+            icon: Icons.payments_outlined,
+            label: 'Payouts',
+            badgeText: payoutsCount != null ? '$payoutsCount' : null,
+            showAlertDot: hasPendingPayout,
+            textPrimary: textPrimary,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMainTabItem({
+    Key? key,
+    required int index,
+    required int selectedIndex,
+    required IconData icon,
+    required String label,
+    String? badgeText,
+    bool showAlertDot = false,
+    required Color textPrimary,
+  }) {
+    final isSelected = selectedIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        key: key,
+        onTap: () => controller.selectSection(index),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withAlpha(55),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 16,
+                    color: isSelected ? Colors.white : textPrimary,
+                  ),
+                  if (badgeText != null) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withAlpha(45)
+                            : AppColors.primary.withAlpha(25),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected ? Colors.white : AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (showAlertDot)
+                    Container(
+                      width: 7,
+                      height: 7,
+                      margin: const EdgeInsets.only(left: 4),
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFF59E0B),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : textPrimary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  fontSize: 11.5,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeliveryBreakdownSection({
+    required BuildContext context,
+    required RiderRevenueDataEntity? revenue,
+    required RiderRevenueSummaryEntity summary,
+    required bool isDark,
+    required Color textPrimary,
+    required Color textSecondary,
+    required Color surfaceVariant,
+    required Color borderColor,
+  }) {
+    if (controller.revenueError.value != null && revenue == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 36, color: AppColors.error),
+            const SizedBox(height: 8),
+            Text(
+              'Could Not Load Revenue',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: textPrimary),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              controller.revenueError.value ?? 'Something went wrong.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, color: textSecondary),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () => controller.loadRevenue(),
+              style: OutlinedButton.styleFrom(minimumSize: const Size(140, 40)),
+              icon: const Icon(Icons.refresh_rounded, size: 16),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search Bar
+        _buildSearchBar(context, isDark, textPrimary, textSecondary, borderColor),
+        const SizedBox(height: 12),
+
+        // Status Tabs
+        _buildStatusTabs(summary, surfaceVariant, textPrimary, borderColor),
+        const SizedBox(height: 10),
+
+        // Period Filter Chips
+        _buildPeriodFilterChips(isDark, textPrimary, borderColor),
+        const SizedBox(height: 14),
+
+        // Deliveries List Header
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(
+              child: Text(
+                'Delivery Settlement Breakdown',
+                style: AppTextStyles.titleMedium(color: textPrimary),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (controller.isFilterLoading.value)
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Text(
+                '${revenue?.deliveries.length ?? 0} shown',
+                style: AppTextStyles.bodySmall(color: textSecondary),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // Deliveries Cards
+        _buildDeliveriesList(
+          context,
+          revenue?.deliveries ?? [],
+          summary.currency,
+          textPrimary,
+          textSecondary,
+          borderColor,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSearchBar(
+    BuildContext context,
+    bool isDark,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.lightCardBorder),
+        border: Border.all(color: borderColor),
       ),
       child: TextField(
         controller: controller.searchController,
-        onChanged: (val) => controller.setSearchQuery(val),
+        style: TextStyle(fontSize: 13.5, color: textPrimary),
+        onChanged: (val) => controller.onSearchChanged(val),
+        onSubmitted: (val) => controller.setSearchQuery(val),
         decoration: InputDecoration(
+          filled: false,
           hintText: AppStrings.searchOrdersOrStores,
-          hintStyle: const TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
-          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.primary, size: 20),
+          hintStyle: TextStyle(fontSize: 13, color: textSecondary),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: isDark ? AppColors.primaryLight : AppColors.primary,
+            size: 20,
+          ),
           suffixIcon: controller.searchQuery.value.isNotEmpty
               ? IconButton(
-                  icon: const Icon(Icons.close_rounded, size: 18),
+                  icon: Icon(Icons.close_rounded, size: 18, color: textSecondary),
                   onPressed: () => controller.clearSearch(),
                 )
               : null,
           border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
       ),
     );
   }
 
-  Widget _buildStatusTabs(RiderRevenueSummaryEntity summary) {
+  Widget _buildStatusTabs(
+    RiderRevenueSummaryEntity summary,
+    Color surfaceVariant,
+    Color textPrimary,
+    Color borderColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.lightSurfaceVariant,
+        color: surfaceVariant,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
       ),
       child: Row(
         children: [
-          _buildStatusTabItem('All (${summary.totalDeliveriesCount})', 'all'),
-          _buildStatusTabItem('Delivered (${summary.deliveredCount})', 'delivered'),
-          _buildStatusTabItem('In Progress (${summary.inProgressCount})', 'inprogress'),
+          _buildStatusTabItem(
+            'All (${summary.totalDeliveriesCount})',
+            'all',
+            textPrimary,
+          ),
+          _buildStatusTabItem(
+            'Delivered (${summary.deliveredCount})',
+            'delivered',
+            textPrimary,
+          ),
+          _buildStatusTabItem(
+            'In Progress (${summary.inProgressCount})',
+            'inprogress',
+            textPrimary,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatusTabItem(String label, String statusKey) {
+  Widget _buildStatusTabItem(String label, String statusKey, Color textPrimary) {
     final isSelected = controller.selectedStatus.value == statusKey;
     return Expanded(
       child: GestureDetector(
         onTap: () => controller.setStatusFilter(statusKey),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 9),
+          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primary : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
@@ -174,12 +558,16 @@ class EarningsView extends GetView<EarningsController> {
                 : null,
           ),
           child: Center(
-            child: Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.white : AppColors.textPrimaryLight,
-                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                fontSize: 12,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: isSelected ? Colors.white : textPrimary,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontSize: 11.5,
+                ),
+                maxLines: 1,
               ),
             ),
           ),
@@ -188,63 +576,82 @@ class EarningsView extends GetView<EarningsController> {
     );
   }
 
-  Widget _buildPeriodFilterChips() {
+  Widget _buildPeriodFilterChips(bool isDark, Color textPrimary, Color borderColor) {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
-          _buildPeriodChip(AppStrings.allTime, 'all'),
+          _buildPeriodChip(AppStrings.allTime, 'all', isDark, textPrimary, borderColor),
           const SizedBox(width: 8),
-          _buildPeriodChip(AppStrings.today, 'today'),
+          _buildPeriodChip(AppStrings.today, 'today', isDark, textPrimary, borderColor),
           const SizedBox(width: 8),
-          _buildPeriodChip(AppStrings.thisWeek, 'week'),
+          _buildPeriodChip(AppStrings.thisWeek, 'week', isDark, textPrimary, borderColor),
           const SizedBox(width: 8),
-          _buildPeriodChip(AppStrings.thisMonth, 'month'),
+          _buildPeriodChip(AppStrings.thisMonth, 'month', isDark, textPrimary, borderColor),
         ],
       ),
     );
   }
 
-  Widget _buildPeriodChip(String label, String periodKey) {
+  Widget _buildPeriodChip(
+    String label,
+    String periodKey,
+    bool isDark,
+    Color textPrimary,
+    Color borderColor,
+  ) {
     final isSelected = controller.selectedPeriod.value == periodKey;
     return FilterChip(
       label: Text(label),
       labelStyle: TextStyle(
         fontSize: 12,
         fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-        color: isSelected ? Colors.white : AppColors.textPrimaryLight,
+        color: isSelected ? Colors.white : textPrimary,
       ),
       selected: isSelected,
       selectedColor: AppColors.primary,
-      backgroundColor: AppColors.lightSurfaceVariant,
+      backgroundColor: isDark ? AppColors.darkSurfaceVariant : AppColors.lightSurfaceVariant,
       checkmarkColor: Colors.white,
+      side: BorderSide(color: isSelected ? AppColors.primary : borderColor),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       onSelected: (_) => controller.setPeriodFilter(periodKey),
     );
   }
 
-  Widget _buildDeliveriesList(List<RiderRevenueDeliveryEntity> deliveries, String currency) {
+  Widget _buildDeliveriesList(
+    BuildContext context,
+    List<RiderRevenueDeliveryEntity> deliveries,
+    String currency,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
     if (deliveries.isEmpty) {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
-          color: Colors.grey.withAlpha(15),
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor),
         ),
-        child: const Column(
+        child: Column(
           children: [
-            Icon(Icons.receipt_long_outlined, size: 48, color: Colors.grey),
-            SizedBox(height: 12),
+            Icon(Icons.receipt_long_outlined, size: 46, color: textSecondary),
+            const SizedBox(height: 12),
             Text(
               'No Deliveries Found',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: textPrimary,
+              ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
               'There are no delivery revenue records matching the selected filters.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: Colors.grey),
+              style: TextStyle(fontSize: 12.5, color: textSecondary),
             ),
           ],
         ),

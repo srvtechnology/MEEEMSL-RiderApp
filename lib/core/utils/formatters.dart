@@ -14,6 +14,37 @@ class Formatters {
     return _currencyFormatter.format(amount);
   }
 
+  /// Safely formats currency amounts using integer-cent rounding to prevent
+  /// floating-point artifacts (e.g. 449.996 -> "NLe 450", 450.5 -> "NLe 450.50").
+  static String formatRevenueAmount(
+    double value, {
+    String currency = 'NLe',
+    bool forceDecimals = false,
+  }) {
+    final safeVal = value.isNaN || value.isInfinite ? 0.0 : value;
+    final roundedCents = (safeVal * 100).round();
+    final isNegative = roundedCents < 0;
+    final absCents = roundedCents.abs();
+    final whole = absCents ~/ 100;
+    final cents = absCents % 100;
+    final wholeStr = NumberFormat('#,##0').format(whole);
+    final sign = isNegative ? '-' : '';
+    if (!forceDecimals && cents == 0) {
+      return '$sign$currency $wholeStr';
+    }
+    return '$sign$currency $wholeStr.${cents.toString().padLeft(2, '0')}';
+  }
+
+  static String formatShortDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    return '${formatShortDate(local)}, ${formatTime(local)}';
+  }
+
+  static String formatFullDateTime(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    return '${DateFormat('MMM d, yyyy').format(local)} • ${formatTime(local)}';
+  }
+
   static String formatDistance(double km) {
     if (km < 1.0) {
       return '${(km * 1000).toInt()} m';

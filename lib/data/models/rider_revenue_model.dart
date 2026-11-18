@@ -1,4 +1,69 @@
 import '../../domain/entities/rider_revenue_entity.dart';
+import 'rider_ledger_model.dart';
+
+double _parseDouble(dynamic value, {double fallback = 0.0}) {
+  if (value == null) return fallback;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value.trim()) ?? fallback;
+  return fallback;
+}
+
+double? _parseNullableDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  if (value is String) return double.tryParse(value.trim());
+  return null;
+}
+
+int _parseInt(dynamic value, {int fallback = 0}) {
+  if (value == null) return fallback;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value.trim()) ?? fallback;
+  return fallback;
+}
+
+DateTime? _parseDate(dynamic value) {
+  if (value == null) return null;
+  final str = value.toString().trim();
+  if (str.isEmpty) return null;
+  return DateTime.tryParse(str);
+}
+
+class RiderBankDetailsModel extends RiderBankDetailsEntity {
+  const RiderBankDetailsModel({
+    super.paymentOption,
+    super.preferredPayoutMethod,
+    super.bankName,
+    super.accountHolderName,
+    super.accountNumber,
+    super.mobileNumber,
+    super.mobileMoneyOption,
+  });
+
+  factory RiderBankDetailsModel.fromJson(Map<String, dynamic> json) {
+    return RiderBankDetailsModel(
+      paymentOption: json['paymentOption']?.toString(),
+      preferredPayoutMethod: json['preferredPayoutMethod']?.toString(),
+      bankName: json['bankName']?.toString(),
+      accountHolderName: json['accountHolderName']?.toString(),
+      accountNumber: json['accountNumber']?.toString(),
+      mobileNumber: json['mobileNumber']?.toString(),
+      mobileMoneyOption: json['mobileMoneyOption']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'paymentOption': paymentOption,
+      'preferredPayoutMethod': preferredPayoutMethod,
+      'bankName': bankName,
+      'accountHolderName': accountHolderName,
+      'accountNumber': accountNumber,
+      'mobileNumber': mobileNumber,
+      'mobileMoneyOption': mobileMoneyOption,
+    };
+  }
+}
 
 class RevenueOrderItemModel extends RevenueOrderItemEntity {
   const RevenueOrderItemModel({
@@ -18,9 +83,9 @@ class RevenueOrderItemModel extends RevenueOrderItemEntity {
       productId: json['productId']?.toString(),
       name: json['name']?.toString() ?? 'Order Item',
       variantName: json['variantName']?.toString(),
-      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      shippingAmount: (json['shippingAmount'] as num?)?.toDouble() ?? 0.0,
+      quantity: _parseInt(json['quantity'], fallback: 1),
+      price: _parseDouble(json['price']),
+      shippingAmount: _parseDouble(json['shippingAmount']),
       image: json['image']?.toString(),
     );
   }
@@ -102,6 +167,14 @@ class RiderRevenueDeliveryModel extends RiderRevenueDeliveryEntity {
     required super.status,
     required super.statusCategory,
     required super.isDelivered,
+    super.paymentMethod,
+    super.settlementStatus,
+    super.codAmountCollected,
+    super.payoutRequestedAt,
+    super.payoutDisbursedAt,
+    super.payoutReference,
+    super.payoutMethod,
+    super.payoutNote,
     required super.offeredAt,
     super.acceptedAt,
     super.pickedUpAt,
@@ -124,26 +197,22 @@ class RiderRevenueDeliveryModel extends RiderRevenueDeliveryEntity {
         (isDelivered ? 'DELIVERED' : 'IN_PROGRESS');
 
     final itemsList = (json['items'] as List?)
-            ?.map((e) => RevenueOrderItemModel.fromJson(e as Map<String, dynamic>))
+            ?.whereType<Map>()
+            .map((e) => RevenueOrderItemModel.fromJson(Map<String, dynamic>.from(e)))
             .toList() ??
         <RevenueOrderItemModel>[];
 
-    final storeMap = json['store'] is Map<String, dynamic>
-        ? json['store'] as Map<String, dynamic>
+    final storeMap = json['store'] is Map
+        ? Map<String, dynamic>.from(json['store'] as Map)
         : <String, dynamic>{};
-    final customerMap = json['customer'] is Map<String, dynamic>
-        ? json['customer'] as Map<String, dynamic>
+    final customerMap = json['customer'] is Map
+        ? Map<String, dynamic>.from(json['customer'] as Map)
         : <String, dynamic>{};
 
-    final deliveryCharge = (json['deliveryCharge'] as num?)?.toDouble() ?? 0.0;
+    final deliveryCharge = _parseDouble(json['deliveryCharge'] ?? json['deliveryFee']);
     final totalAmount = isDelivered
-        ? ((json['totalAmount'] as num?)?.toDouble() ?? deliveryCharge)
+        ? (_parseNullableDouble(json['totalAmount']) ?? deliveryCharge)
         : null;
-
-    final offeredStr = json['offeredAt']?.toString();
-    final acceptedStr = json['acceptedAt']?.toString();
-    final pickedUpStr = json['pickedUpAt']?.toString();
-    final deliveredStr = json['deliveredAt']?.toString();
 
     return RiderRevenueDeliveryModel(
       id: json['id']?.toString() ?? json['assignmentId']?.toString() ?? '',
@@ -153,20 +222,32 @@ class RiderRevenueDeliveryModel extends RiderRevenueDeliveryEntity {
       status: rawStatus,
       statusCategory: statusCat,
       isDelivered: isDelivered,
-      offeredAt: offeredStr != null ? (DateTime.tryParse(offeredStr) ?? DateTime.now()) : DateTime.now(),
-      acceptedAt: acceptedStr != null ? DateTime.tryParse(acceptedStr) : null,
-      pickedUpAt: pickedUpStr != null ? DateTime.tryParse(pickedUpStr) : null,
-      deliveredAt: deliveredStr != null ? DateTime.tryParse(deliveredStr) : null,
+      paymentMethod: json['paymentMethod']?.toString().toUpperCase(),
+      settlementStatus: json['settlementStatus']?.toString().toUpperCase(),
+      codAmountCollected: _parseNullableDouble(json['codAmountCollected']),
+      payoutRequestedAt: _parseDate(json['payoutRequestedAt']),
+      payoutDisbursedAt: _parseDate(json['payoutDisbursedAt']),
+      payoutReference: json['payoutReference']?.toString(),
+      payoutMethod: json['payoutMethod']?.toString(),
+      payoutNote: json['payoutNote']?.toString(),
+      offeredAt: _parseDate(json['offeredAt']) ?? DateTime.now(),
+      acceptedAt: _parseDate(json['acceptedAt']),
+      pickedUpAt: _parseDate(json['pickedUpAt']),
+      deliveredAt: _parseDate(json['deliveredAt']),
       deliveryOtp: json['deliveryOtp']?.toString(),
       deliveryProofImage: json['deliveryProofImage']?.toString(),
-      distanceKm: (json['distanceKm'] as num?)?.toDouble(),
+      distanceKm: _parseNullableDouble(json['distanceKm']),
       deliveryCharge: deliveryCharge,
       totalAmount: totalAmount,
       store: RevenueStoreModel.fromJson(storeMap),
       customer: RevenueCustomerModel.fromJson(customerMap),
       items: itemsList,
-      totalItemsCount: (json['totalItemsCount'] as num?)?.toInt() ??
-          (itemsList.isNotEmpty ? itemsList.fold(0, (sum, it) => sum + it.quantity) : 1),
+      totalItemsCount: _parseInt(
+        json['totalItemsCount'],
+        fallback: itemsList.isNotEmpty
+            ? itemsList.fold(0, (sum, it) => sum + it.quantity)
+            : 1,
+      ),
     );
   }
 
@@ -179,6 +260,14 @@ class RiderRevenueDeliveryModel extends RiderRevenueDeliveryEntity {
       'status': status,
       'statusCategory': statusCategory,
       'isDelivered': isDelivered,
+      'paymentMethod': paymentMethod,
+      'settlementStatus': settlementStatus,
+      'codAmountCollected': codAmountCollected,
+      'payoutRequestedAt': payoutRequestedAt?.toIso8601String(),
+      'payoutDisbursedAt': payoutDisbursedAt?.toIso8601String(),
+      'payoutReference': payoutReference,
+      'payoutMethod': payoutMethod,
+      'payoutNote': payoutNote,
       'offeredAt': offeredAt.toIso8601String(),
       'acceptedAt': acceptedAt?.toIso8601String(),
       'pickedUpAt': pickedUpAt?.toIso8601String(),
@@ -198,33 +287,71 @@ class RiderRevenueDeliveryModel extends RiderRevenueDeliveryEntity {
 
 class RiderRevenueSummaryModel extends RiderRevenueSummaryEntity {
   const RiderRevenueSummaryModel({
+    super.netBalance,
+    super.availablePayoutBalance,
     required super.totalDeliveredRevenue,
+    super.prepaidDeliveredRevenue,
+    super.codDeliveredRevenue,
+    super.codCashCollectedTotal,
     required super.pendingInProgressRevenue,
     required super.deliveredCount,
     required super.inProgressCount,
     required super.totalDeliveriesCount,
     super.currency,
+    super.hasPendingPayoutRequest,
+    super.pendingPayoutRequest,
   });
 
   factory RiderRevenueSummaryModel.fromJson(Map<String, dynamic> json) {
+    final netBalance = _parseDouble(
+      json['netBalance'] ?? json['availablePayoutBalance'],
+    );
+    final availablePayoutBalance = _parseDouble(
+      json['availablePayoutBalance'],
+      fallback: netBalance,
+    );
+    final pendingMap = json['pendingPayoutRequest'] is Map
+        ? Map<String, dynamic>.from(json['pendingPayoutRequest'] as Map)
+        : null;
+    final pendingReq = pendingMap != null
+        ? RiderPayoutRequestModel.fromJson(pendingMap)
+        : null;
+
     return RiderRevenueSummaryModel(
-      totalDeliveredRevenue: (json['totalDeliveredRevenue'] as num?)?.toDouble() ?? 0.0,
-      pendingInProgressRevenue: (json['pendingInProgressRevenue'] as num?)?.toDouble() ?? 0.0,
-      deliveredCount: (json['deliveredCount'] as num?)?.toInt() ?? 0,
-      inProgressCount: (json['inProgressCount'] as num?)?.toInt() ?? 0,
-      totalDeliveriesCount: (json['totalDeliveriesCount'] as num?)?.toInt() ?? 0,
+      netBalance: netBalance,
+      availablePayoutBalance: availablePayoutBalance,
+      totalDeliveredRevenue: _parseDouble(json['totalDeliveredRevenue']),
+      prepaidDeliveredRevenue: _parseDouble(json['prepaidDeliveredRevenue']),
+      codDeliveredRevenue: _parseDouble(json['codDeliveredRevenue']),
+      codCashCollectedTotal: _parseDouble(json['codCashCollectedTotal']),
+      pendingInProgressRevenue: _parseDouble(json['pendingInProgressRevenue']),
+      deliveredCount: _parseInt(json['deliveredCount']),
+      inProgressCount: _parseInt(json['inProgressCount']),
+      totalDeliveriesCount: _parseInt(json['totalDeliveriesCount']),
       currency: json['currency']?.toString() ?? 'NLe',
+      hasPendingPayoutRequest:
+          json['hasPendingPayoutRequest'] == true || pendingReq != null,
+      pendingPayoutRequest: pendingReq,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'netBalance': netBalance,
+      'availablePayoutBalance': availablePayoutBalance,
       'totalDeliveredRevenue': totalDeliveredRevenue,
+      'prepaidDeliveredRevenue': prepaidDeliveredRevenue,
+      'codDeliveredRevenue': codDeliveredRevenue,
+      'codCashCollectedTotal': codCashCollectedTotal,
       'pendingInProgressRevenue': pendingInProgressRevenue,
       'deliveredCount': deliveredCount,
       'inProgressCount': inProgressCount,
       'totalDeliveriesCount': totalDeliveriesCount,
       'currency': currency,
+      'hasPendingPayoutRequest': hasPendingPayoutRequest,
+      'pendingPayoutRequest': pendingPayoutRequest is RiderPayoutRequestModel
+          ? (pendingPayoutRequest as RiderPayoutRequestModel).toJson()
+          : null,
     };
   }
 }
@@ -256,28 +383,36 @@ class RiderRevenueFiltersModel extends RiderRevenueFiltersEntity {
 class RiderRevenueDataModel extends RiderRevenueDataEntity {
   const RiderRevenueDataModel({
     required super.summary,
+    super.riderBankDetails,
     required super.filters,
     required super.count,
     required super.deliveries,
   });
 
   factory RiderRevenueDataModel.fromJson(Map<String, dynamic> json) {
-    final summaryMap = json['summary'] is Map<String, dynamic>
-        ? json['summary'] as Map<String, dynamic>
+    final summaryMap = json['summary'] is Map
+        ? Map<String, dynamic>.from(json['summary'] as Map)
         : <String, dynamic>{};
-    final filtersMap = json['filters'] is Map<String, dynamic>
-        ? json['filters'] as Map<String, dynamic>
+    final bankDetailsMap = json['riderBankDetails'] is Map
+        ? Map<String, dynamic>.from(json['riderBankDetails'] as Map)
+        : null;
+    final filtersMap = json['filters'] is Map
+        ? Map<String, dynamic>.from(json['filters'] as Map)
         : <String, dynamic>{};
 
     final rawDeliveries = (json['deliveries'] as List?)
-            ?.map((e) => RiderRevenueDeliveryModel.fromJson(e as Map<String, dynamic>))
+            ?.whereType<Map>()
+            .map((e) => RiderRevenueDeliveryModel.fromJson(Map<String, dynamic>.from(e)))
             .toList() ??
         <RiderRevenueDeliveryModel>[];
 
     return RiderRevenueDataModel(
       summary: RiderRevenueSummaryModel.fromJson(summaryMap),
+      riderBankDetails: bankDetailsMap != null
+          ? RiderBankDetailsModel.fromJson(bankDetailsMap)
+          : null,
       filters: RiderRevenueFiltersModel.fromJson(filtersMap),
-      count: (json['count'] as num?)?.toInt() ?? rawDeliveries.length,
+      count: _parseInt(json['count'], fallback: rawDeliveries.length),
       deliveries: rawDeliveries,
     );
   }
@@ -285,6 +420,9 @@ class RiderRevenueDataModel extends RiderRevenueDataEntity {
   Map<String, dynamic> toJson() {
     return {
       'summary': (summary as RiderRevenueSummaryModel).toJson(),
+      'riderBankDetails': riderBankDetails is RiderBankDetailsModel
+          ? (riderBankDetails as RiderBankDetailsModel).toJson()
+          : null,
       'filters': (filters as RiderRevenueFiltersModel).toJson(),
       'count': count,
       'deliveries': deliveries.map((e) => (e as RiderRevenueDeliveryModel).toJson()).toList(),

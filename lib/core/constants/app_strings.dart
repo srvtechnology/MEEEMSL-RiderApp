@@ -153,10 +153,21 @@ class AppStrings {
   static const String openInAppleMaps = 'Apple Maps';
   static const String chooseMapApp = 'Choose Navigation App';
 
-  // Earnings
+  // Earnings, Wallet, Ledger & Payouts
   static const String wallet = 'Wallet & Earnings';
   static const String myRevenue = 'My Revenue';
+  static const String withdrawableWallet = 'Withdrawable Wallet';
+  static const String requestPayout = 'Request Payout';
+  static const String totalDeliveryEarnings = 'Total Delivery Earnings';
   static const String totalDeliveredRevenue = 'Total Delivered Revenue';
+  static const String prepaidAfriMoneyEarnings = 'Prepaid (AfriMoney)';
+  static const String codEarningsAndCash = 'COD Earnings & Cash';
+  static const String collectedInCashAtDoorstep = 'Collected in Cash at Doorstep';
+  static const String creditedToWalletForPayout = 'Credited to Rider Wallet for Admin payout';
+  static const String deliverySettlements = 'Deliveries';
+  static const String balanceLedger = 'Balance Ledger';
+  static const String payoutRequests = 'Payout Requests';
+  static const String pendingPayoutBannerTitle = 'Payout Request Pending Disbursement';
   static const String inProgressPotential = 'In-Progress Potential';
   static const String activeInTransitDrops = 'Active In-Transit Drops';
   static const String completedDeliveries = 'Completed Deliveries';
@@ -172,7 +183,7 @@ class AppStrings {
   static const String today = 'Today';
   static const String thisWeek = 'This Week';
   static const String thisMonth = 'This Month';
-  static const String searchOrdersOrStores = 'Search by Order # or Store name...';
+  static const String searchOrdersOrStores = 'Search by Order #, Customer or Store...';
   static const String availableForPayout = 'Available Balance';
   static const String cashOut = 'Cash Out';
   static const String daily = 'Daily';
