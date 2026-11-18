@@ -42,4 +42,37 @@ class Formatters {
   static String formatShortDate(DateTime dateTime) {
     return DateFormat('MMM d').format(dateTime);
   }
+
+  /// Strips alphabetic characters and symbols from a local phone number, keeping digits only.
+  /// Conforms to MOBILE_APP_SECURITY_INTEGRATION_GUIDE Section 4.
+  static String sanitizeLocalPhone(String input) {
+    return input.replaceAll(RegExp(r'\D'), '');
+  }
+
+  /// Strips alphabetic characters and symbols from a phone number while preserving
+  /// a single leading '+' if present (e.g. "+232 79-494-127" -> "+23279494127").
+  static String sanitizePhoneNumber(String input) {
+    final trimmed = input.trim();
+    if (trimmed.isEmpty) return '';
+    final hasLeadingPlus = trimmed.startsWith('+');
+    final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+    if (digits.isEmpty) return '';
+    return hasLeadingPlus ? '+$digits' : digits;
+  }
+
+  /// Formats a phone number into clean E.164 format (e.g. "+23279494127").
+  /// Preserves existing E.164 prefix if already present; otherwise strips leading
+  /// trunk zeros (e.g. "079494127" -> "79494127") and prepends sanitized [countryCode].
+  static String toE164Phone(String phone, {String countryCode = '+232'}) {
+    final trimmed = phone.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('+')) {
+      return sanitizePhoneNumber(trimmed);
+    }
+    final localDigits = sanitizeLocalPhone(trimmed).replaceFirst(RegExp(r'^0+'), '');
+    if (localDigits.isEmpty) return '';
+    final ccDigits = sanitizeLocalPhone(countryCode);
+    if (ccDigits.isEmpty) return localDigits;
+    return '+$ccDigits$localDigits';
+  }
 }

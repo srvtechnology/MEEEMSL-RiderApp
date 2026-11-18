@@ -294,11 +294,14 @@ class LoginView extends GetView<AuthController> {
           ),
         ),
         const SizedBox(height: 20),
-        Obx(() => CustomButton(
-              text: 'Sign In',
-              isLoading: controller.isLoading.value,
-              onPressed: () => controller.loginWithEmailPassword(),
-            )),
+        Obx(() {
+          final cooldown = controller.loginCooldownSeconds.value;
+          return CustomButton(
+            text: cooldown > 0 ? 'Try again in ${cooldown}s' : 'Sign In',
+            isLoading: controller.isLoading.value,
+            onPressed: cooldown > 0 ? null : () => controller.loginWithEmailPassword(),
+          );
+        }),
       ],
     );
   }
@@ -355,11 +358,14 @@ class LoginView extends GetView<AuthController> {
           ],
         ),
         const SizedBox(height: 28),
-        Obx(() => CustomButton(
-              text: AppStrings.sendOtp,
-              isLoading: controller.isLoading.value,
-              onPressed: () => controller.sendOtp(),
-            )),
+        Obx(() {
+          final cooldown = controller.phoneOtpCooldownSeconds.value;
+          return CustomButton(
+            text: cooldown > 0 ? 'Resend OTP in ${cooldown}s' : AppStrings.sendOtp,
+            isLoading: controller.isLoading.value,
+            onPressed: cooldown > 0 ? null : () => controller.sendOtp(),
+          );
+        }),
       ],
     );
   }

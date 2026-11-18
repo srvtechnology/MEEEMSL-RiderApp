@@ -1,10 +1,22 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import '../constants/app_constants.dart';
 
 /// Complete standalone Delivery Rider service conforming to
-/// MOBILE_RIDER_DISPATCH_AND_TRIP_CANCELLATION_API_DOC_PART_8.md (Section 6).
+/// MOBILE_RIDER_DISPATCH_AND_TRIP_CANCELLATION_API_DOC_PART_8.md (Section 6)
+/// and MOBILE_APP_SECURITY_INTEGRATION_GUIDE.md (Section 2).
 class RiderDeliveryService {
   static const String baseUrl = 'https://www.meeemsl.com/mobileapi/rider';
+
+  static Map<String, String> _buildHeaders(String token) {
+    final formattedToken =
+        token.startsWith('Bearer ') ? token : 'Bearer $token';
+    return {
+      'Authorization': formattedToken,
+      'Content-Type': 'application/json',
+      AppConstants.mobileAppTokenHeader: AppConstants.mobileAppToken,
+    };
+  }
 
   // 1. Accept Delivery Offer (Within 60s countdown)
   static Future<Map<String, dynamic>> acceptOffer({
@@ -14,13 +26,9 @@ class RiderDeliveryService {
   }) async {
     final httpClient = client ?? http.Client();
     try {
-      final formattedToken = token.startsWith('Bearer ') ? token : 'Bearer $token';
       final res = await httpClient.post(
         Uri.parse('$baseUrl/orders/$orderId/accept'),
-        headers: {
-          'Authorization': formattedToken,
-          'Content-Type': 'application/json',
-        },
+        headers: _buildHeaders(token),
         body: jsonEncode({}),
       );
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -40,13 +48,9 @@ class RiderDeliveryService {
   }) async {
     final httpClient = client ?? http.Client();
     try {
-      final formattedToken = token.startsWith('Bearer ') ? token : 'Bearer $token';
       final res = await httpClient.post(
         Uri.parse('$baseUrl/orders/$orderId/reject'),
-        headers: {
-          'Authorization': formattedToken,
-          'Content-Type': 'application/json',
-        },
+        headers: _buildHeaders(token),
         body: jsonEncode({
           if (reason != null) 'reason': reason,
         }),
@@ -69,17 +73,14 @@ class RiderDeliveryService {
   }) async {
     final httpClient = client ?? http.Client();
     try {
-      final formattedToken = token.startsWith('Bearer ') ? token : 'Bearer $token';
       final bodyMap = <String, dynamic>{
         'status': status,
-        if (pickupPhotos != null && pickupPhotos.isNotEmpty) 'pickupPhotos': pickupPhotos,
+        if (pickupPhotos != null && pickupPhotos.isNotEmpty)
+          'pickupPhotos': pickupPhotos,
       };
       final res = await httpClient.post(
         Uri.parse('$baseUrl/orders/$orderId/status'),
-        headers: {
-          'Authorization': formattedToken,
-          'Content-Type': 'application/json',
-        },
+        headers: _buildHeaders(token),
         body: jsonEncode(bodyMap),
       );
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -100,13 +101,9 @@ class RiderDeliveryService {
   }) async {
     final httpClient = client ?? http.Client();
     try {
-      final formattedToken = token.startsWith('Bearer ') ? token : 'Bearer $token';
       final res = await httpClient.post(
         Uri.parse('$baseUrl/orders/$orderId/status'),
-        headers: {
-          'Authorization': formattedToken,
-          'Content-Type': 'application/json',
-        },
+        headers: _buildHeaders(token),
         body: jsonEncode({
           'status': 'DELIVERED',
           'otp': otp,
@@ -130,13 +127,9 @@ class RiderDeliveryService {
   }) async {
     final httpClient = client ?? http.Client();
     try {
-      final formattedToken = token.startsWith('Bearer ') ? token : 'Bearer $token';
       final res = await httpClient.post(
         Uri.parse('$baseUrl/orders/$orderId/status'),
-        headers: {
-          'Authorization': formattedToken,
-          'Content-Type': 'application/json',
-        },
+        headers: _buildHeaders(token),
         body: jsonEncode({
           'status': 'CANCELLED_BY_RIDER',
           'cancellationReason': cancellationReason,

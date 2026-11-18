@@ -167,13 +167,94 @@ class OtpView extends GetView<AuthController> {
                     LengthLimitingTextInputFormatter(6),
                   ],
                   onChanged: (val) {
-                    // Auto-submit as soon as 6th digit is typed
-                    if (val.trim().length == 6 && !controller.isLoading.value) {
+                    // Auto-submit as soon as 6th digit is typed (unless locked out)
+                    if (val.trim().length == 6 &&
+                        !controller.isLoading.value &&
+                        controller.otpLockoutSeconds.value <= 0) {
                       controller.verifyOtp();
                     }
                   },
                 ),
                 const SizedBox(height: 20),
+
+                // Brute-Force OTP Lockout Banner (15-min lockout after 5 failed attempts)
+                Obx(() {
+                  final lockout = controller.otpLockoutSeconds.value;
+                  if (lockout <= 0) return const SizedBox.shrink();
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFEBEE),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.lock_clock_outlined, size: 20, color: AppColors.error),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Verification Locked (${_formatSeconds(lockout)})',
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                controller.otpLockoutMessage.value.isNotEmpty
+                                    ? controller.otpLockoutMessage.value
+                                    : 'Too many failed attempts. Please wait before trying again.',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFF7F1D1D)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+
+                // Daily OTP Cap Warning Banner (9 SMS / 24h)
+                Obx(() {
+                  if (!controller.dailyOtpLimitReached.value) {
+                    return const SizedBox.shrink();
+                  }
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFE65100).withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.sms_failed_outlined, size: 20, color: Color(0xFFE65100)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            controller.dailyOtpLimitMessage.value.isNotEmpty
+                                ? controller.dailyOtpLimitMessage.value
+                                : 'Daily limit reached for this phone number. Please try again tomorrow or contact customer support.',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFE65100),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
 
                 // Expiry Countdown (if in 2FA mode)
                 Obx(() {
@@ -230,6 +311,12 @@ class OtpView extends GetView<AuthController> {
                 // Timer & Resend Button
                 Center(
                   child: Obx(() {
+                    if (controller.dailyOtpLimitReached.value) {
+                      return Text(
+                        'Daily OTP limit reached. Try again tomorrow.',
+                        style: AppTextStyles.bodyMedium(color: AppColors.error),
+                      );
+                    }
                     if (controller.canResendOtp.value) {
                       return TextButton.icon(
                         onPressed: controller.isLoading.value ? null : () => controller.resendCurrentOtp(),
@@ -238,7 +325,7 @@ class OtpView extends GetView<AuthController> {
                       );
                     }
                     return Text(
-                      'Resend code in ${controller.resendTimerSeconds.value}s',
+                      'Resend OTP in ${controller.resendTimerSeconds.value}s',
                       style: AppTextStyles.bodyMedium(color: AppColors.textSecondaryLight),
                     );
                   }),
@@ -247,8 +334,11 @@ class OtpView extends GetView<AuthController> {
 
                 // Verify Button
                 Obx(() {
+                  final lockout = controller.otpLockoutSeconds.value;
                   String buttonText = AppStrings.verifyOtp;
-                  if (controller.otpFlowType.value == OtpFlowType.twoFactorLogin) {
+                  if (lockout > 0) {
+                    buttonText = 'Locked (${_formatSeconds(lockout)})';
+                  } else if (controller.otpFlowType.value == OtpFlowType.twoFactorLogin) {
                     buttonText = 'Verify & Sign In';
                   } else if (controller.otpFlowType.value == OtpFlowType.registration) {
                     buttonText = 'Verify & Complete';
@@ -256,7 +346,7 @@ class OtpView extends GetView<AuthController> {
                   return CustomButton(
                     text: buttonText,
                     isLoading: controller.isLoading.value,
-                    onPressed: () => controller.verifyOtp(),
+                    onPressed: lockout > 0 ? null : () => controller.verifyOtp(),
                   );
                 }),
               ],

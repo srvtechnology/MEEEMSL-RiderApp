@@ -40,6 +40,7 @@ class SecureUtils {
         'refreshtoken',
         'devicetoken',
         'idtoken',
+        'x-meeem-app-token',
         'token',
         'secret',
         'key',

@@ -166,8 +166,12 @@ class EarningsRemoteDataSourceImpl implements EarningsRemoteDataSource {
       }
       throw const ServerException(message: 'Invalid response from revenue API');
     } on DioException catch (e) {
+      final respData = e.response?.data is Map ? e.response!.data as Map : {};
       throw ServerException(
-        message: e.response?.data?['message']?.toString() ?? e.message ?? 'Failed to load revenue',
+        message: respData['error']?.toString() ??
+            respData['message']?.toString() ??
+            e.message ??
+            'Failed to load revenue',
         statusCode: e.response?.statusCode,
       );
     } catch (e) {

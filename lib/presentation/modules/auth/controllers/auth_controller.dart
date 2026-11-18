@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/services/camera_service.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/image_compressor.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../domain/entities/payout_info_entity.dart';
@@ -31,6 +32,7 @@ import '../../../../domain/entities/operating_zone_entity.dart';
 import '../../../../data/datasources/auth_local_datasource.dart';
 import '../../../../core/services/device_info_service.dart';
 import '../../../../core/error/failures.dart';
+import '../widgets/rate_limit_dialog.dart';
 import '../widgets/suspended_account_dialog.dart';
 import '../../../routes/app_routes.dart';
 
@@ -87,6 +89,21 @@ class AuthController extends GetxController {
   final resendTimerSeconds = AppConstants.otpResendSeconds.obs;
   final canResendOtp = false.obs;
   Timer? _timer;
+
+  // Security & Rate-Limiting Cooldowns (HTTP 429)
+  final loginCooldownSeconds = 0.obs;
+  final phoneOtpCooldownSeconds = 0.obs;
+  final registerCooldownSeconds = 0.obs;
+  final forgotPasswordCooldownSeconds = 0.obs;
+  final otpLockoutSeconds = 0.obs;
+  final otpLockoutMessage = ''.obs;
+  final dailyOtpLimitReached = false.obs;
+  final dailyOtpLimitMessage = ''.obs;
+  Timer? _loginCooldownTimer;
+  Timer? _phoneOtpCooldownTimer;
+  Timer? _registerCooldownTimer;
+  Timer? _forgotPasswordCooldownTimer;
+  Timer? _otpLockoutTimer;
 
   // Registration Controllers & State
   final registerNameController = TextEditingController();
@@ -202,7 +219,7 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
-    _timer?.cancel();
+    cancelAllSecurityTimers();
     _twoFactorExpiryTimer?.cancel();
     clearPreAuthToken();
     super.onClose();
@@ -229,7 +246,9 @@ class AuthController extends GetxController {
 
   void startResendTimer({int? seconds}) {
     _timer?.cancel();
-    resendTimerSeconds.value = seconds ?? AppConstants.otpResendSeconds;
+    final effectiveSeconds =
+        (seconds != null && seconds > 0) ? seconds : AppConstants.otpResendSeconds;
+    resendTimerSeconds.value = effectiveSeconds;
     canResendOtp.value = false;
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (resendTimerSeconds.value > 0) {
@@ -244,6 +263,176 @@ class AuthController extends GetxController {
   void cancelResendTimer() {
     _timer?.cancel();
     _timer = null;
+    cancelCooldownTimers();
+  }
+
+  void cancelCooldownTimers() {
+    _loginCooldownTimer?.cancel();
+    _loginCooldownTimer = null;
+    _phoneOtpCooldownTimer?.cancel();
+    _phoneOtpCooldownTimer = null;
+    _registerCooldownTimer?.cancel();
+    _registerCooldownTimer = null;
+    _forgotPasswordCooldownTimer?.cancel();
+    _forgotPasswordCooldownTimer = null;
+    _otpLockoutTimer?.cancel();
+    _otpLockoutTimer = null;
+  }
+
+  void cancelAllSecurityTimers() {
+    _timer?.cancel();
+    _timer = null;
+    cancelCooldownTimers();
+  }
+
+  void startLoginCooldown({required int seconds}) {
+    _loginCooldownTimer?.cancel();
+    if (seconds <= 0) {
+      loginCooldownSeconds.value = 0;
+      return;
+    }
+    loginCooldownSeconds.value = seconds;
+    _loginCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (loginCooldownSeconds.value > 0) {
+        loginCooldownSeconds.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startPhoneOtpCooldown({required int seconds}) {
+    _phoneOtpCooldownTimer?.cancel();
+    if (seconds <= 0) {
+      phoneOtpCooldownSeconds.value = 0;
+      return;
+    }
+    phoneOtpCooldownSeconds.value = seconds;
+    _phoneOtpCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (phoneOtpCooldownSeconds.value > 0) {
+        phoneOtpCooldownSeconds.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startRegisterCooldown({required int seconds}) {
+    _registerCooldownTimer?.cancel();
+    if (seconds <= 0) {
+      registerCooldownSeconds.value = 0;
+      return;
+    }
+    registerCooldownSeconds.value = seconds;
+    _registerCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (registerCooldownSeconds.value > 0) {
+        registerCooldownSeconds.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startForgotPasswordCooldown({required int seconds}) {
+    _forgotPasswordCooldownTimer?.cancel();
+    if (seconds <= 0) {
+      forgotPasswordCooldownSeconds.value = 0;
+      return;
+    }
+    forgotPasswordCooldownSeconds.value = seconds;
+    _forgotPasswordCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (forgotPasswordCooldownSeconds.value > 0) {
+        forgotPasswordCooldownSeconds.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startOtpLockoutTimer({required int seconds, required String message}) {
+    _otpLockoutTimer?.cancel();
+    final effectiveSeconds = seconds > 0 ? seconds : AppConstants.otpLockoutSeconds;
+    otpLockoutSeconds.value = effectiveSeconds;
+    otpLockoutMessage.value = message;
+    _otpLockoutTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (otpLockoutSeconds.value > 0) {
+        otpLockoutSeconds.value--;
+      } else {
+        otpLockoutMessage.value = '';
+        timer.cancel();
+      }
+    });
+  }
+
+  void clearOtpLockout() {
+    _otpLockoutTimer?.cancel();
+    _otpLockoutTimer = null;
+    otpLockoutSeconds.value = 0;
+    otpLockoutMessage.value = '';
+  }
+
+  /// Centralized handler for HTTP 429 [RateLimitFailure] across all auth flows.
+  void _handleRateLimitFailure(
+    RateLimitFailure failure, {
+    required String flowContext,
+  }) {
+    final lowerMsg = failure.message.toLowerCase();
+    final isDaily = failure.isDailyLimit ||
+        lowerMsg.contains('daily') ||
+        lowerMsg.contains('9/day') ||
+        lowerMsg.contains('try again tomorrow');
+    final isLockout = failure.isOtpLockout ||
+        lowerMsg.contains('failed attempts') ||
+        lowerMsg.contains('locked');
+
+    if (isDaily) {
+      dailyOtpLimitReached.value = true;
+      dailyOtpLimitMessage.value = failure.message;
+      canResendOtp.value = false;
+      RateLimitDialog.showDailyOtpLimit(message: failure.message);
+      return;
+    }
+
+    if (isLockout) {
+      final lockoutSecs = failure.cooldownSeconds > 0
+          ? failure.cooldownSeconds
+          : AppConstants.otpLockoutSeconds;
+      startOtpLockoutTimer(seconds: lockoutSecs, message: failure.message);
+      RateLimitDialog.showOtpLockout(message: failure.message);
+      return;
+    }
+
+    final waitSeconds = failure.retryAfter ?? failure.cooldownSeconds;
+    if (waitSeconds > 0) {
+      switch (flowContext) {
+        case 'login':
+          startLoginCooldown(seconds: waitSeconds);
+          break;
+        case 'phoneOtp':
+          startPhoneOtpCooldown(seconds: waitSeconds);
+          startResendTimer(seconds: waitSeconds);
+          break;
+        case 'register':
+          startRegisterCooldown(seconds: waitSeconds);
+          break;
+        case 'forgotPassword':
+          startForgotPasswordCooldown(seconds: waitSeconds);
+          startResendTimer(seconds: waitSeconds);
+          break;
+        case 'otpResend':
+          startResendTimer(seconds: waitSeconds);
+          break;
+        case 'otpVerify':
+          startOtpLockoutTimer(seconds: waitSeconds, message: failure.message);
+          break;
+      }
+    }
+
+    _showSnackbar(
+      'Too Many Requests',
+      failure.message,
+      snackPosition: SnackPosition.BOTTOM,
+    );
   }
 
   void startTwoFactorExpiryTimer({int? seconds}) {
@@ -291,10 +480,20 @@ class AuthController extends GetxController {
 
   // 2.1 Rider Self-Registration
   Future<void> selfRegisterRider() async {
+    if (registerCooldownSeconds.value > 0) {
+      _showSnackbar(
+        'Please Wait',
+        'Too many requests. Please wait ${registerCooldownSeconds.value}s before trying again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
     final name = registerNameController.text.trim();
     final email = registerEmailController.text.trim();
     final password = registerPasswordController.text.trim();
-    final phone = registerPhoneController.text.trim();
+    final rawPhone = registerPhoneController.text.trim();
+    final phone = Formatters.sanitizeLocalPhone(rawPhone);
     final countryCode = registerCountryCode.value;
     final vehicleType = registerVehicleType.value;
     final vehicleNumber = registerVehicleNumberController.text.trim();
@@ -350,8 +549,16 @@ class AuthController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Registration Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (failure) {
+        if (failure is RateLimitFailure) {
+          _handleRateLimitFailure(failure, flowContext: 'register');
+        } else {
+          Get.snackbar('Registration Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
+        }
+      },
       (data) {
+        dailyOtpLimitReached.value = false;
+        clearOtpLockout();
         registrationEmail.value = email;
         phoneNumber.value = '$countryCode$phone';
         otpFlowType.value = OtpFlowType.registration;
@@ -371,7 +578,7 @@ class AuthController extends GetxController {
 
   // Resend current OTP (Registration Phone SMS OTP vs Phone SMS OTP vs 2FA Challenge OTP)
   Future<void> resendCurrentOtp() async {
-    if (!canResendOtp.value) return;
+    if (!canResendOtp.value || dailyOtpLimitReached.value) return;
 
     isLoading.value = true;
     if (otpFlowType.value == OtpFlowType.twoFactorLogin) {
@@ -406,18 +613,14 @@ class AuthController extends GetxController {
               );
               _safeNavigate(AppRoutes.login, offAll: true);
             } else if (failure is RateLimitFailure) {
-              startResendTimer(seconds: failure.cooldownSeconds);
-              _showSnackbar(
-                'Cooldown Active',
-                failure.message,
-                snackPosition: SnackPosition.BOTTOM,
-              );
+              _handleRateLimitFailure(failure, flowContext: 'otpResend');
             } else {
               _showSnackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
             }
           },
           (res) {
             _preAuthToken.value = res.preAuthToken;
+            dailyOtpLimitReached.value = false;
             startResendTimer(seconds: res.resendCooldown);
             startTwoFactorExpiryTimer(seconds: 300);
             _showSnackbar(
@@ -435,9 +638,10 @@ class AuthController extends GetxController {
     }
 
     if (otpFlowType.value == OtpFlowType.registration) {
-      final phone = registerPhoneController.text.trim().isNotEmpty
+      final rawPhone = registerPhoneController.text.trim().isNotEmpty
           ? registerPhoneController.text.trim()
           : (phoneNumber.value.isNotEmpty ? phoneNumber.value : null);
+      final phone = rawPhone != null ? Formatters.sanitizePhoneNumber(rawPhone) : null;
       final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : AppConstants.defaultCountryCode;
       final email = registrationEmail.value.isNotEmpty ? registrationEmail.value : null;
 
@@ -449,8 +653,15 @@ class AuthController extends GetxController {
       isLoading.value = false;
 
       result.fold(
-        (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
+        (failure) {
+          if (failure is RateLimitFailure) {
+            _handleRateLimitFailure(failure, flowContext: 'otpResend');
+          } else {
+            Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+          }
+        },
         (data) {
+          dailyOtpLimitReached.value = false;
           startResendTimer(seconds: data.resendCooldown);
           final destination = (phone != null && phone.isNotEmpty)
               ? '$countryCode $phone'
@@ -464,13 +675,23 @@ class AuthController extends GetxController {
         },
       );
     } else {
-      final result = await loginUseCase(phoneNumber.value);
+      final cleanPhone = Formatters.sanitizePhoneNumber(phoneNumber.value);
+      final result = await sendPhoneOtpUseCase(cleanPhone.isNotEmpty ? cleanPhone : phoneNumber.value);
       isLoading.value = false;
 
       result.fold(
-        (failure) => Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM),
-        (success) {
-          startResendTimer();
+        (failure) {
+          if (failure is SuspendedFailure) {
+            SuspendedAccountDialog.show(message: failure.message);
+          } else if (failure is RateLimitFailure) {
+            _handleRateLimitFailure(failure, flowContext: 'otpResend');
+          } else {
+            Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+          }
+        },
+        (res) {
+          dailyOtpLimitReached.value = false;
+          startResendTimer(seconds: res.resendCooldown);
           Get.snackbar(
             'New OTP Sent',
             'Login OTP resent to ${phoneNumber.value}',
@@ -544,21 +765,35 @@ class AuthController extends GetxController {
 
   // 3.1 Rider Login with Email/Phone & Password (with Auto Device Token Registration)
   Future<void> loginWithEmailPassword() async {
-    final identifier = loginEmailController.text.trim();
+    if (loginCooldownSeconds.value > 0) {
+      _showSnackbar(
+        'Too Many Login Attempts',
+        'Please wait ${loginCooldownSeconds.value}s before trying again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final rawIdentifier = loginEmailController.text.trim();
     final password = loginPasswordController.text.trim();
 
-    if (identifier.isEmpty) {
+    if (rawIdentifier.isEmpty) {
       Get.snackbar('Validation', 'Please enter your email or mobile number', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
-    final isEmail = identifier.contains('@');
+    final isEmail = rawIdentifier.contains('@');
     if (isEmail) {
-      final emailError = Validators.validateEmail(identifier);
+      final emailError = Validators.validateEmail(rawIdentifier);
       if (emailError != null) {
         Get.snackbar('Validation', emailError, snackPosition: SnackPosition.BOTTOM);
         return;
       }
+    }
+    final identifier = isEmail ? rawIdentifier : Formatters.sanitizePhoneNumber(rawIdentifier);
+    if (!isEmail && identifier.isEmpty) {
+      Get.snackbar('Validation', 'Please enter a valid mobile number', snackPosition: SnackPosition.BOTTOM);
+      return;
     }
 
     if (password.isEmpty || password.length < 6) {
@@ -591,6 +826,8 @@ class AuthController extends GetxController {
       (failure) {
         if (failure is SuspendedFailure) {
           SuspendedAccountDialog.show(message: failure.message);
+        } else if (failure is RateLimitFailure) {
+          _handleRateLimitFailure(failure, flowContext: 'login');
         } else if (failure is UnverifiedAccountFailure) {
           otpFlowType.value = OtpFlowType.registration;
           if (isEmail) {
@@ -617,6 +854,8 @@ class AuthController extends GetxController {
       },
       (res) {
         if (res.requiresOtp) {
+          dailyOtpLimitReached.value = false;
+          clearOtpLockout();
           _preAuthToken.value = res.preAuthToken;
           twoFactorMaskedPhone.value = res.maskedPhone ?? '';
           twoFactorMaskedEmail.value = res.maskedEmail ?? '';
@@ -650,7 +889,17 @@ class AuthController extends GetxController {
 
   // 3.2 (A) Send Phone OTP via SMS
   Future<void> sendOtp() async {
-    final phone = phoneTextController.text.trim();
+    if (phoneOtpCooldownSeconds.value > 0) {
+      _showSnackbar(
+        'Please Wait',
+        'Please wait ${phoneOtpCooldownSeconds.value}s before requesting another OTP.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final rawPhone = phoneTextController.text.trim();
+    final phone = Formatters.sanitizeLocalPhone(rawPhone);
     final error = Validators.validatePhone(phone);
     if (error != null) {
       Get.snackbar('Invalid Input', error, snackPosition: SnackPosition.BOTTOM);
@@ -658,7 +907,7 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final fullPhone = '${selectedCountryCode.value}$phone';
+    final fullPhone = Formatters.toE164Phone(phone, countryCode: selectedCountryCode.value);
     phoneNumber.value = fullPhone;
     otpFlowType.value = OtpFlowType.phoneLogin;
     otpTextController.clear();
@@ -671,13 +920,14 @@ class AuthController extends GetxController {
         if (failure is SuspendedFailure) {
           SuspendedAccountDialog.show(message: failure.message);
         } else if (failure is RateLimitFailure) {
-          startResendTimer(seconds: failure.cooldownSeconds);
-          Get.snackbar('Cooldown Active', failure.message, snackPosition: SnackPosition.BOTTOM);
+          _handleRateLimitFailure(failure, flowContext: 'phoneOtp');
         } else {
           Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
         }
       },
       (res) {
+        dailyOtpLimitReached.value = false;
+        clearOtpLockout();
         startResendTimer(seconds: res.resendCooldown);
         Get.toNamed(AppRoutes.otp);
       },
@@ -691,6 +941,17 @@ class AuthController extends GetxController {
 
   // 3.2 (B) Verify Phone OTP & Obtain Session Tokens (or Phone/Email Registration OTP, 2FA Challenge)
   Future<void> verifyOtp() async {
+    if (otpLockoutSeconds.value > 0) {
+      _showSnackbar(
+        'Verification Locked',
+        otpLockoutMessage.value.isNotEmpty
+            ? otpLockoutMessage.value
+            : 'Too many failed attempts. Please wait before trying again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
     final otp = otpTextController.text.trim();
     final error = Validators.validateOtp(otp);
     if (error != null) {
@@ -754,6 +1015,8 @@ class AuthController extends GetxController {
                 snackPosition: SnackPosition.BOTTOM,
                 backgroundColor: const Color(0xFFFFF4E5),
               );
+            } else if (failure is RateLimitFailure) {
+              _handleRateLimitFailure(failure, flowContext: 'otpVerify');
             } else if (failure is SuspendedFailure) {
               SuspendedAccountDialog.show(message: failure.message);
             } else {
@@ -766,6 +1029,7 @@ class AuthController extends GetxController {
           },
           (res) {
             clearPreAuthToken();
+            clearOtpLockout();
             cancelResendTimer();
             cancelTwoFactorExpiryTimer();
             _handleLoginSuccess(res.user, res.rider);
@@ -778,9 +1042,10 @@ class AuthController extends GetxController {
     }
 
     if (otpFlowType.value == OtpFlowType.registration) {
-      final phone = registerPhoneController.text.trim().isNotEmpty
+      final rawPhone = registerPhoneController.text.trim().isNotEmpty
           ? registerPhoneController.text.trim()
           : (phoneNumber.value.isNotEmpty ? phoneNumber.value : null);
+      final phone = rawPhone != null ? Formatters.sanitizePhoneNumber(rawPhone) : null;
       final countryCode = registerCountryCode.value.isNotEmpty ? registerCountryCode.value : AppConstants.defaultCountryCode;
       final email = registrationEmail.value.isNotEmpty ? registrationEmail.value : null;
 
@@ -793,8 +1058,16 @@ class AuthController extends GetxController {
       isLoading.value = false;
 
       result.fold(
-        (failure) => Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+        (failure) {
+          if (failure is RateLimitFailure) {
+            _handleRateLimitFailure(failure, flowContext: 'otpVerify');
+          } else {
+            Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
+          }
+        },
         (res) {
+          clearOtpLockout();
+          dailyOtpLimitReached.value = false;
           Get.snackbar(
             'Verification Successful!',
             'Account verified successfully! You can now log in to complete your rider onboarding.',
@@ -826,47 +1099,68 @@ class AuthController extends GetxController {
         (failure) {
           if (failure is SuspendedFailure) {
             SuspendedAccountDialog.show(message: failure.message);
+          } else if (failure is RateLimitFailure) {
+            _handleRateLimitFailure(failure, flowContext: 'otpVerify');
           } else {
             Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
           }
         },
-        (res) => _handleLoginSuccess(res.user, res.rider),
+        (res) {
+          clearOtpLockout();
+          dailyOtpLimitReached.value = false;
+          _handleLoginSuccess(res.user, res.rider);
+        },
       );
     }
   }
 
   // Password Reset Flow
   Future<void> sendResetCode({bool isResend = false}) async {
-    final identity = resetIdentityController.text.trim();
-    if (identity.isEmpty) {
+    if (!isResend && forgotPasswordCooldownSeconds.value > 0) {
+      _showSnackbar(
+        'Please Wait',
+        'Please wait ${forgotPasswordCooldownSeconds.value}s before trying again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final rawIdentity = resetIdentityController.text.trim();
+    if (rawIdentity.isEmpty) {
       Get.snackbar('Input Required', 'Please enter your registered email or phone', snackPosition: SnackPosition.BOTTOM);
       return;
     }
 
     isLoading.value = true;
-    final isEmail = identity.contains('@');
+    final isEmail = rawIdentity.contains('@');
+    final identity = isEmail ? rawIdentity : Formatters.sanitizePhoneNumber(rawIdentity);
+    final dispatchIdentity = identity.isNotEmpty ? identity : rawIdentity;
     final countryCode = !isEmail ? AppConstants.defaultCountryCode : null;
-    final result = await resetPasswordUseCase.sendResetCode(identity, countryCode);
+    final result = await resetPasswordUseCase.sendResetCode(dispatchIdentity, countryCode);
     isLoading.value = false;
 
     result.fold(
       (failure) {
         if (failure is RateLimitFailure) {
-          startResendTimer(seconds: failure.cooldownSeconds);
-          Get.snackbar('Cooldown Active', failure.message, snackPosition: SnackPosition.BOTTOM);
+          _handleRateLimitFailure(
+            failure,
+            flowContext: isResend ? 'otpResend' : 'forgotPassword',
+          );
         } else {
           Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
         }
       },
       (res) {
+        dailyOtpLimitReached.value = false;
+        clearOtpLockout();
         resetMaskedDestination.value = res.maskedDestination;
-        resetEmail.value = res.email ?? (isEmail ? identity : '');
-        resetPhone.value = res.phone ?? (!isEmail ? identity : '');
+        resetEmail.value = res.email ?? (isEmail ? dispatchIdentity : '');
+        resetPhone.value = res.phone ?? (!isEmail ? dispatchIdentity : '');
         isResetCodeSent.value = true;
         startResendTimer(seconds: res.resendCooldown);
         Get.snackbar(
           'Code Sent',
-          'Password reset code sent to ${res.maskedDestination.isNotEmpty ? res.maskedDestination : identity}',
+          'Password reset code sent to ${res.maskedDestination.isNotEmpty ? res.maskedDestination : dispatchIdentity}',
           snackPosition: SnackPosition.TOP,
           backgroundColor: const Color(0xFFE8F8EE),
           duration: const Duration(seconds: 4),
@@ -879,17 +1173,28 @@ class AuthController extends GetxController {
   }
 
   Future<void> resendResetOtp() async {
-    if (!canResendOtp.value) return;
+    if (!canResendOtp.value || dailyOtpLimitReached.value) return;
     await sendResetCode(isResend: true);
   }
 
   Future<void> confirmPasswordReset() async {
-    final identity = resetIdentityController.text.trim();
+    if (otpLockoutSeconds.value > 0) {
+      _showSnackbar(
+        'Verification Locked',
+        otpLockoutMessage.value.isNotEmpty
+            ? otpLockoutMessage.value
+            : 'Too many failed attempts. Please wait before trying again.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final rawIdentity = resetIdentityController.text.trim();
     final otp = resetOtpController.text.trim();
     final newPass = newPasswordController.text.trim();
     final confirmPass = confirmPasswordController.text.trim();
 
-    if (identity.isEmpty) {
+    if (rawIdentity.isEmpty) {
       Get.snackbar('Validation', 'Identifier is missing. Please restart the reset process.', snackPosition: SnackPosition.BOTTOM);
       return;
     }
@@ -907,20 +1212,24 @@ class AuthController extends GetxController {
     }
 
     isLoading.value = true;
-    final isEmail = identity.contains('@');
+    final isEmail = rawIdentity.contains('@');
+    final identity = isEmail ? rawIdentity : Formatters.sanitizePhoneNumber(rawIdentity);
+    final dispatchIdentity = identity.isNotEmpty ? identity : rawIdentity;
     final countryCode = !isEmail ? AppConstants.defaultCountryCode : null;
-    final result = await resetPasswordUseCase.confirmReset(identity, otp, newPass, countryCode);
+    final result = await resetPasswordUseCase.confirmReset(dispatchIdentity, otp, newPass, countryCode);
     isLoading.value = false;
 
     result.fold(
       (failure) {
         if (failure is RateLimitFailure) {
-          Get.snackbar('Cooldown Active', failure.message, snackPosition: SnackPosition.BOTTOM);
+          _handleRateLimitFailure(failure, flowContext: 'otpVerify');
         } else {
           Get.snackbar('Reset Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
         }
       },
       (success) {
+        clearOtpLockout();
+        dailyOtpLimitReached.value = false;
         Get.snackbar(
           'Password Reset Successful',
           AppStrings.passwordResetSuccess,

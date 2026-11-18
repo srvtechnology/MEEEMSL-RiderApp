@@ -79,11 +79,16 @@ class ForgotPasswordView extends GetView<AuthController> {
               const SizedBox(height: 28),
 
               // Submit Action Button: "Send 6-Digit OTP"
-              Obx(() => CustomButton(
-                    text: AppStrings.send6DigitOtp,
-                    isLoading: controller.isLoading.value,
-                    onPressed: () => controller.sendResetCode(),
-                  )),
+              Obx(() {
+                final cooldown = controller.forgotPasswordCooldownSeconds.value;
+                return CustomButton(
+                  text: cooldown > 0
+                      ? 'Try again in ${cooldown}s'
+                      : AppStrings.send6DigitOtp,
+                  isLoading: controller.isLoading.value,
+                  onPressed: cooldown > 0 ? null : () => controller.sendResetCode(),
+                );
+              }),
               const SizedBox(height: 24),
 
               // Back to Login Link

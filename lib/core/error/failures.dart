@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'exceptions.dart';
 
 /// Failure base class for functional error handling with `Either<Failure, T>`.
 abstract class Failure extends Equatable {
@@ -41,14 +42,22 @@ class SuspendedFailure extends Failure {
 
 class RateLimitFailure extends Failure {
   final int cooldownSeconds;
+  final int? retryAfter;
+  final RateLimitType type;
+
   const RateLimitFailure({
     required super.message,
     this.cooldownSeconds = 60,
+    this.retryAfter,
+    this.type = RateLimitType.generic,
     super.statusCode = 429,
   });
 
+  bool get isDailyLimit => type == RateLimitType.dailyOtpLimit;
+  bool get isOtpLockout => type == RateLimitType.otpLockout;
+
   @override
-  List<Object?> get props => [message, statusCode, cooldownSeconds];
+  List<Object?> get props => [message, statusCode, cooldownSeconds, retryAfter, type];
 }
 
 class ValidationFailure extends Failure {

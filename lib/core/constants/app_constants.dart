@@ -17,12 +17,21 @@ class AppConstants {
   static const String activeOrderKey = 'rider_active_order_cache';
   static const String orderHistoryKey = 'rider_order_history_cache';
 
+  // Mobile Client Security Authentication Header
+  // Can be overridden at build time via --dart-define=MEEEM_MOBILE_APP_TOKEN=<secret>
+  static const String mobileAppTokenHeader = 'x-meeem-app-token';
+  static const String mobileAppToken = String.fromEnvironment(
+    'MEEEM_MOBILE_APP_TOKEN',
+    defaultValue: 'meeem_mobile_token_9e7a4b2c1d8f3056',
+  );
+
   // Default Localization
   static const String defaultCountryCode = '+232';
 
   // Timers & Timeouts
   static const int incomingOrderTimeoutSeconds = 60;
   static const int otpResendSeconds = 60;
+  static const int otpLockoutSeconds = 900; // 15 minutes after 5 failed OTP attempts
   static const int locationUpdateIntervalSeconds = 10;
   static const int connectionTimeoutMs = 15000;
   static const int receiveTimeoutMs = 15000;

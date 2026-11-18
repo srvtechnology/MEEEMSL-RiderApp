@@ -182,11 +182,16 @@ class RegisterView extends GetView<AuthController> {
               const SizedBox(height: 28),
 
               // Submit Button
-              Obx(() => CustomButton(
-                    text: 'Register & Verify Phone',
-                    isLoading: controller.isLoading.value,
-                    onPressed: () => controller.selfRegisterRider(),
-                  )),
+              Obx(() {
+                final cooldown = controller.registerCooldownSeconds.value;
+                return CustomButton(
+                  text: cooldown > 0
+                      ? 'Try again in ${cooldown}s'
+                      : 'Register & Verify Phone',
+                  isLoading: controller.isLoading.value,
+                  onPressed: cooldown > 0 ? null : () => controller.selfRegisterRider(),
+                );
+              }),
               const SizedBox(height: 24),
 
               // Login Prompt

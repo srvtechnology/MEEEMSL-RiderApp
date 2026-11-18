@@ -14,7 +14,8 @@ class LegalRemoteDataSourceImpl implements LegalRemoteDataSource {
   LegalRemoteDataSourceImpl(this._dioClient);
 
   @override
-  Future<LegalTermsAndPrivacyModel> getLegalDocuments({String type = 'all'}) async {
+  Future<LegalTermsAndPrivacyModel> getLegalDocuments(
+      {String type = 'all'}) async {
     try {
       final response = await _dioClient.dio.get(
         ApiEndpoints.terms,
@@ -33,17 +34,23 @@ class LegalRemoteDataSourceImpl implements LegalRemoteDataSource {
         if (response.data is Map<String, dynamic>) {
           body = response.data as Map<String, dynamic>;
         } else {
-          throw const ServerException(message: 'Invalid response format from legal endpoint');
+          throw const ServerException(
+              message: 'Invalid response format from legal endpoint');
         }
         return LegalTermsAndPrivacyModel.fromJson(body);
       } else {
         throw ServerException(
-          message: response.data?['message']?.toString() ?? 'Failed to load legal terms & privacy policy',
+          message: response.data?['message']?.toString() ??
+              'Failed to load legal terms & privacy policy',
           statusCode: response.statusCode,
         );
       }
     } on DioException catch (e) {
-      final msg = e.response?.data?['message']?.toString() ?? e.message ?? 'Network error fetching legal terms';
+      final respData = e.response?.data is Map ? e.response!.data as Map : {};
+      final msg = respData['error']?.toString() ??
+          respData['message']?.toString() ??
+          e.message ??
+          'Network error fetching legal terms';
       throw ServerException(message: msg, statusCode: e.response?.statusCode);
     } catch (e) {
       if (e is ServerException) rethrow;

@@ -130,11 +130,19 @@ class ApiClient extends GetConnect {
       uri = uri.replace(queryParameters: mergedQuery);
     }
 
+    final effectiveHeaders = <String, String>{
+      'Accept': 'application/json',
+      AppConstants.mobileAppTokenHeader: AppConstants.mobileAppToken,
+      if (headers != null) ...headers,
+    };
+    // Ensure mobile client token cannot be stripped by caller headers
+    effectiveHeaders[AppConstants.mobileAppTokenHeader] = AppConstants.mobileAppToken;
+
     final startTime = DateTime.now().millisecondsSinceEpoch;
     final logId = AsyncApiLogger.instance.logRequest(
       method: method,
       url: uri.toString(),
-      headers: headers,
+      headers: effectiveHeaders,
       body: _extractRequestBody(body),
     );
 
@@ -159,13 +167,9 @@ class ApiClient extends GetConnect {
       if (token != null && token.isNotEmpty && !isAuthEndpoint) {
         ioRequest.headers.set('Authorization', 'Bearer $token');
       }
-      ioRequest.headers.set('Accept', 'application/json');
-
-      if (headers != null) {
-        headers.forEach((key, value) {
-          ioRequest!.headers.set(key, value);
-        });
-      }
+      effectiveHeaders.forEach((key, value) {
+        ioRequest!.headers.set(key, value);
+      });
 
       // Body writing
       if (body is FormData) {

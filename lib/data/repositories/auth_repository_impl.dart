@@ -22,6 +22,15 @@ class AuthRepositoryImpl implements AuthRepository {
     required this.localDataSource,
   });
 
+  RateLimitFailure _toRateLimitFailure(RateLimitException e) {
+    return RateLimitFailure(
+      message: e.message,
+      cooldownSeconds: e.cooldownSeconds,
+      retryAfter: e.retryAfter,
+      type: e.type,
+    );
+  }
+
   @override
   Future<Either<Failure, LoginResponseEntity>> loginWithEmailPassword({
     String? email,
@@ -84,9 +93,10 @@ class AuthRepositoryImpl implements AuthRepository {
         approvalStatus: e.approvalStatus,
       ));
     } on SuspendedException catch (e) {
-      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+      return Left(
+          SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -144,7 +154,10 @@ class AuthRepositoryImpl implements AuthRepository {
         codeExpired: e.codeExpired,
       ));
     } on SuspendedException catch (e) {
-      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+      return Left(
+          SuspendedFailure(message: e.message, authStatus: e.authStatus));
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -167,10 +180,7 @@ class AuthRepositoryImpl implements AuthRepository {
         sessionExpired: e.sessionExpired,
       ));
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(
-        message: e.message,
-        cooldownSeconds: e.cooldownSeconds,
-      ));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -179,14 +189,16 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, SendPhoneOtpResultEntity>> sendPhoneOtp(String phone) async {
+  Future<Either<Failure, SendPhoneOtpResultEntity>> sendPhoneOtp(
+      String phone) async {
     try {
       final result = await remoteDataSource.sendPhoneOtp(phone: phone);
       return Right(result);
     } on SuspendedException catch (e) {
-      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+      return Left(
+          SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -234,9 +246,10 @@ class AuthRepositoryImpl implements AuthRepository {
 
       return Right(response);
     } on SuspendedException catch (e) {
-      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+      return Left(
+          SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -249,6 +262,8 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       final result = await remoteDataSource.login(phone);
       return Right(result);
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -257,7 +272,8 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, RiderEntity>> loginWithPassword(String email, String password) async {
+  Future<Either<Failure, RiderEntity>> loginWithPassword(
+      String email, String password) async {
     try {
       final data = await remoteDataSource.loginWithPassword(email, password);
       final token = data['token'] as String;
@@ -270,6 +286,8 @@ class AuthRepositoryImpl implements AuthRepository {
       await localDataSource.setIsOnline(rider.isOnline);
 
       return Right(rider);
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -278,12 +296,15 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(String identity, [String? phoneCountryCode]) async {
+  Future<Either<Failure, SendResetOtpResultEntity>> forgotPassword(
+      String identity,
+      [String? phoneCountryCode]) async {
     try {
-      final result = await remoteDataSource.forgotPassword(identity, phoneCountryCode);
+      final result =
+          await remoteDataSource.forgotPassword(identity, phoneCountryCode);
       return Right(result);
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -292,12 +313,15 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, bool>> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]) async {
+  Future<Either<Failure, bool>> resetPassword(
+      String identity, String otp, String newPassword,
+      [String? phoneCountryCode]) async {
     try {
-      final result = await remoteDataSource.resetPassword(identity, otp, newPassword, phoneCountryCode);
+      final result = await remoteDataSource.resetPassword(
+          identity, otp, newPassword, phoneCountryCode);
       return Right(result);
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -306,7 +330,8 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, RiderEntity>> verifyOtp(String phone, String otp) async {
+  Future<Either<Failure, RiderEntity>> verifyOtp(
+      String phone, String otp) async {
     try {
       final data = await remoteDataSource.verifyOtp(phone, otp);
       final token = data['token'] as String;
@@ -319,6 +344,8 @@ class AuthRepositoryImpl implements AuthRepository {
       await localDataSource.setIsOnline(rider.isOnline);
 
       return Right(rider);
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -327,11 +354,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, RiderEntity>> register(Map<String, dynamic> riderData) async {
+  Future<Either<Failure, RiderEntity>> register(
+      Map<String, dynamic> riderData) async {
     try {
       final rider = await remoteDataSource.register(riderData);
       await localDataSource.saveRider(rider);
       return Right(rider);
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -438,9 +468,10 @@ class AuthRepositoryImpl implements AuthRepository {
       );
       return Right(result);
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on SuspendedException catch (e) {
-      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+      return Left(
+          SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -449,7 +480,8 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Either<Failure, VerifyRegistrationResultEntity>> verifyRegistrationOtp({
+  Future<Either<Failure, VerifyRegistrationResultEntity>>
+      verifyRegistrationOtp({
     String? phone,
     String? phoneCountryCode,
     String? email,
@@ -464,7 +496,7 @@ class AuthRepositoryImpl implements AuthRepository {
       );
       return Right(result);
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -486,7 +518,7 @@ class AuthRepositoryImpl implements AuthRepository {
       );
       return Right(result);
     } on RateLimitException catch (e) {
-      return Left(RateLimitFailure(message: e.message, cooldownSeconds: e.cooldownSeconds));
+      return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
     } catch (e) {
@@ -565,7 +597,8 @@ class AuthRepositoryImpl implements AuthRepository {
     required String deviceId,
   }) async {
     try {
-      final result = await remoteDataSource.unregisterDeviceToken(deviceId: deviceId);
+      final result =
+          await remoteDataSource.unregisterDeviceToken(deviceId: deviceId);
       return Right(result);
     } on ServerException catch (e) {
       return Left(ServerFailure(message: e.message, statusCode: e.statusCode));

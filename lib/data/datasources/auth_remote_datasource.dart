@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../core/constants/api_endpoints.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/error/exceptions.dart';
 import '../../core/network/dio_client.dart';
+import '../../core/network/rate_limit_parser.dart';
+import '../../core/utils/formatters.dart';
 import '../../core/utils/image_compressor.dart';
 import '../models/rider_model.dart';
 import '../models/registration_result_model.dart';
@@ -119,6 +122,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   AuthRemoteDataSourceImpl(this._dioClient);
 
+  String _extractErrorMessage(DioException e, String fallback) {
+    final body = RateLimitParser.decodeBodyMap(e.response?.data);
+    final raw = body?['error'] ?? body?['message'];
+    if (raw != null && raw.toString().trim().isNotEmpty) {
+      return raw.toString().trim();
+    }
+    if (e.message != null && e.message!.trim().isNotEmpty) {
+      return e.message!.trim();
+    }
+    return fallback;
+  }
+
   @override
   Future<LoginResponseModel> loginWithEmailPassword({
     String? email,
@@ -132,11 +147,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String userAgent,
   }) async {
     try {
-      final effectiveIdentifier = identifier ?? email ?? phone ?? '';
+      final rawIdentifier = (identifier ?? email ?? phone ?? '').trim();
+      final isEmail = rawIdentifier.contains('@');
+      final effectiveIdentifier = isEmail
+          ? rawIdentifier
+          : Formatters.sanitizePhoneNumber(rawIdentifier);
       final payload = <String, dynamic>{
         'identifier': effectiveIdentifier,
-        if (effectiveIdentifier.contains('@')) 'email': effectiveIdentifier,
-        if (!effectiveIdentifier.contains('@') && effectiveIdentifier.isNotEmpty) 'phone': effectiveIdentifier,
+        if (isEmail) 'email': effectiveIdentifier,
+        if (!isEmail && effectiveIdentifier.isNotEmpty) 'phone': effectiveIdentifier,
         if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
         'password': password,
         'deviceId': deviceId,
@@ -164,6 +183,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final approvalStatus = respData['approvalStatus']?.toString();
       final msg = respData['error'] ?? respData['message'] ?? 'Login failed';
 
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+        );
+      }
       if (e.response?.statusCode == 403) {
         if (isSuspended) {
           throw SuspendedException(
@@ -228,6 +253,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final sessionExpired = respData['sessionExpired'] as bool? ?? false;
       final codeExpired = respData['codeExpired'] as bool? ?? false;
 
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+          defaultCooldownSeconds: AppConstants.otpLockoutSeconds,
+        );
+      }
       if (sessionExpired || msg.toString().toLowerCase().contains('session has expired')) {
         throw TwoFactorSessionExpiredException(message: msg.toString());
       }
@@ -267,8 +299,19 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       if (sessionExpired || msg.toString().toLowerCase().contains('session has expired')) {
         throw TwoFactorSessionExpiredException(message: msg.toString());
       }
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+        );
+      }
       if (cooldownRemaining != null && cooldownRemaining > 0) {
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: cooldownRemaining);
+        throw RateLimitException(
+          message: msg.toString(),
+          cooldownSeconds: cooldownRemaining,
+          retryAfter: cooldownRemaining,
+          type: RateLimitType.otpCooldown,
+        );
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
@@ -277,9 +320,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<SendPhoneOtpResultModel> sendPhoneOtp({required String phone}) async {
     try {
+      final cleanPhone = Formatters.sanitizePhoneNumber(phone);
       final response = await _dioClient.dio.post(
         ApiEndpoints.phoneOtpSend,
-        data: {'phone': phone},
+        data: {'phone': cleanPhone.isNotEmpty ? cleanPhone : phone},
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data['data'] as Map<String, dynamic>;
@@ -298,7 +342,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         );
       }
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: 45);
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+        );
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
@@ -314,10 +361,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String userAgent,
   }) async {
     try {
+      final cleanPhone = Formatters.sanitizePhoneNumber(phone);
       final response = await _dioClient.dio.post(
         ApiEndpoints.phoneOtpVerify,
         data: {
-          'phone': phone,
+          'phone': cleanPhone.isNotEmpty ? cleanPhone : phone,
           'otp': otp,
           'deviceId': deviceId,
           'platform': platform,
@@ -334,7 +382,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       final respData = e.response?.data is Map ? e.response!.data as Map : {};
       final msg = respData['error'] ?? respData['message'] ?? 'Invalid OTP code';
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: 300);
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+          defaultCooldownSeconds: AppConstants.otpLockoutSeconds,
+        );
       }
       throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
     }
@@ -343,14 +395,18 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<bool> login(String phone) async {
     try {
+      final cleanPhone = Formatters.sanitizePhoneNumber(phone);
       final response = await _dioClient.dio.post(
         ApiEndpoints.login,
-        data: {'phone': phone},
+        data: {'phone': cleanPhone.isNotEmpty ? cleanPhone : phone},
       );
       return response.statusCode == 200;
     } on DioException catch (e) {
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(e);
+      }
       throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to send verification code',
+        message: _extractErrorMessage(e, 'Failed to send verification code'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -376,8 +432,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Invalid email or password');
     } on DioException catch (e) {
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(e);
+      }
       throw ServerException(
-        message: e.response?.data?['message'] ?? 'Invalid credentials',
+        message: _extractErrorMessage(e, 'Invalid credentials'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -386,9 +445,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   @override
   Future<Map<String, dynamic>> verifyOtp(String phone, String otp) async {
     try {
+      final cleanPhone = Formatters.sanitizePhoneNumber(phone);
       final response = await _dioClient.dio.post(
         ApiEndpoints.verifyOtp,
-        data: {'phone': phone, 'otp': otp},
+        data: {'phone': cleanPhone.isNotEmpty ? cleanPhone : phone, 'otp': otp},
       );
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data as Map<String, dynamic>;
@@ -403,8 +463,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Invalid response from server');
     } on DioException catch (e) {
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          defaultCooldownSeconds: AppConstants.otpLockoutSeconds,
+        );
+      }
       throw ServerException(
-        message: e.response?.data?['message'] ?? 'Failed to verify OTP',
+        message: _extractErrorMessage(e, 'Failed to verify OTP'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -422,8 +488,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Registration failed');
     } on DioException catch (e) {
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(e);
+      }
       throw ServerException(
-        message: e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Registration failed',
+        message: _extractErrorMessage(e, 'Registration failed'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -609,11 +678,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           statusCode: 413,
         );
       }
-      final msg = e.response?.data?['error'] ??
-          e.response?.data?['message'] ??
-          'Onboarding submission failed';
-      throw ServerException(
-          message: msg.toString(), statusCode: e.response?.statusCode);
+      final msg = _extractErrorMessage(e, 'Onboarding submission failed');
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -631,9 +697,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? platform,
   }) async {
     try {
+      final cleanPhone = Formatters.sanitizePhoneNumber(phone);
       final payload = <String, dynamic>{
         'name': name,
-        'phone': phone,
+        'phone': cleanPhone.isNotEmpty ? cleanPhone : phone,
         'phoneCountryCode': (phoneCountryCode != null && phoneCountryCode.isNotEmpty) ? phoneCountryCode : '+232',
         if (email != null && email.isNotEmpty) 'email': email,
         'password': password,
@@ -654,8 +721,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Registration failed');
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Registration failed';
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      final msg = _extractErrorMessage(e, 'Registration failed');
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg,
+        );
+      }
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -667,10 +740,11 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     required String otp,
   }) async {
     try {
+      final cleanPhone = phone != null ? Formatters.sanitizePhoneNumber(phone) : null;
       final payload = <String, dynamic>{
         'otp': otp,
-        if (phone != null && phone.isNotEmpty) ...{
-          'phone': phone,
+        if (cleanPhone != null && cleanPhone.isNotEmpty) ...{
+          'phone': cleanPhone,
           if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
         } else if (email != null && email.isNotEmpty) ...{
           'email': email,
@@ -687,8 +761,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Verification failed');
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Invalid or expired OTP code.';
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      final msg = _extractErrorMessage(e, 'Invalid or expired OTP code.');
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg,
+          defaultCooldownSeconds: AppConstants.otpLockoutSeconds,
+        );
+      }
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -699,9 +780,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? email,
   }) async {
     try {
+      final cleanPhone = phone != null ? Formatters.sanitizePhoneNumber(phone) : null;
       final payload = <String, dynamic>{
-        if (phone != null && phone.isNotEmpty) ...{
-          'phone': phone,
+        if (cleanPhone != null && cleanPhone.isNotEmpty) ...{
+          'phone': cleanPhone,
           if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
         } else if (email != null && email.isNotEmpty) ...{
           'email': email,
@@ -718,11 +800,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Failed to resend verification code');
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to resend code';
+      final msg = _extractErrorMessage(e, 'Failed to resend code');
       if (e.response?.statusCode == 429) {
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: 60);
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg,
+        );
       }
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -730,12 +815,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<SendResetOtpResultModel> forgotPassword(String identity, [String? phoneCountryCode]) async {
     try {
       final isEmail = identity.contains('@');
+      final effectiveIdentity = isEmail ? identity.trim() : Formatters.sanitizePhoneNumber(identity);
+      final dispatchIdentity = effectiveIdentity.isNotEmpty ? effectiveIdentity : identity.trim();
       final response = await _dioClient.dio.post(
         ApiEndpoints.forgotPassword,
         data: {
-          'identifier': identity,
-          if (isEmail) 'email': identity else 'phone': identity,
-          'identity': identity,
+          'identifier': dispatchIdentity,
+          if (isEmail) 'email': dispatchIdentity else 'phone': dispatchIdentity,
+          'identity': dispatchIdentity,
           if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
         },
       );
@@ -745,13 +832,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       throw const ServerException(message: 'Failed to send reset code');
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to send reset code';
+      final msg = _extractErrorMessage(e, 'Failed to send reset code');
       if (e.response?.statusCode == 429) {
-        final match = RegExp(r'(\d+)').firstMatch(msg.toString());
-        final cooldown = match != null ? int.tryParse(match.group(1)!) ?? 45 : 45;
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: cooldown);
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg,
+        );
       }
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -759,12 +847,14 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<bool> resetPassword(String identity, String otp, String newPassword, [String? phoneCountryCode]) async {
     try {
       final isEmail = identity.contains('@');
+      final effectiveIdentity = isEmail ? identity.trim() : Formatters.sanitizePhoneNumber(identity);
+      final dispatchIdentity = effectiveIdentity.isNotEmpty ? effectiveIdentity : identity.trim();
       final response = await _dioClient.dio.post(
         ApiEndpoints.resetPassword,
         data: {
-          'identifier': identity,
-          if (isEmail) 'email': identity else 'phone': identity,
-          'identity': identity,
+          'identifier': dispatchIdentity,
+          if (isEmail) 'email': dispatchIdentity else 'phone': dispatchIdentity,
+          'identity': dispatchIdentity,
           if (phoneCountryCode != null && phoneCountryCode.isNotEmpty) 'phoneCountryCode': phoneCountryCode,
           'otp': otp,
           'newPassword': newPassword,
@@ -772,13 +862,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       return response.statusCode == 200;
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to reset password';
+      final msg = _extractErrorMessage(e, 'Failed to reset password');
       if (e.response?.statusCode == 429) {
-        final match = RegExp(r'(\d+)').firstMatch(msg.toString());
-        final cooldown = match != null ? int.tryParse(match.group(1)!) ?? 300 : 300;
-        throw RateLimitException(message: msg.toString(), cooldownSeconds: cooldown);
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg,
+          defaultCooldownSeconds: AppConstants.otpLockoutSeconds,
+        );
       }
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -792,7 +884,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       return response.data['token'] as String;
     } on DioException catch (e) {
       throw ServerException(
-        message: e.response?.data?['message'] ?? 'Session expired',
+        message: _extractErrorMessage(e, 'Session expired'),
         statusCode: e.response?.statusCode,
       );
     }
@@ -830,8 +922,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       return response.statusCode == 200;
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to register device token';
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      final msg = _extractErrorMessage(e, 'Failed to register device token');
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 
@@ -850,8 +942,8 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       );
       return response.statusCode == 200;
     } on DioException catch (e) {
-      final msg = e.response?.data?['error'] ?? e.response?.data?['message'] ?? 'Failed to unregister device token';
-      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+      final msg = _extractErrorMessage(e, 'Failed to unregister device token');
+      throw ServerException(message: msg, statusCode: e.response?.statusCode);
     }
   }
 }

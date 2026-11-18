@@ -44,16 +44,34 @@ class SuspendedException implements Exception {
   String toString() => 'SuspendedException: $message';
 }
 
+enum RateLimitType {
+  ipRateLimit,
+  otpCooldown,
+  dailyOtpLimit,
+  otpLockout,
+  loginRateLimit,
+  generic,
+}
+
 class RateLimitException implements Exception {
   final String message;
   final int cooldownSeconds;
+  final int? retryAfter;
+  final RateLimitType type;
+
   const RateLimitException({
     required this.message,
     this.cooldownSeconds = 60,
+    this.retryAfter,
+    this.type = RateLimitType.generic,
   });
 
+  bool get isDailyLimit => type == RateLimitType.dailyOtpLimit;
+  bool get isOtpLockout => type == RateLimitType.otpLockout;
+
   @override
-  String toString() => 'RateLimitException: $message (cooldown: ${cooldownSeconds}s)';
+  String toString() =>
+      'RateLimitException: $message (type: ${type.name}, cooldown: ${cooldownSeconds}s)';
 }
 
 class UnverifiedAccountException implements Exception {

@@ -13,6 +13,12 @@ import '../controllers/auth_controller.dart';
 class ResetPasswordView extends GetView<AuthController> {
   const ResetPasswordView({super.key});
 
+  String _formatSeconds(int totalSeconds) {
+    final minutes = (totalSeconds ~/ 60).toString().padLeft(2, '0');
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -60,9 +66,10 @@ class ResetPasswordView extends GetView<AuthController> {
               Obx(() {
                 final email = controller.resetEmail.value;
                 final phone = controller.resetPhone.value;
-                final destination = controller.resetMaskedDestination.value.isNotEmpty
-                    ? controller.resetMaskedDestination.value
-                    : controller.resetIdentityController.text;
+                final destination =
+                    controller.resetMaskedDestination.value.isNotEmpty
+                        ? controller.resetMaskedDestination.value
+                        : controller.resetIdentityController.text;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,7 +77,9 @@ class ResetPasswordView extends GetView<AuthController> {
                     Text(
                       'Enter the 6-digit reset code sent to your registered credentials.',
                       style: AppTextStyles.bodyMedium(
-                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -80,25 +89,42 @@ class ResetPasswordView extends GetView<AuthController> {
                       children: [
                         if (phone.isNotEmpty)
                           Chip(
-                            avatar: const Icon(Icons.phone_android_rounded, size: 16, color: AppColors.primary),
-                            label: Text(phone, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            backgroundColor: isDark ? AppColors.darkSurface : Colors.grey.shade100,
+                            avatar: const Icon(Icons.phone_android_rounded,
+                                size: 16, color: AppColors.primary),
+                            label: Text(phone,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13)),
+                            backgroundColor: isDark
+                                ? AppColors.darkSurface
+                                : Colors.grey.shade100,
                             side: BorderSide(color: AppColors.lightCardBorder),
                             visualDensity: VisualDensity.compact,
                           ),
                         if (email.isNotEmpty)
                           Chip(
-                            avatar: const Icon(Icons.email_outlined, size: 16, color: AppColors.primary),
-                            label: Text(email, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            backgroundColor: isDark ? AppColors.darkSurface : Colors.grey.shade100,
+                            avatar: const Icon(Icons.email_outlined,
+                                size: 16, color: AppColors.primary),
+                            label: Text(email,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13)),
+                            backgroundColor: isDark
+                                ? AppColors.darkSurface
+                                : Colors.grey.shade100,
                             side: BorderSide(color: AppColors.lightCardBorder),
                             visualDensity: VisualDensity.compact,
                           ),
-                        if (email.isEmpty && phone.isEmpty && destination.isNotEmpty)
+                        if (email.isEmpty &&
+                            phone.isEmpty &&
+                            destination.isNotEmpty)
                           Chip(
-                            avatar: const Icon(Icons.verified_user_outlined, size: 16, color: AppColors.primary),
-                            label: Text(destination, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                            backgroundColor: isDark ? AppColors.darkSurface : Colors.grey.shade100,
+                            avatar: const Icon(Icons.verified_user_outlined,
+                                size: 16, color: AppColors.primary),
+                            label: Text(destination,
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w600, fontSize: 13)),
+                            backgroundColor: isDark
+                                ? AppColors.darkSurface
+                                : Colors.grey.shade100,
                             side: BorderSide(color: AppColors.lightCardBorder),
                             visualDensity: VisualDensity.compact,
                           ),
@@ -160,17 +186,62 @@ class ResetPasswordView extends GetView<AuthController> {
                         color: AppColors.textSecondaryLight,
                         size: 20,
                       ),
-                      onPressed: () => controller.toggleConfirmPasswordVisibility(),
+                      onPressed: () =>
+                          controller.toggleConfirmPasswordVisibility(),
                     ),
                   )),
               const SizedBox(height: 24),
 
+              // Brute-Force OTP Lockout Banner
+              Obx(() {
+                final lockout = controller.otpLockoutSeconds.value;
+                if (lockout <= 0) return const SizedBox.shrink();
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFEBEE),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.4)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.lock_clock_outlined,
+                          size: 20, color: AppColors.error),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          controller.otpLockoutMessage.value.isNotEmpty
+                              ? '${controller.otpLockoutMessage.value} (${_formatSeconds(lockout)})'
+                              : 'Too many failed attempts. Locked for ${_formatSeconds(lockout)}.',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.error,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+
               // Resend OTP Section with Countdown Timer
               Center(
                 child: Obx(() {
+                  if (controller.dailyOtpLimitReached.value) {
+                    return Text(
+                      'Daily OTP limit reached. Try again tomorrow.',
+                      style: AppTextStyles.bodyMedium(color: AppColors.error),
+                    );
+                  }
                   if (controller.canResendOtp.value) {
                     return TextButton.icon(
-                      onPressed: controller.isLoading.value ? null : () => controller.resendResetOtp(),
+                      onPressed: controller.isLoading.value
+                          ? null
+                          : () => controller.resendResetOtp(),
                       icon: const Icon(Icons.refresh_rounded, size: 18),
                       label: const Text(
                         'Resend OTP',
@@ -204,11 +275,18 @@ class ResetPasswordView extends GetView<AuthController> {
               const SizedBox(height: 24),
 
               // Submit Button: "Reset Password & Sign In"
-              Obx(() => CustomButton(
-                    text: AppStrings.resetPasswordAndSignIn,
-                    isLoading: controller.isLoading.value,
-                    onPressed: () => controller.confirmPasswordReset(),
-                  )),
+              Obx(() {
+                final lockout = controller.otpLockoutSeconds.value;
+                return CustomButton(
+                  text: lockout > 0
+                      ? 'Locked (${_formatSeconds(lockout)})'
+                      : AppStrings.resetPasswordAndSignIn,
+                  isLoading: controller.isLoading.value,
+                  onPressed: lockout > 0
+                      ? null
+                      : () => controller.confirmPasswordReset(),
+                );
+              }),
               const SizedBox(height: 16),
 
               // Change Email / Phone Link
