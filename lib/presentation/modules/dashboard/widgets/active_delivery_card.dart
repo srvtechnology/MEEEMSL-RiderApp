@@ -3,7 +3,6 @@ import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
-import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
@@ -224,11 +223,12 @@ class ActiveDeliveryCard extends StatelessWidget {
                                 padding: const EdgeInsets.all(6),
                                 icon: const Icon(Icons.navigation_outlined,
                                     size: 18, color: AppColors.primary),
-                                onPressed: () => _openMaps(
-                                  order.pickupLat,
-                                  order.pickupLng,
-                                  order.pickupName,
-                                ),
+                                onPressed: () {
+                                  if (Get.isRegistered<OrdersController>()) {
+                                    Get.find<OrdersController>().selectedOrder.value = order;
+                                  }
+                                  Get.toNamed(AppRoutes.navigation);
+                                },
                               ),
                             ],
                           ),
@@ -330,11 +330,12 @@ class ActiveDeliveryCard extends StatelessWidget {
                                 padding: const EdgeInsets.all(6),
                                 icon: const Icon(Icons.navigation_outlined,
                                     size: 18, color: AppColors.success),
-                                onPressed: () => _openMaps(
-                                  order.dropoffLat,
-                                  order.dropoffLng,
-                                  order.customerName,
-                                ),
+                                onPressed: () {
+                                  if (Get.isRegistered<OrdersController>()) {
+                                    Get.find<OrdersController>().selectedOrder.value = order;
+                                  }
+                                  Get.toNamed(AppRoutes.navigation);
+                                },
                               ),
                             ],
                           ),
@@ -463,11 +464,5 @@ class ActiveDeliveryCard extends StatelessWidget {
     }
   }
 
-  Future<void> _openMaps(double lat, double lng, String title) async {
-    await MapLauncherUtil.openGoogleMaps(
-      latitude: lat,
-      longitude: lng,
-      label: title,
-    );
-  }
+
 }

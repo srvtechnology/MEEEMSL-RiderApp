@@ -69,13 +69,13 @@ class LocationService extends GetxService {
   DateTime? _lastRestFallbackTimestamp;
   bool _wasSocketConnected = false;
 
-  // Fallback initial location (Downtown Delivery District)
+  // Fallback initial location (Cooch Behar / COB Delivery District)
   static final Position defaultFallbackPosition = Position(
-    latitude: 8.484245,
-    longitude: -13.234125,
+    latitude: 26.3239,
+    longitude: 89.4510,
     timestamp: DateTime.now(),
     accuracy: 5.0,
-    altitude: 10.0,
+    altitude: 40.0,
     altitudeAccuracy: 1.0,
     heading: 90.0,
     headingAccuracy: 1.0,
@@ -185,7 +185,7 @@ class LocationService extends GetxService {
       locationSettings = AndroidSettings(
         accuracy: LocationAccuracy.high,
         distanceFilter: 5, // update when moved 5 meters
-        forceLocationManager: true,
+        forceLocationManager: false, // Use Google Play Services Fused Location Provider for accurate GPS in COB
         intervalDuration: const Duration(seconds: telemetryIntervalSeconds),
         foregroundNotificationConfig: const ForegroundNotificationConfig(
           notificationTitle: 'Meeem Delivery Rider Active',
@@ -211,6 +211,13 @@ class LocationService extends GetxService {
     }
 
     try {
+      // Immediately obtain high accuracy location lock
+      Geolocator.getCurrentPosition(
+        locationSettings: locationSettings,
+      ).then((Position initialPos) {
+        currentPosition.value = initialPos;
+      }).catchError((_) {});
+
       _positionSubscription =
           Geolocator.getPositionStream(locationSettings: locationSettings)
               .listen(

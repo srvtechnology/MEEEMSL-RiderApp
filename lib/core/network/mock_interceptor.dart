@@ -714,8 +714,8 @@ class MockInterceptor extends Interceptor {
           type: DioExceptionType.badResponse,
         ), true);
       }
-      final lat = options.data is Map ? (options.data['latitude'] ?? 8.484245) : 8.484245;
-      final lng = options.data is Map ? (options.data['longitude'] ?? -13.234125) : -13.234125;
+      final lat = options.data is Map ? (options.data['latitude'] ?? 26.3239) : 26.3239;
+      final lng = options.data is Map ? (options.data['longitude'] ?? 89.4510) : 89.4510;
       final isOnline = options.data is Map ? (options.data['isOnline'] ?? false) : false;
       return _resolve(handler, Response(
         requestOptions: options,
@@ -981,8 +981,8 @@ class MockInterceptor extends Interceptor {
           },
         );
       }
-      final lat = options.data is Map ? (options.data['latitude'] ?? 8.484245) : 8.484245;
-      final lng = options.data is Map ? (options.data['longitude'] ?? -13.234125) : -13.234125;
+      final lat = options.data is Map ? (options.data['latitude'] ?? 26.3239) : 26.3239;
+      final lng = options.data is Map ? (options.data['longitude'] ?? 89.4510) : 89.4510;
       final isOnline = options.data is Map ? (options.data['isOnline'] ?? false) : false;
       return Response(
         requestOptions: options,
@@ -1429,8 +1429,8 @@ class MockInterceptor extends Interceptor {
             'pocContact': '+23277987654',
             'street': '25 Siaka Stevens St',
             'city': 'Freetown',
-            'latitude': 8.484,
-            'longitude': -13.234,
+            'latitude': 26.3239,
+            'longitude': 89.4510,
           },
         },
         'items': [

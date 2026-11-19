@@ -150,28 +150,137 @@ class OrderModel extends OrderEntity {
         orderMap?['pickupPhone']?.toString() ??
         '';
 
-    final pickupLat = double.tryParse(businessInfo?['latitude']?.toString() ?? '') ??
-        double.tryParse(store?['lat']?.toString() ?? '') ??
-        double.tryParse(json['sellerLatitude']?.toString() ?? '') ??
-        double.tryParse(json['pickupLat']?.toString() ?? '') ??
-        double.tryParse(orderMap?['pickupLat']?.toString() ?? '') ??
-        8.484245;
+    double? parseCoordinate(dynamic val) {
+      if (val == null) return null;
+      if (val is num) return val.toDouble();
+      return double.tryParse(val.toString());
+    }
 
-    final pickupLng = double.tryParse(businessInfo?['longitude']?.toString() ?? '') ??
-        double.tryParse(store?['lng']?.toString() ?? '') ??
-        double.tryParse(json['sellerLongitude']?.toString() ?? '') ??
-        double.tryParse(json['pickupLng']?.toString() ?? '') ??
-        double.tryParse(orderMap?['pickupLng']?.toString() ?? '') ??
-        -13.234125;
+    final shippingAddressMap = safeMap(orderMap?['shippingAddress'] ?? json['shippingAddress']);
+    final deliveryAddressMap = safeMap(orderMap?['deliveryAddress'] ?? json['deliveryAddress']);
+    final dropoffLocationMap = safeMap(orderMap?['dropoffLocation'] ?? json['dropoffLocation']);
+    final coords = orderMap?['coordinates'] ?? json['coordinates'];
 
-    final dropoffLat = double.tryParse(json['dropoffLat']?.toString() ?? '') ??
-        double.tryParse(orderMap?['dropoffLat']?.toString() ?? '') ??
-        8.460;
-        double.tryParse(orderMap?['dropoffLat']?.toString() ?? '') ??
-        8.460;
-    final dropoffLng = double.tryParse(json['dropoffLng']?.toString() ?? '') ??
-        double.tryParse(orderMap?['dropoffLng']?.toString() ?? '') ??
-        -13.250;
+    double? rawDropLat = parseCoordinate(json['dropoffLat']) ??
+        parseCoordinate(orderMap?['dropoffLat']) ??
+        parseCoordinate(json['dropoffLatitude']) ??
+        parseCoordinate(orderMap?['dropoffLatitude']) ??
+        parseCoordinate(orderMap?['shippingLatitude']) ??
+        parseCoordinate(json['shippingLatitude']) ??
+        parseCoordinate(orderMap?['shippingLat']) ??
+        parseCoordinate(json['shippingLat']) ??
+        parseCoordinate(orderMap?['deliveryLatitude']) ??
+        parseCoordinate(json['deliveryLatitude']) ??
+        parseCoordinate(shippingAddressMap?['latitude']) ??
+        parseCoordinate(shippingAddressMap?['lat']) ??
+        parseCoordinate(deliveryAddressMap?['latitude']) ??
+        parseCoordinate(deliveryAddressMap?['lat']) ??
+        parseCoordinate(dropoffLocationMap?['latitude']) ??
+        parseCoordinate(dropoffLocationMap?['lat']) ??
+        parseCoordinate(customer?['latitude']) ??
+        parseCoordinate(customer?['lat']) ??
+        (coords is List && coords.length >= 2 ? parseCoordinate(coords[1]) : null);
+
+    double? rawDropLng = parseCoordinate(json['dropoffLng']) ??
+        parseCoordinate(orderMap?['dropoffLng']) ??
+        parseCoordinate(json['dropoffLongitude']) ??
+        parseCoordinate(orderMap?['dropoffLongitude']) ??
+        parseCoordinate(orderMap?['shippingLongitude']) ??
+        parseCoordinate(json['shippingLongitude']) ??
+        parseCoordinate(orderMap?['shippingLng']) ??
+        parseCoordinate(json['shippingLng']) ??
+        parseCoordinate(orderMap?['deliveryLongitude']) ??
+        parseCoordinate(json['deliveryLongitude']) ??
+        parseCoordinate(shippingAddressMap?['longitude']) ??
+        parseCoordinate(shippingAddressMap?['lng']) ??
+        parseCoordinate(deliveryAddressMap?['longitude']) ??
+        parseCoordinate(deliveryAddressMap?['lng']) ??
+        parseCoordinate(dropoffLocationMap?['longitude']) ??
+        parseCoordinate(dropoffLocationMap?['lng']) ??
+        parseCoordinate(customer?['longitude']) ??
+        parseCoordinate(customer?['lng']) ??
+        (coords is List && coords.length >= 2 ? parseCoordinate(coords[0]) : null);
+
+    // Geocode known locations in Cooch Behar (COB) or North Bengal if missing or Sierra Leone default
+    final dropAddrLower = dropoffAddress.toLowerCase();
+    if (dropAddrLower.contains('khagrabari') || dropAddrLower.contains('khagra bari')) {
+      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
+        rawDropLat = 26.3442;
+        rawDropLng = 89.4529;
+      }
+    } else if (dropAddrLower.contains('cooch') || dropAddrLower.contains('cob') || dropAddrLower.contains('koch bihar')) {
+      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
+        rawDropLat = 26.3239;
+        rawDropLng = 89.4510;
+      }
+    } else if (dropAddrLower.contains('alipurduar')) {
+      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
+        rawDropLat = 26.4919;
+        rawDropLng = 89.5271;
+      }
+    } else if (dropAddrLower.contains('tufanganj')) {
+      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
+        rawDropLat = 26.3167;
+        rawDropLng = 89.6667;
+      }
+    } else if (dropAddrLower.contains('dinhata')) {
+      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
+        rawDropLat = 26.1333;
+        rawDropLng = 89.4667;
+      }
+    } else if (dropAddrLower.contains('mathabhanga')) {
+      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
+        rawDropLat = 26.3333;
+        rawDropLng = 89.2167;
+      }
+    }
+
+    if (rawDropLat != null && (rawDropLat >= 8.4 && rawDropLat <= 8.55) && (rawDropLng != null && rawDropLng <= -13.15 && rawDropLng >= -13.35)) {
+      rawDropLat = 26.3442;
+      rawDropLng = 89.4529;
+    }
+
+    final dropoffLat = rawDropLat ?? 26.3442;
+    final dropoffLng = rawDropLng ?? 89.4529;
+
+    double? rawPickLat = parseCoordinate(businessInfo?['latitude']) ??
+        parseCoordinate(store?['lat']) ??
+        parseCoordinate(store?['latitude']) ??
+        parseCoordinate(json['sellerLatitude']) ??
+        parseCoordinate(json['pickupLat']) ??
+        parseCoordinate(orderMap?['pickupLat']) ??
+        parseCoordinate(sellerMap?['latitude']) ??
+        parseCoordinate(sellerMap?['lat']);
+
+    double? rawPickLng = parseCoordinate(businessInfo?['longitude']) ??
+        parseCoordinate(store?['lng']) ??
+        parseCoordinate(store?['longitude']) ??
+        parseCoordinate(json['sellerLongitude']) ??
+        parseCoordinate(json['pickupLng']) ??
+        parseCoordinate(orderMap?['pickupLng']) ??
+        parseCoordinate(sellerMap?['longitude']) ??
+        parseCoordinate(sellerMap?['lng']);
+
+    final pickAddrLower = pickupAddress.toLowerCase();
+    if (pickAddrLower.contains('khagrabari') || pickAddrLower.contains('khagra bari')) {
+      if (rawPickLat == null || (rawPickLat >= 8.4 && rawPickLat <= 8.55)) {
+        rawPickLat = 26.3442;
+        rawPickLng = 89.4529;
+      }
+    } else if (pickAddrLower.contains('cooch') || pickAddrLower.contains('cob') || pickAddrLower.contains('koch bihar')) {
+      if (rawPickLat == null || (rawPickLat >= 8.4 && rawPickLat <= 8.55)) {
+        rawPickLat = 26.3239;
+        rawPickLng = 89.4510;
+      }
+    }
+
+    if (rawPickLat != null && (rawPickLat >= 8.4 && rawPickLat <= 8.55) && (rawPickLng != null && rawPickLng <= -13.15 && rawPickLng >= -13.35)) {
+      rawPickLat = 26.3239;
+      rawPickLng = 89.4510;
+    }
+
+    final pickupLat = rawPickLat ?? 26.3239;
+    final pickupLng = rawPickLng ?? 89.4510;
 
     final rawItems = orderMap?['items'] ?? json['items'];
     final items = <OrderItemModel>[];

@@ -4,7 +4,6 @@ import 'package:get/get.dart';
 import '../../../../core/constants/app_strings.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/text_styles.dart';
-import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../core/widgets/custom_card.dart';
 import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
@@ -282,17 +281,11 @@ class ActiveOrderView extends GetView<OrdersController> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildCircleActionButton(
-                    icon: Icons.directions_rounded,
-                    tooltip: '1-Tap Maps to Vendor',
+                    icon: Icons.navigation_rounded,
+                    tooltip: 'Live Navigation to Vendor',
                     bgColor: AppColors.primaryContainer,
                     iconColor: AppColors.primary,
-                    onTap: () => MapLauncherUtil.showMapOptionsModal(
-                      context: context,
-                      latitude: order.pickupLat,
-                      longitude: order.pickupLng,
-                      title: order.pickupName,
-                      address: order.pickupAddress,
-                    ),
+                    onTap: () => Get.toNamed(AppRoutes.navigation),
                   ),
                   const SizedBox(width: 6),
                   _buildCircleActionButton(
@@ -349,17 +342,11 @@ class ActiveOrderView extends GetView<OrdersController> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _buildCircleActionButton(
-                    icon: Icons.directions_rounded,
-                    tooltip: '1-Tap Maps to Customer',
+                    icon: Icons.navigation_rounded,
+                    tooltip: 'Live Navigation to Customer',
                     bgColor: AppColors.primaryContainer,
                     iconColor: AppColors.primary,
-                    onTap: () => MapLauncherUtil.showMapOptionsModal(
-                      context: context,
-                      latitude: order.dropoffLat,
-                      longitude: order.dropoffLng,
-                      title: order.customerName,
-                      address: order.dropoffAddress,
-                    ),
+                    onTap: () => Get.toNamed(AppRoutes.navigation),
                   ),
                   const SizedBox(width: 6),
                   _buildCircleActionButton(

@@ -54,5 +54,25 @@ void main() {
       controller.onCameraMoveStarted();
       expect(controller.isFollowingRider.value, isFalse);
     });
+
+    test('toggleCameraMode toggles 3d navigation perspective', () {
+      expect(controller.is3dNavigationMode.value, isTrue);
+      controller.toggleCameraMode();
+      expect(controller.is3dNavigationMode.value, isFalse);
+      controller.toggleCameraMode();
+      expect(controller.is3dNavigationMode.value, isTrue);
+    });
+
+    test('toggleTraffic toggles real-time traffic overlay', () {
+      expect(controller.isTrafficEnabled.value, isTrue);
+      controller.toggleTraffic();
+      expect(controller.isTrafficEnabled.value, isFalse);
+    });
+
+    test('toggleMute toggles voice instruction state', () {
+      expect(controller.isMuted.value, isFalse);
+      controller.toggleMute();
+      expect(controller.isMuted.value, isTrue);
+    });
   });
 }
