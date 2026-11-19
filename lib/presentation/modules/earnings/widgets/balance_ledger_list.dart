@@ -168,10 +168,16 @@ class BalanceLedgerList extends StatelessWidget {
             ),
           )
         else
-          Column(
-            children: filteredTransactions
-                .map((tx) => _buildTransactionCard(context, tx, isDark, textPrimary, textSecondary, borderColor))
-                .toList(),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            addAutomaticKeepAlives: false,
+            itemCount: filteredTransactions.length,
+            itemBuilder: (context, index) => BalanceLedgerTransactionCard(
+              tx: filteredTransactions[index],
+              currency: currency,
+            ),
           ),
       ],
     );
@@ -238,14 +244,66 @@ class BalanceLedgerList extends StatelessWidget {
     );
   }
 
-  Widget _buildTransactionCard(
+  Widget _buildErrorCard(
     BuildContext context,
-    RiderBalanceTransactionEntity tx,
     bool isDark,
     Color textPrimary,
     Color textSecondary,
     Color borderColor,
   ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 36, color: AppColors.error),
+          const SizedBox(height: 8),
+          Text(
+            'Could Not Load Ledger',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            errorMessage ?? 'Something went wrong.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: textSecondary),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            style: OutlinedButton.styleFrom(minimumSize: const Size(140, 40)),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Virtualization-ready standalone ledger transaction card used inside `SliverList.builder`.
+class BalanceLedgerTransactionCard extends StatelessWidget {
+  final RiderBalanceTransactionEntity tx;
+  final String currency;
+
+  const BalanceLedgerTransactionCard({
+    super.key,
+    required this.tx,
+    this.currency = 'NLe',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textPrimary = isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
+    final textSecondary = isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final borderColor = isDark ? AppColors.darkCardBorder : AppColors.lightCardBorder;
+
     late final Color accentColor;
     late final Color badgeBg;
     late final IconData icon;
@@ -409,47 +467,6 @@ class BalanceLedgerList extends StatelessWidget {
           fontWeight: FontWeight.w700,
           color: fg,
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorCard(
-    BuildContext context,
-    bool isDark,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
-  ) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor),
-      ),
-      child: Column(
-        children: [
-          const Icon(Icons.error_outline_rounded, size: 36, color: AppColors.error),
-          const SizedBox(height: 8),
-          Text(
-            'Could Not Load Ledger',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: textPrimary),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            errorMessage ?? 'Something went wrong.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: textSecondary),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: onRetry,
-            style: OutlinedButton.styleFrom(minimumSize: const Size(140, 40)),
-            icon: const Icon(Icons.refresh_rounded, size: 16),
-            label: const Text('Retry'),
-          ),
-        ],
       ),
     );
   }

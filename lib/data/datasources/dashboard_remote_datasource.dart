@@ -125,73 +125,77 @@ class DashboardRemoteDataSourceImpl implements DashboardRemoteDataSource {
     int totalDeliveries = 0;
     double weeklyEarnings = 0.0;
     bool hasActiveOrder = false;
+    double totalEarnings = 0.0;
+    int completedDeliveriesCount = 0;
+    int activeDeliveriesCount = 0;
 
-    // 1. Check real active orders
-    try {
-      final activeRes = await _dioClient.dio.get(
-        ApiEndpoints.orders,
-        queryParameters: {'tab': 'active'},
-      );
-      if (activeRes.statusCode == 200 && activeRes.data != null) {
-        final activeList = activeRes.data['data'];
-        if (activeList is List && activeList.isNotEmpty) {
-          hasActiveOrder = true;
-        }
-      }
-    } catch (_) {}
+    // Run active orders, completed orders, and settings in parallel (1 RTT instead of 3 sequential RTTs)
+    await Future.wait<void>([
+      () async {
+        try {
+          final activeRes = await _dioClient.dio.get(
+            ApiEndpoints.orders,
+            queryParameters: {'tab': 'active'},
+          );
+          if (activeRes.statusCode == 200 && activeRes.data != null) {
+            final activeList = activeRes.data['data'];
+            if (activeList is List && activeList.isNotEmpty) {
+              hasActiveOrder = true;
+            }
+          }
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          final completedRes = await _dioClient.dio.get(
+            ApiEndpoints.orders,
+            queryParameters: {'tab': 'completed'},
+          );
+          if (completedRes.statusCode == 200 && completedRes.data != null) {
+            final data = completedRes.data['data'];
+            if (data is List) {
+              totalDeliveries = data.length;
+              final now = DateTime.now();
+              final todayStart = DateTime(now.year, now.month, now.day);
+              final weekStart = now.subtract(const Duration(days: 7));
 
-    // 2. Fetch real completed orders to calculate real earnings and trip counts
-    try {
-      final completedRes = await _dioClient.dio.get(
-        ApiEndpoints.orders,
-        queryParameters: {'tab': 'completed'},
-      );
-      if (completedRes.statusCode == 200 && completedRes.data != null) {
-        final data = completedRes.data['data'];
-        if (data is List) {
-          totalDeliveries = data.length;
-          final now = DateTime.now();
-          final todayStart = DateTime(now.year, now.month, now.day);
-          final weekStart = now.subtract(const Duration(days: 7));
+              for (final item in data) {
+                if (item is Map<String, dynamic>) {
+                  final earnings = (item['riderEarnings'] as num?)?.toDouble() ??
+                      (item['order']?['deliveryFee'] as num?)?.toDouble() ??
+                      0.0;
+                  final dateStr = item['deliveredAt'] ?? item['createdAt'] ?? item['updatedAt'];
+                  final date = dateStr != null ? DateTime.tryParse(dateStr.toString()) : null;
 
-          for (final item in data) {
-            if (item is Map<String, dynamic>) {
-              final earnings = (item['riderEarnings'] as num?)?.toDouble() ??
-                  (item['order']?['deliveryFee'] as num?)?.toDouble() ??
-                  0.0;
-              final dateStr = item['deliveredAt'] ?? item['createdAt'] ?? item['updatedAt'];
-              final date = dateStr != null ? DateTime.tryParse(dateStr.toString()) : null;
-
-              if (date != null) {
-                if (date.isAfter(todayStart)) {
-                  todayEarnings += earnings;
-                  todayDeliveries += 1;
-                }
-                if (date.isAfter(weekStart)) {
-                  weeklyEarnings += earnings;
+                  if (date != null) {
+                    if (date.isAfter(todayStart)) {
+                      todayEarnings += earnings;
+                      todayDeliveries += 1;
+                    }
+                    if (date.isAfter(weekStart)) {
+                      weeklyEarnings += earnings;
+                    }
+                  }
                 }
               }
             }
           }
-        }
-      }
-    } catch (_) {}
-
-    // 2.1 Fetch Rider Settings & Lifetime Stats (Part 3 Section 4.1: GET /mobileapi/rider/settings)
-    double totalEarnings = 0.0;
-    int completedDeliveriesCount = 0;
-    int activeDeliveriesCount = 0;
-    try {
-      final settingsRes = await _dioClient.dio.get(ApiEndpoints.settings);
-      if (settingsRes.statusCode == 200 && settingsRes.data != null) {
-        final statsData = settingsRes.data['stats'] ?? settingsRes.data['data']?['stats'];
-        if (statsData is Map<String, dynamic>) {
-          totalEarnings = (statsData['totalEarnings'] as num?)?.toDouble() ?? 0.0;
-          completedDeliveriesCount = (statsData['completedDeliveriesCount'] as num?)?.toInt() ?? 0;
-          activeDeliveriesCount = (statsData['activeDeliveriesCount'] as num?)?.toInt() ?? 0;
-        }
-      }
-    } catch (_) {}
+        } catch (_) {}
+      }(),
+      () async {
+        try {
+          final settingsRes = await _dioClient.dio.get(ApiEndpoints.settings);
+          if (settingsRes.statusCode == 200 && settingsRes.data != null) {
+            final statsData = settingsRes.data['stats'] ?? settingsRes.data['data']?['stats'];
+            if (statsData is Map<String, dynamic>) {
+              totalEarnings = (statsData['totalEarnings'] as num?)?.toDouble() ?? 0.0;
+              completedDeliveriesCount = (statsData['completedDeliveriesCount'] as num?)?.toInt() ?? 0;
+              activeDeliveriesCount = (statsData['activeDeliveriesCount'] as num?)?.toInt() ?? 0;
+            }
+          }
+        } catch (_) {}
+      }(),
+    ]);
 
     final finalTotalDeliveries = completedDeliveriesCount > 0 ? completedDeliveriesCount : totalDeliveries;
     final finalTotalEarnings = totalEarnings > 0.0

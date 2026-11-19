@@ -1769,7 +1769,37 @@ class AuthController extends GetxController {
     isLoading.value = false;
 
     result.fold(
-      (failure) => Get.snackbar('Onboarding Submission Failed', failure.message, snackPosition: SnackPosition.BOTTOM),
+      (failure) {
+        final lowerMsg = failure.message.toLowerCase();
+        final isMobileClientTokenError =
+            lowerMsg.contains('mobile client authentication token') ||
+            lowerMsg.contains(AppConstants.mobileAppTokenHeader);
+        final isSessionExpired =
+            failure.statusCode == 401 && !isMobileClientTokenError;
+
+        if (isSessionExpired) {
+          try {
+            final storage = GetStorage();
+            storage.remove(AppConstants.tokenKey);
+            storage.remove(AppConstants.refreshTokenKey);
+          } catch (_) {}
+          _showSnackbar(
+            'Session Expired',
+            '${failure.message} Please sign in again to complete onboarding.',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFFFEBEE),
+            duration: const Duration(seconds: 4),
+          );
+          _safeNavigate(AppRoutes.login, offAll: true);
+          return;
+        }
+
+        _showSnackbar(
+          'Onboarding Submission Failed',
+          failure.message,
+          snackPosition: SnackPosition.BOTTOM,
+        );
+      },
       (rider) {
         if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
           Get.snackbar(

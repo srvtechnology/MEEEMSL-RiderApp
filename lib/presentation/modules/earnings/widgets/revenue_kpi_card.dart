@@ -421,7 +421,7 @@ class RevenueKpiCard extends StatefulWidget {
       caption: countText,
       icon: Icons.local_shipping_rounded,
       isDelivered: false,
-      showPulseIndicator: true,
+      showPulseIndicator: count > 0,
       gradient: const LinearGradient(
         colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
         begin: Alignment.topLeft,
@@ -444,13 +444,30 @@ class _RevenueKpiCardState extends State<RevenueKpiCard>
   void initState() {
     super.initState();
     if (widget.showPulseIndicator) {
-      _pulseController = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 1400),
-      )..repeat(reverse: true);
-      _pulseAnimation = Tween<double>(begin: 0.8, end: 1.25).animate(
-        CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
-      );
+      _startPulse();
+    }
+  }
+
+  void _startPulse() {
+    _pulseController ??= AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _pulseAnimation ??= Tween<double>(begin: 0.8, end: 1.25).animate(
+      CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
+    );
+    if (!_pulseController!.isAnimating) {
+      _pulseController!.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant RevenueKpiCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.showPulseIndicator && !oldWidget.showPulseIndicator) {
+      _startPulse();
+    } else if (!widget.showPulseIndicator && oldWidget.showPulseIndicator) {
+      _pulseController?.stop();
     }
   }
 

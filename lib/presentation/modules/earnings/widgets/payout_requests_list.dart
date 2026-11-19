@@ -216,10 +216,20 @@ class PayoutRequestsList extends StatelessWidget {
             ),
           )
         else
-          Column(
-            children: requests
-                .map((req) => _buildRequestCard(context, req, isDark, textPrimary, textSecondary, borderColor))
-                .toList(),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            addAutomaticKeepAlives: false,
+            itemCount: requests.length,
+            itemBuilder: (context, index) => _buildRequestCard(
+              context,
+              requests[index],
+              isDark,
+              textPrimary,
+              textSecondary,
+              borderColor,
+            ),
           ),
       ],
     );

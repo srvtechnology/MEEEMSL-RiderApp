@@ -102,6 +102,17 @@ class OrdersController extends GetxController {
     }
   }
 
+  DateTime? _lastOrdersFetchAt;
+
+  Future<void> loadOrdersIfStale({Duration ttl = const Duration(seconds: 15)}) async {
+    if (_lastOrdersFetchAt != null &&
+        DateTime.now().difference(_lastOrdersFetchAt!) < ttl &&
+        (selectedOrder.value != null || orderHistory.isNotEmpty)) {
+      return;
+    }
+    await loadOrders();
+  }
+
   Future<void> loadOrders() async {
     if (selectedOrder.value == null && orderHistory.isEmpty) {
       isLoading.value = true;
@@ -110,6 +121,7 @@ class OrdersController extends GetxController {
       _loadActiveOrders(),
       _loadHistory(),
     ]);
+    _lastOrdersFetchAt = DateTime.now();
     isLoading.value = false;
   }
 
@@ -415,10 +427,7 @@ class OrdersController extends GetxController {
         // Immediately refresh Rider Revenue, Balance Ledger & Payouts (Part 6 & Payment Ledger Guide)
         if (Get.isRegistered<EarningsController>()) {
           final earnings = Get.find<EarningsController>();
-          earnings.loadRevenue(showLoading: false);
-          earnings.loadBalanceTransactions(showLoading: false);
-          earnings.loadPayoutRequests(showLoading: false);
-          earnings.loadEarnings();
+          earnings.loadAll(showLoading: false);
         }
 
         // Immediately refresh Profile stats as well

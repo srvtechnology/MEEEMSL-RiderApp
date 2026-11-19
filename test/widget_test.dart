@@ -67,7 +67,7 @@ void main() {
       if (key.endsWith('.ttf')) {
         return ByteData.view(Uint8List.fromList(_fontBytes).buffer);
       }
-      if (key.endsWith('.png') || key.endsWith('.jpg') || key.endsWith('.jpeg') || key.endsWith('.mp4')) {
+      if (key.endsWith('.png') || key.endsWith('.jpg') || key.endsWith('.jpeg')) {
         return ByteData.view(Uint8List.fromList(_kTransparentImage).buffer);
       }
       return null;
@@ -76,15 +76,6 @@ void main() {
         .setMockMethodCallHandler(
       const MethodChannel('plugins.flutter.io/path_provider'),
       (MethodCall methodCall) async => '.',
-    );
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-        .setMockMethodCallHandler(
-      const MethodChannel('flutter.io/videoPlayer'),
-      (MethodCall methodCall) async {
-        if (methodCall.method == 'init') return null;
-        if (methodCall.method == 'create') return {'textureId': 0};
-        return null;
-      },
     );
     await GetStorage.init();
     final storage = GetStorage();

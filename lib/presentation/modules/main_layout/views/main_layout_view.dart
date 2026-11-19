@@ -13,45 +13,48 @@ class MainLayoutView extends GetView<MainLayoutController> {
 
   @override
   Widget build(BuildContext context) {
-    final List<Widget> pages = [
-      const DashboardView(),
-      const OrderHistoryView(),
-      const EarningsView(),
-      const ProfileView(),
-    ];
+    return Obx(() {
+      final current = controller.currentIndex.value;
+      final visited = controller.visitedTabs;
 
-    return Obx(() => Scaffold(
-          drawer: const RiderDrawer(),
-          body: IndexedStack(
-            index: controller.currentIndex.value,
-            children: pages,
-          ),
-          bottomNavigationBar: BottomNavigationBar(
-            currentIndex: controller.currentIndex.value,
-            onTap: (index) => controller.changeTab(index),
-            items: const [
-              BottomNavigationBarItem(
-                icon: Icon(Icons.explore_outlined),
-                activeIcon: Icon(Icons.explore),
-                label: 'Dashboard',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.receipt_long_outlined),
-                activeIcon: Icon(Icons.receipt_long),
-                label: 'Orders',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.account_balance_wallet_outlined),
-                activeIcon: Icon(Icons.account_balance_wallet),
-                label: AppStrings.myRevenue,
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person_outline_rounded),
-                activeIcon: Icon(Icons.person_rounded),
-                label: 'Profile',
-              ),
-            ],
-          ),
-        ));
+      return Scaffold(
+        drawer: const RiderDrawer(),
+        body: IndexedStack(
+          index: current,
+          children: [
+            const DashboardView(),
+            visited.contains(1) ? const OrderHistoryView() : const SizedBox.shrink(),
+            visited.contains(2) ? const EarningsView() : const SizedBox.shrink(),
+            visited.contains(3) ? const ProfileView() : const SizedBox.shrink(),
+          ],
+        ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: current,
+          onTap: (index) => controller.changeTab(index),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.explore_outlined),
+              activeIcon: Icon(Icons.explore),
+              label: 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.receipt_long_outlined),
+              activeIcon: Icon(Icons.receipt_long),
+              label: 'Orders',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.account_balance_wallet_outlined),
+              activeIcon: Icon(Icons.account_balance_wallet),
+              label: AppStrings.myRevenue,
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_outline_rounded),
+              activeIcon: Icon(Icons.person_rounded),
+              label: 'Profile',
+            ),
+          ],
+        ),
+      );
+    });
   }
 }

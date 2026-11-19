@@ -718,6 +718,8 @@ class _RevenueDeliveryCardState extends State<RevenueDeliveryCard> {
                     imageUrl: item.image!,
                     width: 38,
                     height: 38,
+                    memCacheWidth: 114,
+                    memCacheHeight: 114,
                     fit: BoxFit.cover,
                     placeholder: (_, __) => Container(
                       width: 38,

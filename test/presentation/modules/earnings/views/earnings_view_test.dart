@@ -315,23 +315,53 @@ void main() {
     );
     expect(ctaBtn.onPressed, isNotNull);
 
-    // 2. Delivery Settlement Breakdown cards with Payment Method & Settlement Status badges
-    expect(find.byType(RevenueDeliveryCard), findsNWidgets(3));
+    // 2. Scroll down into virtualized SliverList to inspect Delivery Settlement Breakdown cards
+    final scrollable = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('#ORD-20261110-001'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pump();
     expect(find.text('#ORD-20261110-001'), findsOneWidget);
-    expect(find.text('#ORD-20261110-002'), findsOneWidget);
-    expect(find.text('AFRIMONEY (Prepaid)'), findsNWidgets(2));
-    expect(find.text('COD (Cash)'), findsOneWidget);
+    expect(find.text('AFRIMONEY (Prepaid)'), findsWidgets);
     expect(find.text('Yet to Pay (In Wallet)'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('#ORD-20261110-002'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pump();
+    expect(find.text('#ORD-20261110-002'), findsOneWidget);
+    expect(find.text('COD (Cash)'), findsOneWidget);
     expect(find.text('COD Collected (Cash in Hand)'), findsOneWidget);
     expect(find.text('COD Cash Collected (Doorstep)'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Pending (Upon Delivery)'),
+      300,
+      scrollable: scrollable,
+    );
+    await tester.pump();
     expect(find.text('Pending (Upon Delivery)'), findsOneWidget);
 
-    // 3. Switch to Ledger tab
-    await tester.ensureVisible(find.byKey(const Key('section_tab_ledger')));
+    // 3. Scroll back up to section tabs and switch to Ledger tab
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('section_tab_ledger')),
+      -300,
+      scrollable: scrollable,
+    );
     await tester.tap(find.byKey(const Key('section_tab_ledger')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
+    await tester.scrollUntilVisible(
+      find.text('Ledger Audit Trail'),
+      250,
+      scrollable: scrollable,
+    );
+    await tester.pump();
     expect(find.text('Ledger Audit Trail'), findsOneWidget);
     expect(find.text('Prepaid Delivery Credited'), findsOneWidget);
     expect(find.text('COD Delivery Fee Collected'), findsOneWidget);
@@ -339,11 +369,21 @@ void main() {
     expect(find.text('Payout Disbursed'), findsOneWidget);
 
     // 4. Switch to Payouts tab
-    await tester.ensureVisible(find.byKey(const Key('section_tab_payouts')));
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('section_tab_payouts')),
+      -250,
+      scrollable: scrollable,
+    );
     await tester.tap(find.byKey(const Key('section_tab_payouts')));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 250));
 
+    await tester.scrollUntilVisible(
+      find.text('Payout Request History'),
+      250,
+      scrollable: scrollable,
+    );
+    await tester.pump();
     expect(find.text('Payout Request History'), findsOneWidget);
     expect(find.text('DISBURSED'), findsOneWidget);
     expect(find.text('Ref: AFRI-PAY-99881'), findsOneWidget);

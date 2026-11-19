@@ -68,8 +68,28 @@ class LoginResponseModel extends LoginResponseEntity {
             approvalStatus: '',
           );
 
-    final accessToken = tokensJson['accessToken'] as String? ?? dataMap['token'] as String? ?? json['token'] as String? ?? '';
-    final refreshToken = tokensJson['refreshToken'] as String? ?? dataMap['refreshToken'] as String? ?? json['refreshToken'] as String? ?? '';
+    String firstNonEmpty(List<dynamic> candidates) {
+      for (final value in candidates) {
+        if (value is String && value.trim().isNotEmpty) {
+          return value.trim();
+        }
+      }
+      return '';
+    }
+
+    final accessToken = firstNonEmpty([
+      tokensJson['accessToken'],
+      tokensJson['token'],
+      dataMap['accessToken'],
+      dataMap['token'],
+      json['accessToken'],
+      json['token'],
+    ]);
+    final refreshToken = firstNonEmpty([
+      tokensJson['refreshToken'],
+      dataMap['refreshToken'],
+      json['refreshToken'],
+    ]);
     final expiresIn = tokensJson['expiresIn'] as int? ?? dataMap['expiresIn'] as int? ?? json['expiresIn'] as int? ?? 172800;
 
     return LoginResponseModel(

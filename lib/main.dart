@@ -24,22 +24,22 @@ import 'domain/usecases/auth/unregister_device_token_usecase.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Local Key-Value Storage
-  await GetStorage.init();
-
-  // Initialize Firebase
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-  } catch (e) {
-    debugPrint('Firebase initialization notice: $e');
-  }
-
-  // Set Preferred Orientations
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
+  // Initialize storage, Firebase, and orientation lock in parallel to minimize cold-start latency
+  await Future.wait<void>([
+    GetStorage.init(),
+    () async {
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+      } catch (e) {
+        debugPrint('Firebase initialization notice: $e');
+      }
+    }(),
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]),
   ]);
 
   // Global Core Dependency Registrations

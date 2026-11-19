@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../data/models/rider_ledger_model.dart';
+import '../../../../data/models/rider_revenue_model.dart';
 import '../../../../domain/entities/earnings_entity.dart';
 import '../../../../domain/entities/rider_ledger_entity.dart';
 import '../../../../domain/entities/rider_revenue_entity.dart';
@@ -75,6 +79,9 @@ class EarningsController extends GetxController {
     return null;
   }
 
+  GetStorage? get _storage =>
+      Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
+
   // UI State Observables
   final isLoading = false.obs;
   final isFilterLoading = false.obs;
@@ -107,6 +114,12 @@ class EarningsController extends GetxController {
   final searchController = TextEditingController();
   Timer? _searchDebounce;
   int _revenueRequestSeq = 0;
+
+  // Freshness timestamps to avoid redundant API hits on rapid tab switching
+  DateTime? _lastRevenueFetchAt;
+  DateTime? _lastLedgerFetchAt;
+  DateTime? _lastPayoutsFetchAt;
+  static const Duration _staleTtl = Duration(seconds: 20);
 
   // Computed Wallet & Payout Getters (reactive inside Obx)
   String get currency => revenueData.value?.summary.currency ?? 'NLe';
@@ -173,8 +186,10 @@ class EarningsController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    loadAll();
-    loadEarnings();
+    // 1. Hydrate cached snapshots immediately for 0ms first paint
+    _restoreFromCache();
+    // 2. Prioritize the primary visible endpoint (/revenue) first; Ledger & Payouts load lazily on tab tap
+    loadRevenue(showLoading: revenueData.value == null);
   }
 
   @override
@@ -184,7 +199,97 @@ class EarningsController extends GetxController {
     super.onClose();
   }
 
+  void _restoreFromCache() {
+    final storage = _storage;
+    if (storage == null) return;
+    try {
+      final rawRev = storage.read(AppConstants.revenueCacheKey);
+      if (rawRev is Map) {
+        revenueData.value = RiderRevenueDataModel.fromJson(
+          Map<String, dynamic>.from(rawRev),
+        );
+      }
+    } catch (_) {}
+    try {
+      final rawLedger = storage.read(AppConstants.balanceLedgerCacheKey);
+      if (rawLedger is Map) {
+        ledgerData.value = RiderBalanceLedgerModel.fromJson(
+          Map<String, dynamic>.from(rawLedger),
+        );
+      }
+    } catch (_) {}
+    try {
+      final rawPayouts = storage.read(AppConstants.payoutStatusCacheKey);
+      if (rawPayouts is Map) {
+        payoutStatus.value = RiderPayoutStatusModel.fromJson(
+          Map<String, dynamic>.from(rawPayouts),
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _cacheRevenueIfDefault(RiderRevenueDataEntity data) {
+    final storage = _storage;
+    if (storage == null) return;
+    if (selectedStatus.value != 'all' ||
+        selectedPeriod.value != 'all' ||
+        searchQuery.value.isNotEmpty) {
+      return;
+    }
+    if (data is RiderRevenueDataModel) {
+      try {
+        storage.write(AppConstants.revenueCacheKey, data.toJson());
+      } catch (_) {}
+    }
+  }
+
+  void _cacheLedger(RiderBalanceLedgerEntity data) {
+    final storage = _storage;
+    if (storage == null) return;
+    if (data is RiderBalanceLedgerModel) {
+      try {
+        storage.write(AppConstants.balanceLedgerCacheKey, data.toJson());
+      } catch (_) {}
+    }
+  }
+
+  void _cachePayoutStatus(RiderPayoutStatusEntity data) {
+    final storage = _storage;
+    if (storage == null) return;
+    if (data is RiderPayoutStatusModel) {
+      try {
+        storage.write(AppConstants.payoutStatusCacheKey, data.toJson());
+      } catch (_) {}
+    }
+  }
+
+  bool _isStale(DateTime? lastFetched) {
+    if (lastFetched == null) return true;
+    return DateTime.now().difference(lastFetched) >= _staleTtl;
+  }
+
+  /// Smart tab-switch refresh: refreshes only the active section if its data is stale.
+  Future<void> refreshIfStale() async {
+    final idx = selectedSectionIndex.value;
+    if (idx == 0) {
+      if (_isStale(_lastRevenueFetchAt)) {
+        await loadRevenue(showLoading: false);
+      }
+    } else if (idx == 1) {
+      await Future.wait([
+        if (_isStale(_lastRevenueFetchAt)) loadRevenue(showLoading: false),
+        if (_isStale(_lastLedgerFetchAt)) loadBalanceTransactions(showLoading: false),
+      ]);
+    } else {
+      await Future.wait([
+        if (_isStale(_lastRevenueFetchAt)) loadRevenue(showLoading: false),
+        if (_isStale(_lastPayoutsFetchAt)) loadPayoutRequests(showLoading: false),
+      ]);
+    }
+  }
+
   /// Refreshes revenue summary/deliveries, balance ledger, and payout requests in parallel.
+  /// Used for explicit pull-to-refresh, AppBar refresh, post-delivery OTP, and post-payout submission.
   Future<void> loadAll({bool showLoading = true}) async {
     await Future.wait([
       loadRevenue(showLoading: showLoading),
@@ -193,14 +298,19 @@ class EarningsController extends GetxController {
     ]);
   }
 
-  /// Switches the active transparency tab (0: Deliveries, 1: Ledger, 2: Payouts).
+  /// Switches the active transparency tab (0: Deliveries, 1: Ledger, 2: Payouts)
+  /// and lazily fetches Ledger/Payouts only when visited or stale.
   void selectSection(int index) {
     if (index < 0 || index > 2) return;
     selectedSectionIndex.value = index;
-    if (index == 1 && ledgerData.value == null && !isLedgerLoading.value) {
-      loadBalanceTransactions();
-    } else if (index == 2 && payoutStatus.value == null && !isPayoutsLoading.value) {
-      loadPayoutRequests();
+    if (index == 1 &&
+        !isLedgerLoading.value &&
+        (ledgerData.value == null || _isStale(_lastLedgerFetchAt))) {
+      loadBalanceTransactions(showLoading: ledgerData.value == null);
+    } else if (index == 2 &&
+        !isPayoutsLoading.value &&
+        (payoutStatus.value == null || _isStale(_lastPayoutsFetchAt))) {
+      loadPayoutRequests(showLoading: payoutStatus.value == null);
     }
   }
 
@@ -243,8 +353,16 @@ class EarningsController extends GetxController {
       (data) {
         revenueError.value = null;
         revenueData.value = data;
-        // Reconcile pending payout state if server reports Admin already disbursed
-        if (!data.summary.hasPendingPayoutRequest &&
+        _lastRevenueFetchAt = DateTime.now();
+        _cacheRevenueIfDefault(data);
+
+        // Reconcile pending payout details lazily only if pending exists or changed
+        if (data.summary.hasPendingPayoutRequest &&
+            data.summary.pendingPayoutRequest == null &&
+            payoutStatus.value?.effectivePendingRequest == null &&
+            !isPayoutsLoading.value) {
+          loadPayoutRequests(showLoading: false);
+        } else if (!data.summary.hasPendingPayoutRequest &&
             data.summary.pendingPayoutRequest == null &&
             (payoutStatus.value?.hasPendingRequest ?? false)) {
           loadPayoutRequests(showLoading: false);
@@ -273,6 +391,8 @@ class EarningsController extends GetxController {
       (data) {
         ledgerError.value = null;
         ledgerData.value = data;
+        _lastLedgerFetchAt = DateTime.now();
+        _cacheLedger(data);
       },
     );
   }
@@ -297,6 +417,8 @@ class EarningsController extends GetxController {
       (data) {
         payoutsError.value = null;
         payoutStatus.value = data;
+        _lastPayoutsFetchAt = DateTime.now();
+        _cachePayoutStatus(data);
       },
     );
   }
@@ -318,7 +440,6 @@ class EarningsController extends GetxController {
   /// Debounced handler for the search text input to avoid hammering the API per keystroke.
   void onSearchChanged(String query) {
     _searchDebounce?.cancel();
-    // Update immediately so clear suffix button toggles cleanly
     searchQuery.value = query;
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
       loadRevenue(showLoading: false);
@@ -343,7 +464,7 @@ class EarningsController extends GetxController {
     }
   }
 
-  /// Legacy earnings loader (for backward compatibility)
+  /// Legacy earnings loader (retained only for backward compatibility; no longer invoked on init)
   Future<void> loadEarnings() async {
     final result = await getEarningsBreakdownUseCase('weekly');
     result.fold(
@@ -354,7 +475,6 @@ class EarningsController extends GetxController {
 
   Future<void> openManagePayoutAccount() async {
     await Get.toNamed(AppRoutes.payoutInfo);
-    // Refresh revenue & payout account snapshot after returning from Payout Info screen
     await loadAll(showLoading: false);
   }
 
@@ -440,7 +560,7 @@ class EarningsController extends GetxController {
           ...(existingStatus?.history ?? const <RiderPayoutRequestEntity>[])
               .where((r) => r.id != createdRequest.id),
         ];
-        payoutStatus.value = RiderPayoutStatusEntity(
+        final updatedStatus = RiderPayoutStatusModel(
           netBalance: existingStatus?.netBalance ?? effectiveNetBalance,
           payoutMethod: createdRequest.payoutMethod ?? existingStatus?.payoutMethod,
           payoutAccountSnapshot: createdRequest.payoutAccountSnapshot ??
@@ -448,11 +568,13 @@ class EarningsController extends GetxController {
           pendingRequest: createdRequest,
           history: updatedHistory,
         );
+        payoutStatus.value = updatedStatus;
+        _cachePayoutStatus(updatedStatus);
 
         // Reload all authoritative server feeds in background
         loadAll(showLoading: false);
         if (Get.isRegistered<ProfileController>()) {
-          Get.find<ProfileController>().loadAllProfileData();
+          Get.find<ProfileController>().loadAllProfileData(force: false);
         }
 
         final formattedAmt = Formatters.formatRevenueAmount(

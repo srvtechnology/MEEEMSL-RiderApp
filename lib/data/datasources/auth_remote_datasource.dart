@@ -881,7 +881,25 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         ApiEndpoints.refreshToken,
         data: {'refreshToken': refreshToken},
       );
-      return response.data['token'] as String;
+      final body = RateLimitParser.decodeBodyMap(response.data);
+      final nestedData = body?['data'] is Map ? body!['data'] as Map : null;
+      final nestedTokens = nestedData?['tokens'] is Map
+          ? nestedData!['tokens'] as Map
+          : (body?['tokens'] is Map ? body!['tokens'] as Map : null);
+
+      for (final candidate in [
+        nestedTokens?['accessToken'],
+        nestedTokens?['token'],
+        nestedData?['accessToken'],
+        nestedData?['token'],
+        body?['accessToken'],
+        body?['token'],
+      ]) {
+        if (candidate is String && candidate.trim().isNotEmpty) {
+          return candidate.trim();
+        }
+      }
+      throw const ServerException(message: 'Session expired', statusCode: 401);
     } on DioException catch (e) {
       throw ServerException(
         message: _extractErrorMessage(e, 'Session expired'),

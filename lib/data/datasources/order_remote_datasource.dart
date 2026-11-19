@@ -111,6 +111,9 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
   // Section 3.1: GET /mobileapi/rider/orders?tab=active (with robust multi-tier fallback)
   @override
   Future<List<OrderModel>> getActiveOrders() async {
+    bool tabActiveSucceededEmpty = false;
+    bool statusConfirmedIdle = false;
+
     // 1. Tier 1: GET /orders?tab=active
     try {
       final response = await _dioClient.dio.get(
@@ -137,6 +140,8 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
             _saveActiveOrderToLocal(orders.first);
             return orders;
           }
+        } else if (data is List && data.isEmpty) {
+          tabActiveSucceededEmpty = true;
         }
       }
     } catch (e, s) {
@@ -150,6 +155,7 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         final statusData = statusResp.data['data'] ?? statusResp.data;
         if (statusData is Map<String, dynamic>) {
           final activeAssignmentId = statusData['activeAssignmentId']?.toString();
+          final opStatus = statusData['operationalStatus']?.toString().toUpperCase() ?? '';
           if (activeAssignmentId != null && activeAssignmentId.isNotEmpty) {
             try {
               final activeDetails = await getOrderDetails(activeAssignmentId);
@@ -162,6 +168,8 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
                 return [activeDetails];
               }
             } catch (_) {}
+          } else if (opStatus != 'ON_DELIVERY' && opStatus != 'DELIVERING' && opStatus != 'BUSY') {
+            statusConfirmedIdle = true;
           }
         }
       }
@@ -181,7 +189,12 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
       return List.from(_activeOrders);
     }
 
-    // 5. Tier 5 (Last resort only if no local/active order exists): GET /orders?tab=all
+    // Fast path: Both tab=active (200 []) and /status confirmed idle — skip downloading entire order history!
+    if (tabActiveSucceededEmpty && statusConfirmedIdle) {
+      return [];
+    }
+
+    // 5. Tier 5 (Last resort only if tab=active failed or /status indicated active delivery): GET /orders?tab=all
     try {
       final response = await _dioClient.dio.get(
         ApiEndpoints.orders,

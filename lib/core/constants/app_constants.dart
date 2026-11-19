@@ -16,6 +16,10 @@ class AppConstants {
   static const String payoutInfoKey = 'rider_payout_info';
   static const String activeOrderKey = 'rider_active_order_cache';
   static const String orderHistoryKey = 'rider_order_history_cache';
+  static const String dashboardSummaryCacheKey = 'rider_dashboard_summary_cache';
+  static const String revenueCacheKey = 'rider_revenue_cache';
+  static const String balanceLedgerCacheKey = 'rider_balance_ledger_cache';
+  static const String payoutStatusCacheKey = 'rider_payout_status_cache';
 
   // Mobile Client Security Authentication Header
   // Can be overridden at build time via --dart-define=MEEEM_MOBILE_APP_TOKEN=<secret>

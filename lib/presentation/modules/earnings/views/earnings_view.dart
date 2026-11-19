@@ -64,150 +64,208 @@ class EarningsView extends GetView<EarningsController> {
         final hasPendingPayout = controller.hasPendingPayout;
         final activePendingReq = controller.activePendingPayoutRequest;
         final selectedSection = controller.selectedSectionIndex.value;
+        final deliveries = revenue?.deliveries ?? const <RiderRevenueDeliveryEntity>[];
 
         return RefreshIndicator(
           onRefresh: () => controller.loadAll(showLoading: false),
-          child: SingleChildScrollView(
+          child: CustomScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (controller.isLoading.value && revenue != null) ...[
-                  const ClipRRect(
-                    borderRadius: BorderRadius.all(Radius.circular(2)),
-                    child: LinearProgressIndicator(minHeight: 2.5),
-                  ),
-                  const SizedBox(height: 10),
-                ],
-                // =============================================================
-                // 1. FOUR TOP-LEVEL KPI CARDS (Guide Section 8.1)
-                // =============================================================
-
-                // KPI (a): Withdrawable Wallet (`summary.netBalance`) + "Request Payout" CTA
-                WithdrawableWalletCard(
-                  balance: effectiveNetBalance,
-                  currency: summary.currency,
-                  hasPendingPayoutRequest: hasPendingPayout,
-                  isSubmittingPayout: controller.isSubmittingPayout.value,
-                  payoutMethodLabel: controller.effectivePayoutMethod,
-                  onRequestPayout: controller.canRequestPayout
-                      ? () => controller.openPayoutModal()
-                      : null,
-                ),
-
-                // Amber Pending Payout Request Banner (Guide Section 8.3)
-                if (hasPendingPayout) ...[
-                  const SizedBox(height: 12),
-                  PendingPayoutBanner(
-                    pendingRequest: activePendingReq,
-                    fallbackAmount: effectiveNetBalance,
-                    currency: summary.currency,
-                    onViewPayouts: selectedSection != 2
-                        ? () => controller.selectSection(2)
-                        : null,
-                  ),
-                ],
-                const SizedBox(height: 12),
-
-                // KPI (b): Total Delivery Earnings (`summary.totalDeliveredRevenue`)
-                RevenueKpiCard.delivered(
-                  amount: summary.totalDeliveredRevenue,
-                  count: summary.deliveredCount,
-                  currency: summary.currency,
-                ),
-                const SizedBox(height: 12),
-
-                // KPI (c) & KPI (d): Prepaid (AfriMoney) vs COD Earnings & Cash Collected
-                IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
+            slivers: [
+              // 1. Top KPI Cards + Pending Banner + 3-Tab Switcher
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: RevenueKpiCard.prepaid(
-                          amount: summary.prepaidDeliveredRevenue,
-                          currency: summary.currency,
+                      if (controller.isLoading.value && revenue != null) ...[
+                        const ClipRRect(
+                          borderRadius: BorderRadius.all(Radius.circular(2)),
+                          child: LinearProgressIndicator(minHeight: 2.5),
                         ),
+                        const SizedBox(height: 10),
+                      ],
+
+                      // KPI (a): Withdrawable Wallet (`summary.netBalance`) + "Request Payout" CTA
+                      WithdrawableWalletCard(
+                        balance: effectiveNetBalance,
+                        currency: summary.currency,
+                        hasPendingPayoutRequest: hasPendingPayout,
+                        isSubmittingPayout: controller.isSubmittingPayout.value,
+                        payoutMethodLabel: controller.effectivePayoutMethod,
+                        onRequestPayout: controller.canRequestPayout
+                            ? () => controller.openPayoutModal()
+                            : null,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: RevenueKpiCard.cod(
-                          codDeliveryEarnings: summary.codDeliveredRevenue,
-                          codCashCollectedTotal: summary.codCashCollectedTotal,
+
+                      // Amber Pending Payout Request Banner (Guide Section 8.3)
+                      if (hasPendingPayout) ...[
+                        const SizedBox(height: 12),
+                        PendingPayoutBanner(
+                          pendingRequest: activePendingReq,
+                          fallbackAmount: effectiveNetBalance,
                           currency: summary.currency,
+                          onViewPayouts: selectedSection != 2
+                              ? () => controller.selectSection(2)
+                              : null,
                         ),
+                      ],
+                      const SizedBox(height: 12),
+
+                      // KPI (b): Total Delivery Earnings (`summary.totalDeliveredRevenue`)
+                      RevenueKpiCard.delivered(
+                        amount: summary.totalDeliveredRevenue,
+                        count: summary.deliveredCount,
+                        currency: summary.currency,
                       ),
+                      const SizedBox(height: 12),
+
+                      // KPI (c) & KPI (d): Prepaid (AfriMoney) vs COD Earnings & Cash Collected
+                      // Avoids IntrinsicHeight double-pass layout cost for smoother scrolling
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 136),
+                              child: RevenueKpiCard.prepaid(
+                                amount: summary.prepaidDeliveredRevenue,
+                                currency: summary.currency,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(minHeight: 136),
+                              child: RevenueKpiCard.cod(
+                                codDeliveryEarnings: summary.codDeliveredRevenue,
+                                codCashCollectedTotal: summary.codCashCollectedTotal,
+                                currency: summary.currency,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // In-Progress Potential Card (Active In-Transit Drops)
+                      RevenueKpiCard.inProgress(
+                        amount: summary.pendingInProgressRevenue,
+                        count: summary.inProgressCount,
+                        currency: summary.currency,
+                      ),
+                      const SizedBox(height: 18),
+
+                      // 2. Three Transparency Section Tabs (Guide Section 8.2)
+                      _buildMainSectionTabs(
+                        selectedIndex: selectedSection,
+                        deliveriesCount: summary.totalDeliveriesCount,
+                        ledgerCount: controller.ledgerData.value?.transactions.length,
+                        payoutsCount: controller.payoutStatus.value?.history.length,
+                        hasPendingPayout: hasPendingPayout,
+                        surfaceVariant: surfaceVariant,
+                        textPrimary: textPrimary,
+                        borderColor: borderColor,
+                      ),
+                      const SizedBox(height: 16),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
+              ),
 
-                // In-Progress Potential Card (Active In-Transit Drops)
-                RevenueKpiCard.inProgress(
-                  amount: summary.pendingInProgressRevenue,
-                  count: summary.inProgressCount,
-                  currency: summary.currency,
+              // 3. Active Tab Content (Virtualized with SliverList.builder!)
+              if (selectedSection == 0) ...[
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: _buildDeliveryFiltersHeader(
+                      context: context,
+                      revenue: revenue,
+                      summary: summary,
+                      isDark: isDark,
+                      textPrimary: textPrimary,
+                      textSecondary: textSecondary,
+                      surfaceVariant: surfaceVariant,
+                      borderColor: borderColor,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 18),
-
-                // =============================================================
-                // 2. THREE TRANSPARENCY SECTION TABS (Guide Section 8.2)
-                // =============================================================
-                _buildMainSectionTabs(
-                  selectedIndex: selectedSection,
-                  deliveriesCount: summary.totalDeliveriesCount,
-                  ledgerCount: controller.ledgerData.value?.transactions.length,
-                  payoutsCount: controller.payoutStatus.value?.history.length,
-                  hasPendingPayout: hasPendingPayout,
-                  surfaceVariant: surfaceVariant,
-                  textPrimary: textPrimary,
-                  borderColor: borderColor,
-                ),
-                const SizedBox(height: 16),
-
-                // =============================================================
-                // 3. ACTIVE SECTION CONTENT
-                // =============================================================
-                if (selectedSection == 0)
-                  _buildDeliveryBreakdownSection(
-                    context: context,
-                    revenue: revenue,
-                    summary: summary,
-                    isDark: isDark,
-                    textPrimary: textPrimary,
-                    textSecondary: textSecondary,
-                    surfaceVariant: surfaceVariant,
-                    borderColor: borderColor,
+                if (controller.revenueError.value != null && revenue == null)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildRevenueErrorCard(
+                        context,
+                        textPrimary,
+                        textSecondary,
+                        borderColor,
+                      ),
+                    ),
                   )
-                else if (selectedSection == 1)
-                  BalanceLedgerList(
-                    ledger: controller.ledgerData.value,
-                    filteredTransactions: controller.filteredLedgerTransactions,
-                    selectedFilter: controller.selectedLedgerFilter.value,
-                    currency: summary.currency,
-                    isLoading: controller.isLedgerLoading.value,
-                    errorMessage: controller.ledgerError.value,
-                    onFilterChanged: controller.setLedgerFilter,
-                    onRetry: () => controller.loadBalanceTransactions(),
+                else if (deliveries.isEmpty)
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverToBoxAdapter(
+                      child: _buildEmptyDeliveriesCard(
+                        context,
+                        textPrimary,
+                        textSecondary,
+                        borderColor,
+                      ),
+                    ),
                   )
                 else
-                  PayoutRequestsList(
-                    payoutStatus: controller.payoutStatus.value,
-                    fallbackPayoutMethod: controller.effectivePayoutMethod,
-                    fallbackAccountSnapshot: controller.effectivePayoutAccountSnapshot,
-                    currency: summary.currency,
-                    isLoading: controller.isPayoutsLoading.value,
-                    errorMessage: controller.payoutsError.value,
-                    canRequestPayout: controller.canRequestPayout,
-                    onRequestPayout: () => controller.openPayoutModal(),
-                    onRetry: () => controller.loadPayoutRequests(),
-                    onManagePayoutAccount: () => controller.openManagePayoutAccount(),
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList.builder(
+                      itemCount: deliveries.length,
+                      addAutomaticKeepAlives: false,
+                      itemBuilder: (context, index) => RevenueDeliveryCard(
+                        key: ValueKey(deliveries[index].assignmentId),
+                        delivery: deliveries[index],
+                        currency: summary.currency,
+                      ),
+                    ),
                   ),
+              ] else if (selectedSection == 1)
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: BalanceLedgerList(
+                      ledger: controller.ledgerData.value,
+                      filteredTransactions: controller.filteredLedgerTransactions,
+                      selectedFilter: controller.selectedLedgerFilter.value,
+                      currency: summary.currency,
+                      isLoading: controller.isLedgerLoading.value,
+                      errorMessage: controller.ledgerError.value,
+                      onFilterChanged: controller.setLedgerFilter,
+                      onRetry: () => controller.loadBalanceTransactions(),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  sliver: SliverToBoxAdapter(
+                    child: PayoutRequestsList(
+                      payoutStatus: controller.payoutStatus.value,
+                      fallbackPayoutMethod: controller.effectivePayoutMethod,
+                      fallbackAccountSnapshot: controller.effectivePayoutAccountSnapshot,
+                      currency: summary.currency,
+                      isLoading: controller.isPayoutsLoading.value,
+                      errorMessage: controller.payoutsError.value,
+                      canRequestPayout: controller.canRequestPayout,
+                      onRequestPayout: () => controller.openPayoutModal(),
+                      onRetry: () => controller.loadPayoutRequests(),
+                      onManagePayoutAccount: () => controller.openManagePayoutAccount(),
+                    ),
+                  ),
+                ),
 
-                const SizedBox(height: 24),
-              ],
-            ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            ],
           ),
         );
       }),
@@ -360,7 +418,7 @@ class EarningsView extends GetView<EarningsController> {
     );
   }
 
-  Widget _buildDeliveryBreakdownSection({
+  Widget _buildDeliveryFiltersHeader({
     required BuildContext context,
     required RiderRevenueDataEntity? revenue,
     required RiderRevenueSummaryEntity summary,
@@ -371,56 +429,18 @@ class EarningsView extends GetView<EarningsController> {
     required Color borderColor,
   }) {
     if (controller.revenueError.value != null && revenue == null) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.error_outline_rounded, size: 36, color: AppColors.error),
-            const SizedBox(height: 8),
-            Text(
-              'Could Not Load Revenue',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: textPrimary),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              controller.revenueError.value ?? 'Something went wrong.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: textSecondary),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () => controller.loadRevenue(),
-              style: OutlinedButton.styleFrom(minimumSize: const Size(140, 40)),
-              icon: const Icon(Icons.refresh_rounded, size: 16),
-              label: const Text('Retry'),
-            ),
-          ],
-        ),
-      );
+      return const SizedBox.shrink();
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Search Bar
         _buildSearchBar(context, isDark, textPrimary, textSecondary, borderColor),
         const SizedBox(height: 12),
-
-        // Status Tabs
         _buildStatusTabs(summary, surfaceVariant, textPrimary, borderColor),
         const SizedBox(height: 10),
-
-        // Period Filter Chips
         _buildPeriodFilterChips(isDark, textPrimary, borderColor),
         const SizedBox(height: 14),
-
-        // Deliveries List Header
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -446,17 +466,84 @@ class EarningsView extends GetView<EarningsController> {
           ],
         ),
         const SizedBox(height: 12),
-
-        // Deliveries Cards
-        _buildDeliveriesList(
-          context,
-          revenue?.deliveries ?? [],
-          summary.currency,
-          textPrimary,
-          textSecondary,
-          borderColor,
-        ),
       ],
+    );
+  }
+
+  Widget _buildRevenueErrorCard(
+    BuildContext context,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 36, color: AppColors.error),
+          const SizedBox(height: 8),
+          Text(
+            'Could Not Load Revenue',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: textPrimary),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            controller.revenueError.value ?? 'Something went wrong.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: textSecondary),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => controller.loadRevenue(),
+            style: OutlinedButton.styleFrom(minimumSize: const Size(140, 40)),
+            icon: const Icon(Icons.refresh_rounded, size: 16),
+            label: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyDeliveriesCard(
+    BuildContext context,
+    Color textPrimary,
+    Color textSecondary,
+    Color borderColor,
+  ) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(
+        children: [
+          Icon(Icons.receipt_long_outlined, size: 46, color: textSecondary),
+          const SizedBox(height: 12),
+          Text(
+            'No Deliveries Found',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 16,
+              color: textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'There are no delivery revenue records matching the selected filters.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, color: textSecondary),
+          ),
+        ],
+      ),
     );
   }
 
@@ -615,56 +702,6 @@ class EarningsView extends GetView<EarningsController> {
       side: BorderSide(color: isSelected ? AppColors.primary : borderColor),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       onSelected: (_) => controller.setPeriodFilter(periodKey),
-    );
-  }
-
-  Widget _buildDeliveriesList(
-    BuildContext context,
-    List<RiderRevenueDeliveryEntity> deliveries,
-    String currency,
-    Color textPrimary,
-    Color textSecondary,
-    Color borderColor,
-  ) {
-    if (deliveries.isEmpty) {
-      return Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor),
-        ),
-        child: Column(
-          children: [
-            Icon(Icons.receipt_long_outlined, size: 46, color: textSecondary),
-            const SizedBox(height: 12),
-            Text(
-              'No Deliveries Found',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 16,
-                color: textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'There are no delivery revenue records matching the selected filters.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, color: textSecondary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Column(
-      children: deliveries
-          .map((delivery) => RevenueDeliveryCard(
-                delivery: delivery,
-                currency: currency,
-              ))
-          .toList(),
     );
   }
 }

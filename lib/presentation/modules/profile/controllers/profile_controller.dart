@@ -156,16 +156,28 @@ class ProfileController extends GetxController {
     loadAllProfileData();
   }
 
-  Future<void> loadAllProfileData() async {
-    isLoading.value = true;
+  DateTime? _lastProfileFetchAt;
+
+  Future<void> loadAllProfileData({bool force = true}) async {
+    if (!force &&
+        _lastProfileFetchAt != null &&
+        DateTime.now().difference(_lastProfileFetchAt!) < const Duration(seconds: 30) &&
+        riderProfile.value != null) {
+      return;
+    }
+
+    if (riderProfile.value == null) {
+      isLoading.value = true;
+    }
     await Future.wait([
       _loadProfile(),
       _loadDocuments(),
-      _loadOperatingZones(),
+      if (force || operatingZones.isEmpty) _loadOperatingZones(),
       _loadPayoutInfo(),
       _loadSettings(),
       _loadLiveStats(),
     ]);
+    _lastProfileFetchAt = DateTime.now();
     isLoading.value = false;
   }
 
@@ -205,9 +217,10 @@ class ProfileController extends GetxController {
         }
       }
 
-      // 3. Query DashboardSummaryUseCase for authoritative server metrics
+      // 3. Only query DashboardSummaryUseCase (3 network calls) if stats are still missing
       final summaryUseCase = dashboardSummaryUseCase;
-      if (summaryUseCase != null) {
+      if (summaryUseCase != null &&
+          (totalDeliveries.value == 0 || walletBalance.value == 0.0)) {
         final result = await summaryUseCase();
         result.fold(
           (_) => null,

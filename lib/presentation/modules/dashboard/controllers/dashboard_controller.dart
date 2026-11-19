@@ -181,9 +181,24 @@ class DashboardController extends GetxController {
       _locationService?.stopTracking();
     }
 
-    // Step 1: Immediately restore cached active order from GetStorage so there is NO radar flicker
+    // Step 1: Immediately restore cached active order & dashboard metrics from GetStorage (0ms render)
     final storage = Get.isRegistered<GetStorage>() ? Get.find<GetStorage>() : null;
     if (storage != null) {
+      try {
+        final rawSummary = storage.read(AppConstants.dashboardSummaryCacheKey);
+        if (rawSummary is Map) {
+          final data = Map<String, dynamic>.from(rawSummary);
+          todayEarnings.value = (data['todayEarnings'] as num?)?.toDouble() ?? 0.0;
+          todayDeliveries.value = (data['todayDeliveries'] as num?)?.toInt() ?? 0;
+          totalDeliveries.value = (data['totalTrips'] as num?)?.toInt() ?? 0;
+          totalEarnings.value = (data['totalEarnings'] as num?)?.toDouble() ?? 0.0;
+          completedDeliveriesCount.value =
+              (data['completedDeliveriesCount'] as num?)?.toInt() ?? totalDeliveries.value;
+          acceptanceRate.value = (data['acceptanceRate'] as num?)?.toDouble() ?? 100.0;
+          rating.value = (data['rating'] as num?)?.toDouble() ?? 5.0;
+          onlineHours.value = (data['onlineHours'] as num?)?.toDouble() ?? 0.0;
+        }
+      } catch (_) {}
       try {
         final raw = storage.read(AppConstants.activeOrderKey);
         if (raw != null && raw is Map) {
@@ -288,66 +303,80 @@ class DashboardController extends GetxController {
   }
 
   Future<void> loadDashboardData() async {
-    isLoading.value = true;
+    final hasCachedMetrics = totalDeliveries.value > 0 || totalEarnings.value > 0 || activeOrder.value != null;
+    if (!hasCachedMetrics) {
+      isLoading.value = true;
+    }
 
-    // Checklist Point 4: Sync database rider status via GET /mobileapi/rider/status on app open/restart
+    // Run rider status, dashboard summary, and active orders in PARALLEL (cuts 3 sequential phases to 1)
     final riderStatusUseCase = _riderStatusUseCase;
     String? activeAssignmentIdFromStatus;
     String? operationalStatusFromStatus;
-    if (riderStatusUseCase != null) {
-      final statusResult = await riderStatusUseCase();
-      statusResult.fold(
-        (failure) => null,
-        (data) {
-          final opStatus = data['operationalStatus']?.toString().toUpperCase();
-          final isDelivering = opStatus == 'ON_DELIVERY' || opStatus == 'DELIVERING' || opStatus == 'BUSY';
-          final hasActive = hasActiveDelivery ||
-              isDelivering ||
-              (data['activeAssignmentId'] != null && data['activeAssignmentId'].toString().isNotEmpty);
-
-          bool backendOnline = data['isOnline'] as bool? ?? false;
-          if (hasActive) {
-            backendOnline = true;
-          }
-
-          isOnline.value = backendOnline;
-          _authLocalDataSource?.setIsOnline(backendOnline);
-          if (backendOnline) {
-            _locationService?.startTracking();
-          } else {
-            _locationService?.stopTracking();
-          }
-          activeAssignmentIdFromStatus = data['activeAssignmentId']?.toString();
-          operationalStatusFromStatus = data['operationalStatus']?.toString();
-        },
-      );
-    }
-
-    final summaryResult = await getDashboardSummaryUseCase();
-    summaryResult.fold(
-      (failure) => null,
-      (data) {
-        todayEarnings.value = (data['todayEarnings'] as num?)?.toDouble() ?? 0.0;
-        todayDeliveries.value = (data['todayDeliveries'] as num?)?.toInt() ?? 0;
-        totalDeliveries.value = (data['totalTrips'] as num?)?.toInt() ?? 0;
-        totalEarnings.value = (data['totalEarnings'] as num?)?.toDouble() ?? 640.0;
-        completedDeliveriesCount.value = (data['completedDeliveriesCount'] as num?)?.toInt() ?? totalDeliveries.value;
-        acceptanceRate.value = (data['acceptanceRate'] as num?)?.toDouble() ?? 100.0;
-        rating.value = (data['rating'] as num?)?.toDouble() ?? 5.0;
-        onlineHours.value = (data['onlineHours'] as num?)?.toDouble() ?? 0.0;
-      },
-    );
-
-    final activeResult = await getActiveOrdersUseCase();
     List<OrderEntity> orders = [];
-    activeResult.fold(
-      (failure) {
-        debugPrint('[DashboardController] getActiveOrdersUseCase failure: ${failure.message}');
-      },
-      (data) {
-        orders = List.from(data);
-      },
-    );
+
+    await Future.wait<void>([
+      if (riderStatusUseCase != null)
+        () async {
+          final statusResult = await riderStatusUseCase();
+          statusResult.fold(
+            (failure) => null,
+            (data) {
+              final opStatus = data['operationalStatus']?.toString().toUpperCase();
+              final isDelivering = opStatus == 'ON_DELIVERY' || opStatus == 'DELIVERING' || opStatus == 'BUSY';
+              final hasActive = hasActiveDelivery ||
+                  isDelivering ||
+                  (data['activeAssignmentId'] != null && data['activeAssignmentId'].toString().isNotEmpty);
+
+              bool backendOnline = data['isOnline'] as bool? ?? false;
+              if (hasActive) {
+                backendOnline = true;
+              }
+
+              isOnline.value = backendOnline;
+              _authLocalDataSource?.setIsOnline(backendOnline);
+              if (backendOnline) {
+                _locationService?.startTracking();
+              } else {
+                _locationService?.stopTracking();
+              }
+              activeAssignmentIdFromStatus = data['activeAssignmentId']?.toString();
+              operationalStatusFromStatus = data['operationalStatus']?.toString();
+            },
+          );
+        }(),
+      () async {
+        final summaryResult = await getDashboardSummaryUseCase();
+        summaryResult.fold(
+          (failure) => null,
+          (data) {
+            todayEarnings.value = (data['todayEarnings'] as num?)?.toDouble() ?? 0.0;
+            todayDeliveries.value = (data['todayDeliveries'] as num?)?.toInt() ?? 0;
+            totalDeliveries.value = (data['totalTrips'] as num?)?.toInt() ?? 0;
+            totalEarnings.value = (data['totalEarnings'] as num?)?.toDouble() ?? 640.0;
+            completedDeliveriesCount.value = (data['completedDeliveriesCount'] as num?)?.toInt() ?? totalDeliveries.value;
+            acceptanceRate.value = (data['acceptanceRate'] as num?)?.toDouble() ?? 100.0;
+            rating.value = (data['rating'] as num?)?.toDouble() ?? 5.0;
+            onlineHours.value = (data['onlineHours'] as num?)?.toDouble() ?? 0.0;
+            if (Get.isRegistered<GetStorage>()) {
+              try {
+                Get.find<GetStorage>().write(AppConstants.dashboardSummaryCacheKey, data);
+              } catch (_) {}
+            }
+          },
+        );
+      }(),
+      () async {
+        final activeResult = await getActiveOrdersUseCase();
+        activeResult.fold(
+          (failure) {
+            debugPrint('[DashboardController] getActiveOrdersUseCase failure: ${failure.message}');
+          },
+          (data) {
+            orders = List.from(data);
+          },
+        );
+      }(),
+    ]);
 
     // If activeResult returned empty, but status reports activeAssignmentId or ON_DELIVERY, attempt single order fetch
     if (orders.isEmpty && (activeAssignmentIdFromStatus != null || operationalStatusFromStatus == 'ON_DELIVERY')) {

@@ -84,9 +84,15 @@ class ApiInterceptor extends Interceptor {
         !err.requestOptions.path.contains(ApiEndpoints.resend2fa)) {
       final refreshToken = _storage.read<String>(AppConstants.refreshTokenKey);
       if (refreshToken != null && refreshToken.isNotEmpty) {
+        String? newAccessToken;
+        String? newRefreshToken;
+        bool shouldClearTokens = false;
+
         try {
           final refreshDio = Dio(BaseOptions(
-            baseUrl: ApiEndpoints.baseUrl,
+            baseUrl: dio.options.baseUrl.isNotEmpty
+                ? dio.options.baseUrl
+                : ApiEndpoints.baseUrl,
             connectTimeout: const Duration(milliseconds: AppConstants.connectionTimeoutMs),
             receiveTimeout: const Duration(milliseconds: AppConstants.receiveTimeoutMs),
             headers: {
@@ -95,6 +101,7 @@ class ApiInterceptor extends Interceptor {
               AppConstants.mobileAppTokenHeader: AppConstants.mobileAppToken,
             },
           ));
+          refreshDio.httpClientAdapter = dio.httpClientAdapter;
 
           final refreshResponse = await refreshDio.post(
             ApiEndpoints.refreshToken,
@@ -102,36 +109,90 @@ class ApiInterceptor extends Interceptor {
           );
 
           if (refreshResponse.statusCode == 200 && refreshResponse.data != null) {
-            final data = refreshResponse.data;
-            String? newAccessToken;
-            if (data is Map<String, dynamic>) {
-              if (data['data'] != null && data['data'] is Map<String, dynamic>) {
-                newAccessToken = data['data']['accessToken'] as String?;
-              } else {
-                newAccessToken = data['accessToken'] as String?;
-              }
-            }
+            final data = RateLimitParser.decodeBodyMap(refreshResponse.data);
+            if (data != null) {
+              final nestedData = data['data'] is Map ? data['data'] as Map : null;
+              final nestedTokens = nestedData?['tokens'] is Map
+                  ? nestedData!['tokens'] as Map
+                  : (data['tokens'] is Map ? data['tokens'] as Map : null);
 
-            if (newAccessToken != null && newAccessToken.isNotEmpty) {
-              await _storage.write(AppConstants.tokenKey, newAccessToken);
-
-              // Retry original request with new token and mobile app header preserved
-              final opts = err.requestOptions;
-              opts.headers['Authorization'] = 'Bearer $newAccessToken';
-              opts.headers[AppConstants.mobileAppTokenHeader] = AppConstants.mobileAppToken;
-              opts.extra['isRetry'] = true;
-
-              final retryResponse = await dio.fetch(opts);
-              return handler.resolve(retryResponse);
+              newAccessToken = _firstNonEmptyString([
+                nestedTokens?['accessToken'],
+                nestedTokens?['token'],
+                nestedData?['accessToken'],
+                nestedData?['token'],
+                data['accessToken'],
+                data['token'],
+              ]);
+              newRefreshToken = _firstNonEmptyString([
+                nestedTokens?['refreshToken'],
+                nestedData?['refreshToken'],
+                data['refreshToken'],
+              ]);
             }
           }
+
+          if (newAccessToken == null) {
+            shouldClearTokens = true;
+          }
+        } on DioException catch (refreshErr) {
+          final refreshCode = refreshErr.response?.statusCode;
+          if (refreshCode == 401 || refreshCode == 403) {
+            shouldClearTokens = true;
+          }
         } catch (_) {
+          shouldClearTokens = true;
+        }
+
+        if (shouldClearTokens) {
           await _storage.remove(AppConstants.tokenKey);
           await _storage.remove(AppConstants.refreshTokenKey);
+          return super.onError(err, handler);
+        }
+
+        if (newAccessToken != null && newAccessToken.isNotEmpty) {
+          await _storage.write(AppConstants.tokenKey, newAccessToken);
+          if (newRefreshToken != null && newRefreshToken.isNotEmpty) {
+            await _storage.write(AppConstants.refreshTokenKey, newRefreshToken);
+          }
+
+          // Retry original request with new token and mobile app header preserved.
+          // Clone finalized FormData so multipart uploads (e.g. /onboarding) can be retried cleanly.
+          final opts = err.requestOptions;
+          if (opts.data is FormData) {
+            final originalFormData = opts.data as FormData;
+            if (originalFormData.isFinalized) {
+              opts.data = originalFormData.clone();
+            }
+            opts.headers.remove('Content-Type');
+            opts.headers.remove('content-type');
+            opts.contentType = null;
+          }
+          opts.headers['Authorization'] = 'Bearer $newAccessToken';
+          opts.headers[AppConstants.mobileAppTokenHeader] = AppConstants.mobileAppToken;
+          opts.extra['isRetry'] = true;
+
+          try {
+            final retryResponse = await dio.fetch(opts);
+            return handler.resolve(retryResponse);
+          } on DioException catch (retryErr) {
+            return handler.next(retryErr);
+          } catch (_) {
+            return super.onError(err, handler);
+          }
         }
       }
     }
 
     return super.onError(err, handler);
+  }
+
+  String? _firstNonEmptyString(List<dynamic> candidates) {
+    for (final candidate in candidates) {
+      if (candidate is String && candidate.trim().isNotEmpty) {
+        return candidate.trim();
+      }
+    }
+    return null;
   }
 }

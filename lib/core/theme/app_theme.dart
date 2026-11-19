@@ -8,7 +8,12 @@ import 'app_colors.dart';
 class AppTheme {
   AppTheme._();
 
-  static ThemeData get lightTheme {
+  static ThemeData? _lightThemeCache;
+  static ThemeData? _darkThemeCache;
+
+  static ThemeData get lightTheme => _lightThemeCache ??= _buildLightTheme();
+
+  static ThemeData _buildLightTheme() {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.light,
@@ -151,7 +156,9 @@ class AppTheme {
     );
   }
 
-  static ThemeData get darkTheme {
+  static ThemeData get darkTheme => _darkThemeCache ??= _buildDarkTheme();
+
+  static ThemeData _buildDarkTheme() {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: AppColors.primary,
       brightness: Brightness.dark,

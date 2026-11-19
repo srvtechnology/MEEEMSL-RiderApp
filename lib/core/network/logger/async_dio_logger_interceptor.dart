@@ -15,6 +15,10 @@ class AsyncDioLoggerInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    if (!_logger.config.enabled) {
+      return handler.next(options);
+    }
+
     final logId = _uuid.v4();
     final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -35,6 +39,10 @@ class AsyncDioLoggerInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
+    if (!_logger.config.enabled) {
+      return handler.next(response);
+    }
+
     final logId = response.requestOptions.extra[_logIdKey] as String?;
     final startTime = response.requestOptions.extra[_startTimeKey] as int?;
 
@@ -60,6 +68,10 @@ class AsyncDioLoggerInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (!_logger.config.enabled) {
+      return handler.next(err);
+    }
+
     final logId = err.requestOptions.extra[_logIdKey] as String?;
     final startTime = err.requestOptions.extra[_startTimeKey] as int?;
 
