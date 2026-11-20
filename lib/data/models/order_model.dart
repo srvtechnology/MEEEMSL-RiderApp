@@ -95,19 +95,23 @@ class OrderModel extends OrderEntity {
     }
 
     final orderMap = safeMap(json['order']);
+    final pickupLocationMap = safeMap(json['pickupLocation'] ?? orderMap?['pickupLocation']);
+    final dropoffLocationMap = safeMap(json['dropoffLocation'] ?? orderMap?['dropoffLocation']);
     final sellerMap = safeMap(orderMap?['seller'] ?? json['seller']);
-    final businessInfo = safeMap(sellerMap?['businessInfo']);
+    final businessInfo = safeMap(sellerMap?['businessInfo'] ?? sellerMap?['business_info']);
     final store = safeMap(sellerMap?['store'] ?? json['store'] ?? orderMap?['store']);
     final customer = safeMap(orderMap?['customer'] ?? json['customer']);
 
-    final customerName = orderMap?['shippingFullName']?.toString() ??
+    final customerName = dropoffLocationMap?['name']?.toString() ??
+        orderMap?['shippingFullName']?.toString() ??
         json['shippingFullName']?.toString() ??
         orderMap?['customerName']?.toString() ??
         json['customerName']?.toString() ??
         customer?['name']?.toString() ??
         'Customer';
 
-    final customerPhone = orderMap?['shippingPhone']?.toString() ??
+    final customerPhone = dropoffLocationMap?['phone']?.toString() ??
+        orderMap?['shippingPhone']?.toString() ??
         json['shippingPhone']?.toString() ??
         orderMap?['customerPhone']?.toString() ??
         json['customerPhone']?.toString() ??
@@ -120,16 +124,18 @@ class OrderModel extends OrderEntity {
       orderMap?['shippingCity']?.toString() ?? json['shippingCity']?.toString(),
     ].where((s) => s != null && s.trim().isNotEmpty).toList();
 
-    final dropoffAddress = dropoffParts.isNotEmpty
-        ? dropoffParts.join(', ')
-        : (customer?['dropAddress']?.toString() ??
-            customer?['address']?.toString() ??
-            json['customerAddress']?.toString() ??
-            json['dropoffAddress']?.toString() ??
-            orderMap?['dropoffAddress']?.toString() ??
-            '');
+    final dropoffAddress = dropoffLocationMap?['address']?.toString() ??
+        (dropoffParts.isNotEmpty
+            ? dropoffParts.join(', ')
+            : (customer?['dropAddress']?.toString() ??
+                customer?['address']?.toString() ??
+                json['customerAddress']?.toString() ??
+                json['dropoffAddress']?.toString() ??
+                orderMap?['dropoffAddress']?.toString() ??
+                ''));
 
-    final pickupName = store?['name']?.toString() ??
+    final pickupName = pickupLocationMap?['name']?.toString() ??
+        store?['name']?.toString() ??
         businessInfo?['businessName']?.toString() ??
         orderMap?['seller']?['store']?['name']?.toString() ??
         json['seller']?['store']?['name']?.toString() ??
@@ -143,15 +149,17 @@ class OrderModel extends OrderEntity {
       businessInfo?['city']?.toString() ?? store?['city']?.toString(),
     ].where((s) => s != null && s.trim().isNotEmpty).toList();
 
-    final pickupAddress = pickupParts.isNotEmpty
-        ? pickupParts.join(', ')
-        : (store?['address']?.toString() ??
-            json['shopAddress']?.toString() ??
-            json['pickupAddress']?.toString() ??
-            orderMap?['pickupAddress']?.toString() ??
-            '');
+    final pickupAddress = pickupLocationMap?['address']?.toString() ??
+        (pickupParts.isNotEmpty
+            ? pickupParts.join(', ')
+            : (store?['address']?.toString() ??
+                json['shopAddress']?.toString() ??
+                json['pickupAddress']?.toString() ??
+                orderMap?['pickupAddress']?.toString() ??
+                ''));
 
-    final pickupPhone = businessInfo?['pocContact']?.toString() ??
+    final pickupPhone = pickupLocationMap?['phone']?.toString() ??
+        businessInfo?['pocContact']?.toString() ??
         store?['phone']?.toString() ??
         (sellerMap?['user'] is Map ? (sellerMap!['user'] as Map)['phone']?.toString() : null) ??
         json['pickupPhone']?.toString() ??
@@ -187,17 +195,18 @@ class OrderModel extends OrderEntity {
 
     final shippingAddressMap = safeMap(orderMap?['shippingAddress'] ?? json['shippingAddress']);
     final deliveryAddressMap = safeMap(orderMap?['deliveryAddress'] ?? json['deliveryAddress']);
-    final dropoffLocationMap = safeMap(orderMap?['dropoffLocation'] ?? json['dropoffLocation']);
     final coords = orderMap?['coordinates'] ?? json['coordinates'];
 
     // 1. Resolve Customer Dropoff Coordinates
     final customerAddressMap = safeMap(customer?['address']);
     final customerLocationMap = safeMap(customer?['location']);
 
-    double? rawDropLat = parseCoordinate(json['dropoffLat']) ??
-        parseCoordinate(orderMap?['dropoffLat']) ??
-        parseCoordinate(json['dropoffLatitude']) ??
+    double? rawDropLat = parseCoordinate(json['dropoffLatitude']) ??
+        parseCoordinate(dropoffLocationMap?['latitude']) ??
+        parseCoordinate(dropoffLocationMap?['lat']) ??
+        parseCoordinate(json['dropoffLat']) ??
         parseCoordinate(orderMap?['dropoffLatitude']) ??
+        parseCoordinate(orderMap?['dropoffLat']) ??
         parseCoordinate(orderMap?['shippingLatitude']) ??
         parseCoordinate(json['shippingLatitude']) ??
         parseCoordinate(orderMap?['shippingLat']) ??
@@ -208,8 +217,6 @@ class OrderModel extends OrderEntity {
         parseCoordinate(shippingAddressMap?['lat']) ??
         parseCoordinate(deliveryAddressMap?['latitude']) ??
         parseCoordinate(deliveryAddressMap?['lat']) ??
-        parseCoordinate(dropoffLocationMap?['latitude']) ??
-        parseCoordinate(dropoffLocationMap?['lat']) ??
         parseCoordinate(customer?['latitude']) ??
         parseCoordinate(customer?['lat']) ??
         parseCoordinate(customerAddressMap?['latitude']) ??
@@ -217,10 +224,12 @@ class OrderModel extends OrderEntity {
         parseCoordinate(customerLocationMap?['latitude']) ??
         parseCoordinate(customerLocationMap?['lat']);
 
-    double? rawDropLng = parseCoordinate(json['dropoffLng']) ??
-        parseCoordinate(orderMap?['dropoffLng']) ??
-        parseCoordinate(json['dropoffLongitude']) ??
+    double? rawDropLng = parseCoordinate(json['dropoffLongitude']) ??
+        parseCoordinate(dropoffLocationMap?['longitude']) ??
+        parseCoordinate(dropoffLocationMap?['lng']) ??
+        parseCoordinate(json['dropoffLng']) ??
         parseCoordinate(orderMap?['dropoffLongitude']) ??
+        parseCoordinate(orderMap?['dropoffLng']) ??
         parseCoordinate(orderMap?['shippingLongitude']) ??
         parseCoordinate(json['shippingLongitude']) ??
         parseCoordinate(orderMap?['shippingLng']) ??
@@ -231,8 +240,6 @@ class OrderModel extends OrderEntity {
         parseCoordinate(shippingAddressMap?['lng']) ??
         parseCoordinate(deliveryAddressMap?['longitude']) ??
         parseCoordinate(deliveryAddressMap?['lng']) ??
-        parseCoordinate(dropoffLocationMap?['longitude']) ??
-        parseCoordinate(dropoffLocationMap?['lng']) ??
         parseCoordinate(customer?['longitude']) ??
         parseCoordinate(customer?['lng']) ??
         parseCoordinate(customerAddressMap?['longitude']) ??
@@ -325,44 +332,43 @@ class OrderModel extends OrderEntity {
     }
 
     // 2. Resolve Seller / Store Pickup Coordinates
-    final pickupLocationMap = safeMap(orderMap?['pickupLocation'] ?? json['pickupLocation']);
     final storeLocationMap = safeMap(store?['location'] ?? businessInfo?['location'] ?? sellerMap?['location']);
 
-    double? rawPickLat = parseCoordinate(businessInfo?['latitude']) ??
+    double? rawPickLat = parseCoordinate(json['sellerLatitude']) ??
+        parseCoordinate(json['sellerLat']) ??
+        parseCoordinate(pickupLocationMap?['latitude']) ??
+        parseCoordinate(pickupLocationMap?['lat']) ??
+        parseCoordinate(orderMap?['sellerLatitude']) ??
+        parseCoordinate(orderMap?['sellerLat']) ??
+        parseCoordinate(businessInfo?['latitude']) ??
         parseCoordinate(businessInfo?['lat']) ??
         parseCoordinate(store?['lat']) ??
         parseCoordinate(store?['latitude']) ??
-        parseCoordinate(pickupLocationMap?['latitude']) ??
-        parseCoordinate(pickupLocationMap?['lat']) ??
         parseCoordinate(storeLocationMap?['latitude']) ??
         parseCoordinate(storeLocationMap?['lat']) ??
         parseCoordinate(json['pickupLat']) ??
         parseCoordinate(json['pickupLatitude']) ??
         parseCoordinate(orderMap?['pickupLat']) ??
         parseCoordinate(orderMap?['pickupLatitude']) ??
-        parseCoordinate(json['sellerLatitude']) ??
-        parseCoordinate(json['sellerLat']) ??
-        parseCoordinate(orderMap?['sellerLatitude']) ??
-        parseCoordinate(orderMap?['sellerLat']) ??
         parseCoordinate(sellerMap?['latitude']) ??
         parseCoordinate(sellerMap?['lat']);
 
-    double? rawPickLng = parseCoordinate(businessInfo?['longitude']) ??
+    double? rawPickLng = parseCoordinate(json['sellerLongitude']) ??
+        parseCoordinate(json['sellerLng']) ??
+        parseCoordinate(pickupLocationMap?['longitude']) ??
+        parseCoordinate(pickupLocationMap?['lng']) ??
+        parseCoordinate(orderMap?['sellerLongitude']) ??
+        parseCoordinate(orderMap?['sellerLng']) ??
+        parseCoordinate(businessInfo?['longitude']) ??
         parseCoordinate(businessInfo?['lng']) ??
         parseCoordinate(store?['lng']) ??
         parseCoordinate(store?['longitude']) ??
-        parseCoordinate(pickupLocationMap?['longitude']) ??
-        parseCoordinate(pickupLocationMap?['lng']) ??
         parseCoordinate(storeLocationMap?['longitude']) ??
         parseCoordinate(storeLocationMap?['lng']) ??
         parseCoordinate(json['pickupLng']) ??
         parseCoordinate(json['pickupLongitude']) ??
         parseCoordinate(orderMap?['pickupLng']) ??
         parseCoordinate(orderMap?['pickupLongitude']) ??
-        parseCoordinate(json['sellerLongitude']) ??
-        parseCoordinate(json['sellerLng']) ??
-        parseCoordinate(orderMap?['sellerLongitude']) ??
-        parseCoordinate(orderMap?['sellerLng']) ??
         parseCoordinate(sellerMap?['longitude']) ??
         parseCoordinate(sellerMap?['lng']);
 

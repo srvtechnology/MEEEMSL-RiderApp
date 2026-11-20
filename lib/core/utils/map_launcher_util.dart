@@ -14,7 +14,15 @@ class MapLauncherUtil {
     required double latitude,
     required double longitude,
     String? label,
+    String? fallbackAddress,
   }) async {
+    if (latitude == 0.0 && longitude == 0.0) {
+      if (fallbackAddress != null && fallbackAddress.isNotEmpty) {
+        return openGoogleMapsSearch(fallbackAddress);
+      }
+      return false;
+    }
+
     final encodedLabel = Uri.encodeComponent(label ?? 'Destination');
     // Universal Google Maps navigation URL
     final googleMapsUrl = Uri.parse(
@@ -36,7 +44,53 @@ class MapLauncherUtil {
       }
     } catch (_) {}
 
+    if (fallbackAddress != null && fallbackAddress.isNotEmpty) {
+      return openGoogleMapsSearch(fallbackAddress);
+    }
+
     Get.snackbar('Maps', 'Could not open Google Maps. Lat: $latitude, Lng: $longitude');
+    return false;
+  }
+
+  /// Opens Google Maps search using text address string (Backend Handoff Section 1 #4).
+  static Future<bool> openGoogleMapsSearch(String address) async {
+    final encoded = Uri.encodeComponent(address);
+    final webUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encoded');
+    final nativeUri = Uri.parse(
+      Platform.isIOS
+          ? 'comgooglemaps://?q=$encoded'
+          : 'geo:0,0?q=$encoded',
+    );
+
+    try {
+      if (await canLaunchUrl(nativeUri)) {
+        return await launchUrl(nativeUri, mode: LaunchMode.externalApplication);
+      } else if (await canLaunchUrl(webUrl)) {
+        return await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {}
+
+    Get.snackbar('Maps', 'Could not open Google Maps for "$address"');
+    return false;
+  }
+
+  /// Unified 1-tap navigation for an order target (handles both GPS coordinates & fallback text address).
+  static Future<bool> openMapForOrder({
+    required String title,
+    required String address,
+    double? latitude,
+    double? longitude,
+  }) async {
+    if (latitude != null && longitude != null && latitude != 0.0 && longitude != 0.0) {
+      return openGoogleMaps(
+        latitude: latitude,
+        longitude: longitude,
+        label: '$title, $address',
+        fallbackAddress: address,
+      );
+    } else if (address.isNotEmpty) {
+      return openGoogleMapsSearch(address);
+    }
     return false;
   }
 

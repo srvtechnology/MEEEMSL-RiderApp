@@ -100,8 +100,28 @@ class MockInterceptor extends Interceptor {
       ));
     }
 
-    // 3.1 Email & Password Login OR 3.2 B) Phone OTP Verify
-    if (path.endsWith(ApiEndpoints.login) || path.endsWith(ApiEndpoints.phoneOtpVerify)) {
+    // 3.2 C) Email OTP Send
+    if (path.endsWith(ApiEndpoints.emailOtpSend)) {
+      final email = options.data?['email'] ?? 'rider@example.com';
+      return _resolve(handler, Response(
+        requestOptions: options,
+        statusCode: 200,
+        data: {
+          'success': true,
+          'message': 'Login OTP sent to your email.',
+          'data': {
+            'email': email,
+            'expiresIn': 600,
+            'resendCooldown': 60,
+          }
+        },
+      ));
+    }
+
+    // 3.1 Email & Password Login OR 3.2 B) Phone OTP Verify OR 3.2 C) Email OTP Verify
+    if (path.endsWith(ApiEndpoints.login) ||
+        path.endsWith(ApiEndpoints.phoneOtpVerify) ||
+        path.endsWith(ApiEndpoints.emailOtpVerify)) {
       final email = options.data?['email'] ?? 'rider.ibrahim@example.com';
       final phone = options.data?['phone'] ?? '76123456';
 

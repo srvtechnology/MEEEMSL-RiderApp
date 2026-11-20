@@ -253,6 +253,18 @@ class NavigationView extends GetView<NavigationController> {
           tooltip: 'Recenter on Rider',
           child: const Icon(Icons.my_location_rounded, size: 20),
         ),
+        const SizedBox(height: 10),
+
+        // Open in External Google Maps (Turn-by-turn App)
+        FloatingActionButton.small(
+          heroTag: 'nav_external_maps_btn',
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFFEA4335), // Google Maps red
+          elevation: 4,
+          onPressed: () => controller.openExternalMaps(),
+          tooltip: 'Open in Google Maps App',
+          child: const Icon(Icons.directions_rounded, size: 20),
+        ),
       ],
     );
   }
@@ -297,243 +309,263 @@ class NavigationView extends GetView<NavigationController> {
 
   /// Zomato-style Floating Bottom Delivery Action Sheet
   Widget _buildBottomDeliverySheet(BuildContext context) {
-    final isStore = controller.isHeadingToPickup;
-    final order = controller.activeOrder;
+    return Obx(() {
+      final isStore = controller.isHeadingToPickup;
+      final order = controller.activeOrder;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black26,
-            blurRadius: 20,
-            offset: Offset(0, -5),
-          )
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Center pull handle
-            Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.withAlpha(80),
-                borderRadius: BorderRadius.circular(2),
+      return Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 20,
+              offset: Offset(0, -5),
+            )
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Center pull handle
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.withAlpha(80),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
+              const SizedBox(height: 12),
 
-            // Top Status & Order Number Badge Row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Delivery Stage Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isStore ? const Color(0xFFFFF3E0) : const Color(0xFFE8F8EE),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: isStore ? const Color(0xFFFFB74D) : const Color(0xFF81C784),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isStore ? Icons.storefront_rounded : Icons.home_rounded,
-                        size: 14,
-                        color: isStore ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        isStore ? 'STORE PICKUP' : 'CUSTOMER DROPOFF',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w800,
-                          color: isStore ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
-                          letterSpacing: 0.5,
+              // Top Status & Order Number Badge Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Delivery Stage Badge (Tap to toggle leg preview)
+                  GestureDetector(
+                    onTap: () => controller.toggleTargetLeg(),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isStore ? const Color(0xFFFFF3E0) : const Color(0xFFE8F8EE),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isStore ? const Color(0xFFFFB74D) : const Color(0xFF81C784),
+                          width: 1,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                // Order Number
-                Text(
-                  order?.orderNumber.isNotEmpty == true ? '#${order!.orderNumber}' : '#ORDER-ACTIVE',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-
-            // Destination Name, Address & 1-Tap Call/Message Actions
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                // Avatar / Icon Circle
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: isStore ? AppColors.warningLight : AppColors.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    isStore ? Icons.storefront_rounded : Icons.person_pin_circle_rounded,
-                    color: isStore ? AppColors.warningDark : AppColors.primary,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Destination Info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        controller.targetTitle,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.place_outlined, size: 13, color: Colors.grey),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Text(
-                              controller.targetAddress,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Icon(
+                            isStore ? Icons.storefront_rounded : Icons.home_rounded,
+                            size: 14,
+                            color: isStore ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            isStore ? 'STORE PICKUP' : 'CUSTOMER DROPOFF',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              color: isStore ? const Color(0xFFE65100) : const Color(0xFF2E7D32),
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-
-                // 1-Tap Quick Call Contact
-                IconButton.filledTonal(
-                  onPressed: () => controller.callTarget(),
-                  icon: const Icon(Icons.phone, size: 19),
-                  style: IconButton.styleFrom(
-                    backgroundColor: AppColors.primaryContainer,
-                    foregroundColor: AppColors.primary,
-                  ),
-                  tooltip: 'Call Contact',
-                ),
-                const SizedBox(width: 6),
-
-                // 1-Tap Quick Message Contact
-                IconButton.filledTonal(
-                  onPressed: () => controller.messageTarget(),
-                  icon: const Icon(Icons.chat_bubble_outline_rounded, size: 19),
-                  style: IconButton.styleFrom(
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    foregroundColor: Colors.black87,
-                  ),
-                  tooltip: 'Message Contact',
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-
-            // Live Telemetry Row: ETA, Distance, Speed (Zomato-style KPI Bar)
-            Row(
-              children: [
-                // ETA
-                Expanded(
-                  child: Obx(() => _buildTelemetryTile(
-                        icon: Icons.timer_rounded,
-                        iconColor: AppColors.primary,
-                        title: '${controller.remainingMinutes.value} mins',
-                        subtitle: 'ESTIMATED ARRIVAL',
-                        isHighlight: true,
-                      )),
-                ),
-                Container(width: 1, height: 36, color: Colors.grey.withAlpha(50)),
-
-                // Distance
-                Expanded(
-                  child: Obx(() => _buildTelemetryTile(
-                        icon: Icons.route_rounded,
-                        iconColor: const Color(0xFF0284C7),
-                        title: Formatters.formatDistance(controller.remainingDistance.value),
-                        subtitle: 'DISTANCE',
-                      )),
-                ),
-                Container(width: 1, height: 36, color: Colors.grey.withAlpha(50)),
-
-                // Live Speed
-                Expanded(
-                  child: Obx(() => _buildTelemetryTile(
-                        icon: Icons.speed_rounded,
-                        iconColor: const Color(0xFF16A34A),
-                        title: '${controller.currentSpeedKmh.value} km/h',
-                        subtitle: 'RIDER SPEED',
-                      )),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 18),
-
-            // In-App Milestone Action Button (e.g. "I Have Arrived" / "Order Details")
-            Row(
-              children: [
-                Expanded(
-                  child: CustomButton(
-                    text: controller.milestoneActionLabel,
-                    icon: controller.milestoneActionIcon,
-                    type: ButtonType.primary,
-                    onPressed: () => controller.advanceMilestone(),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                IconButton.outlined(
-                  onPressed: () => Get.back(),
-                  icon: const Icon(Icons.arrow_back),
-                  tooltip: 'Return to Order Details',
-                  style: IconButton.styleFrom(
-                    padding: const EdgeInsets.all(12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                ),
-              ],
-            ),
-          ],
+
+                  // Order Number
+                  Text(
+                    order?.orderNumber.isNotEmpty == true ? '#${order!.orderNumber}' : '#ORDER-ACTIVE',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Destination Name, Address & 1-Tap Call/Message/Maps Actions
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Avatar / Icon Circle
+                  Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: isStore ? AppColors.warningLight : AppColors.primaryContainer,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      isStore ? Icons.storefront_rounded : Icons.person_pin_circle_rounded,
+                      color: isStore ? AppColors.warningDark : AppColors.primary,
+                      size: 24,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  // Destination Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          controller.targetTitle,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            const Icon(Icons.place_outlined, size: 13, color: Colors.grey),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                controller.targetAddress,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // 1-Tap Quick Call Contact
+                  IconButton.filledTonal(
+                    onPressed: () => controller.callTarget(),
+                    icon: const Icon(Icons.phone, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.primaryContainer,
+                      foregroundColor: AppColors.primary,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    tooltip: 'Call Contact',
+                  ),
+                  const SizedBox(width: 4),
+
+                  // 1-Tap Quick Message Contact
+                  IconButton.filledTonal(
+                    onPressed: () => controller.messageTarget(),
+                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      foregroundColor: Colors.black87,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    tooltip: 'Message Contact',
+                  ),
+                  const SizedBox(width: 4),
+
+                  // 1-Tap External Google Maps
+                  IconButton.filledTonal(
+                    onPressed: () => controller.openExternalMaps(),
+                    icon: const Icon(Icons.directions_outlined, size: 18),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.secondaryContainer,
+                      foregroundColor: AppColors.secondary,
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    tooltip: 'Open in Google Maps',
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
+
+              // Live Telemetry Row: ETA, Distance, Speed (Zomato-style KPI Bar)
+              Row(
+                children: [
+                  // ETA
+                  Expanded(
+                    child: _buildTelemetryTile(
+                      icon: Icons.timer_rounded,
+                      iconColor: AppColors.primary,
+                      title: '${controller.remainingMinutes.value} mins',
+                      subtitle: 'ESTIMATED ARRIVAL',
+                      isHighlight: true,
+                    ),
+                  ),
+                  Container(width: 1, height: 36, color: Colors.grey.withAlpha(50)),
+
+                  // Distance
+                  Expanded(
+                    child: _buildTelemetryTile(
+                      icon: Icons.route_rounded,
+                      iconColor: const Color(0xFF0284C7),
+                      title: Formatters.formatDistance(controller.remainingDistance.value),
+                      subtitle: 'DISTANCE',
+                    ),
+                  ),
+                  Container(width: 1, height: 36, color: Colors.grey.withAlpha(50)),
+
+                  // Live Speed
+                  Expanded(
+                    child: _buildTelemetryTile(
+                      icon: Icons.speed_rounded,
+                      iconColor: const Color(0xFF16A34A),
+                      title: '${controller.currentSpeedKmh.value} km/h',
+                      subtitle: 'RIDER SPEED',
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 18),
+
+              // In-App Milestone Action Button (e.g. "I Have Arrived" / "Order Details")
+              Row(
+                children: [
+                  Expanded(
+                    child: CustomButton(
+                      text: controller.milestoneActionLabel,
+                      icon: controller.milestoneActionIcon,
+                      type: ButtonType.primary,
+                      onPressed: () => controller.advanceMilestone(),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  IconButton.outlined(
+                    onPressed: () => Get.back(),
+                    icon: const Icon(Icons.arrow_back),
+                    tooltip: 'Return to Order Details',
+                    style: IconButton.styleFrom(
+                      padding: const EdgeInsets.all(12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget _buildTelemetryTile({
@@ -550,15 +582,17 @@ class NavigationView extends GetView<NavigationController> {
           children: [
             Icon(icon, size: 16, color: iconColor),
             const SizedBox(width: 5),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: isHighlight ? AppColors.primary : null,
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: isHighlight ? AppColors.primary : null,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

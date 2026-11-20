@@ -90,14 +90,23 @@ class SocketService extends GetxService {
         isConnected.value = true;
         connectionState.value = SocketConnectionState.connected;
 
-        // Checklist Point 4: Socket.IO Real-Time Cross-Device Sync
+        // Backend Handoff Section 2: emit join_rider upon socket connection
+        _socket?.emit('join_rider', {'riderId': riderId});
+        debugPrint('[SocketService] Emitted join_rider: {"riderId": "$riderId"}');
+
+        // Checklist Point 4 & Section 2: Socket.IO Real-Time Cross-Device Sync & Status
         _socket?.on('rider:status_changed', (data) {
           debugPrint('[SocketService] Received rider:status_changed: $data');
-          if (data is Map && data.containsKey('isOnline') && data['isOnline'] != null) {
-            final isOnline = data['isOnline'] is bool
-                ? (data['isOnline'] as bool)
-                : (data['isOnline'].toString().toLowerCase() == 'true');
-            onRiderStatusChanged?.call(isOnline);
+          if (data is Map) {
+            if (data.containsKey('isOnline') && data['isOnline'] != null) {
+              final isOnline = data['isOnline'] is bool
+                  ? (data['isOnline'] as bool)
+                  : (data['isOnline'].toString().toLowerCase() == 'true');
+              onRiderStatusChanged?.call(isOnline);
+            }
+            if (data.containsKey('switchedDevice') || data.containsKey('activeDeviceId')) {
+              onActiveDeviceChanged?.call(Map<String, dynamic>.from(data));
+            }
           }
         });
 
@@ -130,6 +139,7 @@ class SocketService extends GetxService {
         debugPrint('[SocketService] Telemetry socket reconnected (attempt: $attempt)');
         isConnected.value = true;
         connectionState.value = SocketConnectionState.connected;
+        _socket?.emit('join_rider', {'riderId': riderId});
       });
 
       _socket?.onReconnectAttempt((attempt) {

@@ -5,6 +5,7 @@ import '../../domain/entities/rider_entity.dart';
 import '../../domain/entities/registration_result_entity.dart';
 import '../../domain/entities/login_response_entity.dart';
 import '../../domain/entities/phone_otp_result_entity.dart';
+import '../../domain/entities/email_otp_result_entity.dart';
 import '../../domain/entities/reset_password_result_entity.dart';
 import '../../domain/entities/two_factor_resend_result_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -248,6 +249,78 @@ class AuthRepositoryImpl implements AuthRepository {
     } on SuspendedException catch (e) {
       return Left(
           SuspendedFailure(message: e.message, authStatus: e.authStatus));
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, SendEmailOtpResultEntity>> sendEmailOtp(String email) async {
+    try {
+      final result = await remoteDataSource.sendEmailOtp(email: email);
+      return Right(result);
+    } on UnverifiedAccountException catch (e) {
+      return Left(UnverifiedAccountFailure(
+        message: e.message,
+        email: e.email,
+        verifyUrl: e.verifyUrl,
+      ));
+    } on SuspendedException catch (e) {
+      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
+    } on RateLimitException catch (e) {
+      return Left(_toRateLimitFailure(e));
+    } on ServerException catch (e) {
+      return Left(ServerFailure(message: e.message, statusCode: e.statusCode));
+    } catch (e) {
+      return Left(ServerFailure(message: e.toString()));
+    }
+  }
+
+  @override
+  Future<Either<Failure, LoginResponseEntity>> verifyEmailOtp({
+    required String email,
+    required String otp,
+    required String deviceId,
+    required String platform,
+    required String deviceToken,
+    required String userAgent,
+  }) async {
+    try {
+      final response = await remoteDataSource.verifyEmailOtp(
+        email: email,
+        otp: otp,
+        deviceId: deviceId,
+        platform: platform,
+        deviceToken: deviceToken,
+        userAgent: userAgent,
+      );
+
+      await localDataSource.saveToken(response.accessToken);
+      await localDataSource.saveRefreshToken(response.refreshToken);
+      await localDataSource.saveRider(RiderModel.fromEntity(response.rider));
+      await localDataSource.saveUser(UserModel(
+        id: response.user.id,
+        email: response.user.email,
+        name: response.user.name,
+        role: response.user.role,
+        phone: response.user.phone,
+        phoneCountryCode: response.user.phoneCountryCode,
+        image: response.user.image,
+        isEmailVerified: response.user.isEmailVerified,
+        createdAt: response.user.createdAt,
+      ));
+      await localDataSource.setIsOnline(response.rider.isOnline);
+      if (deviceToken.isNotEmpty) {
+        await localDataSource.saveDeviceToken(deviceToken);
+      }
+
+      return Right(response);
+    } on SuspendedException catch (e) {
+      return Left(SuspendedFailure(message: e.message, authStatus: e.authStatus));
     } on RateLimitException catch (e) {
       return Left(_toRateLimitFailure(e));
     } on ServerException catch (e) {

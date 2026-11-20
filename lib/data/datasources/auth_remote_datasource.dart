@@ -11,6 +11,7 @@ import '../models/rider_model.dart';
 import '../models/registration_result_model.dart';
 import '../models/login_response_model.dart';
 import '../models/phone_otp_result_model.dart';
+import '../models/email_otp_result_model.dart';
 import '../models/reset_password_result_model.dart';
 import '../models/two_factor_resend_result_model.dart';
 
@@ -45,6 +46,17 @@ abstract class AuthRemoteDataSource {
   });
   Future<LoginResponseModel> verifyPhoneOtp({
     required String phone,
+    required String otp,
+    required String deviceId,
+    required String platform,
+    required String deviceToken,
+    required String userAgent,
+  });
+  Future<SendEmailOtpResultModel> sendEmailOtp({
+    required String email,
+  });
+  Future<LoginResponseModel> verifyEmailOtp({
+    required String email,
     required String otp,
     required String deviceId,
     required String platform,
@@ -367,6 +379,87 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         data: {
           'phone': cleanPhone.isNotEmpty ? cleanPhone : phone,
           'otp': otp,
+          'deviceId': deviceId,
+          'platform': platform,
+          'deviceToken': deviceToken,
+          'userAgent': userAgent,
+        },
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>? ?? response.data as Map<String, dynamic>;
+        return LoginResponseModel.fromJson(data);
+      }
+      throw const ServerException(message: 'Verification failed');
+    } on DioException catch (e) {
+      final respData = e.response?.data is Map ? e.response!.data as Map : {};
+      final msg = respData['error'] ?? respData['message'] ?? 'Invalid OTP code';
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+          defaultCooldownSeconds: AppConstants.otpLockoutSeconds,
+        );
+      }
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
+  }
+
+  @override
+  Future<SendEmailOtpResultModel> sendEmailOtp({required String email}) async {
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.emailOtpSend,
+        data: {'email': email.trim().toLowerCase()},
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] as Map<String, dynamic>? ?? Map<String, dynamic>.from(response.data as Map);
+        return SendEmailOtpResultModel.fromJson(data);
+      }
+      throw const ServerException(message: 'Failed to send OTP to email');
+    } on DioException catch (e) {
+      final respData = e.response?.data is Map ? e.response!.data as Map : {};
+      final isSuspended = respData['isSuspended'] as bool? ?? false;
+      final needsVerification = respData['needsVerification'] as bool? ?? false;
+      final msg = respData['error'] ?? respData['message'] ?? 'Failed to send OTP to email';
+
+      if (e.response?.statusCode == 403 && needsVerification) {
+        throw UnverifiedAccountException(
+          message: msg.toString(),
+          email: email.trim().toLowerCase(),
+          verifyUrl: respData['verifyUrl']?.toString(),
+        );
+      }
+      if (e.response?.statusCode == 403 && isSuspended) {
+        throw SuspendedException(
+          message: msg.toString(),
+          authStatus: respData['authStatus']?.toString() ?? 'SUSPENDED',
+        );
+      }
+      if (e.response?.statusCode == 429) {
+        throw RateLimitParser.fromDioException(
+          e,
+          fallbackMessage: msg.toString(),
+        );
+      }
+      throw ServerException(message: msg.toString(), statusCode: e.response?.statusCode);
+    }
+  }
+
+  @override
+  Future<LoginResponseModel> verifyEmailOtp({
+    required String email,
+    required String otp,
+    required String deviceId,
+    required String platform,
+    required String deviceToken,
+    required String userAgent,
+  }) async {
+    try {
+      final response = await _dioClient.dio.post(
+        ApiEndpoints.emailOtpVerify,
+        data: {
+          'email': email.trim().toLowerCase(),
+          'otp': otp.trim(),
           'deviceId': deviceId,
           'platform': platform,
           'deviceToken': deviceToken,

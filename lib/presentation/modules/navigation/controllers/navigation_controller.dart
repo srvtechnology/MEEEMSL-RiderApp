@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:get/get.dart';
@@ -6,6 +7,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/services/location_service.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../../dashboard/controllers/dashboard_controller.dart';
 import '../../orders/controllers/orders_controller.dart';
@@ -38,8 +40,37 @@ class NavigationController extends GetxController {
   OrderEntity? get activeOrder =>
       _ordersController?.selectedOrder.value ?? _dashboardController?.activeOrder.value;
 
-  bool get isHeadingToPickup =>
-      activeOrder?.status == OrderStatus.accepted || activeOrder?.status == OrderStatus.atPickup;
+  final _manualTargetIsPickup = RxnBool();
+  bool get isHeadingToPickup {
+    if (_manualTargetIsPickup.value != null) {
+      return _manualTargetIsPickup.value!;
+    }
+    final status = activeOrder?.status;
+    return status == OrderStatus.pending ||
+        status == OrderStatus.accepted ||
+        status == OrderStatus.atPickup;
+  }
+
+  void toggleTargetLeg() {
+    _manualTargetIsPickup.value = !isHeadingToPickup;
+    updateMapRoute();
+    if (!is3dNavigationMode.value) {
+      fitRouteBounds();
+    }
+  }
+
+  void openExternalMaps() {
+    final lat = targetLat;
+    final lng = targetLng;
+    final address = targetAddress;
+    final title = targetTitle;
+    MapLauncherUtil.openMapForOrder(
+      title: title,
+      address: address,
+      latitude: lat,
+      longitude: lng,
+    );
+  }
 
   String get targetTitle =>
       isHeadingToPickup ? (activeOrder?.pickupName ?? 'Vendor Store') : (activeOrder?.customerName ?? 'Customer Dropoff');
@@ -148,6 +179,14 @@ class NavigationController extends GetxController {
   @override
   void onInit() {
     super.onInit();
+    final args = Get.arguments;
+    if (args is Map && args['target'] != null) {
+      if (args['target'] == 'pickup') {
+        _manualTargetIsPickup.value = true;
+      } else if (args['target'] == 'dropoff') {
+        _manualTargetIsPickup.value = false;
+      }
+    }
     updateMapRoute();
 
     final locService = _locationService;
@@ -166,6 +205,7 @@ class NavigationController extends GetxController {
     if (ordersCtrl != null) {
       _orderWorker = ever(ordersCtrl.selectedOrder, (_) {
         if (_isDisposed) return;
+        _manualTargetIsPickup.value = null;
         updateMapRoute();
         if (isFollowingRider.value && mapController != null) {
           centerOnRider();
@@ -178,6 +218,7 @@ class NavigationController extends GetxController {
     if (dashCtrl != null) {
       _dashboardWorker = ever(dashCtrl.activeOrder, (_) {
         if (_isDisposed) return;
+        _manualTargetIsPickup.value = null;
         updateMapRoute();
         if (isFollowingRider.value && mapController != null) {
           centerOnRider();
@@ -305,9 +346,87 @@ class NavigationController extends GetxController {
     } catch (_) {}
   }
 
+  LatLng? _lastRouteOrigin;
+  LatLng? _lastRouteDest;
+  List<LatLng> _cachedRoadPoints = [];
+  bool _isFetchingRoadRoute = false;
+
+  Future<void> _fetchRoadRoute(LatLng origin, LatLng dest) async {
+    final distKm = Geolocator.distanceBetween(
+      origin.latitude,
+      origin.longitude,
+      dest.latitude,
+      dest.longitude,
+    ) / 1000.0;
+    if (distKm > 800) return;
+
+    if (_isFetchingRoadRoute) return;
+    _isFetchingRoadRoute = true;
+    try {
+      final client = Dio(BaseOptions(
+        connectTimeout: const Duration(milliseconds: 3500),
+        receiveTimeout: const Duration(milliseconds: 3500),
+      ));
+      final url = 'https://router.project-osrm.org/route/v1/driving/'
+          '${origin.longitude},${origin.latitude};${dest.longitude},${dest.latitude}'
+          '?overview=full&geometries=geojson';
+      final response = await client.get(url);
+      if (response.statusCode == 200 && response.data != null) {
+        final routes = response.data['routes'];
+        if (routes is List && routes.isNotEmpty) {
+          final geometry = routes.first['geometry'];
+          final coordinates = geometry?['coordinates'];
+          if (coordinates is List && coordinates.length >= 2) {
+            final pts = <LatLng>[];
+            for (final c in coordinates) {
+              if (c is List && c.length >= 2) {
+                final lng = (c[0] as num).toDouble();
+                final lat = (c[1] as num).toDouble();
+                pts.add(LatLng(lat, lng));
+              }
+            }
+            if (pts.isNotEmpty && !_isDisposed) {
+              _cachedRoadPoints = pts;
+              _lastRouteOrigin = origin;
+              _lastRouteDest = dest;
+              polylines.assignAll({
+                Polyline(
+                  polylineId: const PolylineId('delivery_navigation_route'),
+                  points: pts,
+                  color: AppColors.primary,
+                  width: 6,
+                  geodesic: true,
+                  startCap: Cap.roundCap,
+                  endCap: Cap.roundCap,
+                  jointType: JointType.round,
+                ),
+              });
+            }
+          }
+        }
+      }
+    } catch (_) {
+      // Graceful fallback to geodesic polyline
+    } finally {
+      _isFetchingRoadRoute = false;
+    }
+  }
+
   void updateMapRoute() {
     final rider = riderLatLng;
     final dest = destinationLatLng;
+
+    // Check if we need to query fresh real-time road routing
+    final needsRefetch = _lastRouteDest == null ||
+        _lastRouteOrigin == null ||
+        (dest.latitude - _lastRouteDest!.latitude).abs() > 0.0005 ||
+        (dest.longitude - _lastRouteDest!.longitude).abs() > 0.0005 ||
+        (rider.latitude - _lastRouteOrigin!.latitude).abs() > 0.0008 ||
+        (rider.longitude - _lastRouteOrigin!.longitude).abs() > 0.0008;
+
+    if (needsRefetch) {
+      _fetchRoadRoute(rider, dest);
+    }
 
     // Calculate real distance
     final distMeters = Geolocator.distanceBetween(
@@ -376,8 +495,8 @@ class NavigationController extends GetxController {
       ),
     };
 
-    // Realistic multi-point road trajectory
-    final routePoints = _generateRoadPath(rider, dest);
+    // Realistic multi-point road trajectory or active OSRM road path
+    final routePoints = _cachedRoadPoints.isNotEmpty ? _cachedRoadPoints : _generateRoadPath(rider, dest);
 
     final newPolylines = <Polyline>{
       Polyline(

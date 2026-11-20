@@ -32,6 +32,9 @@ class OtpView extends GetView<AuthController> {
             if (controller.otpFlowType.value == OtpFlowType.twoFactorLogin) {
               return const Text('Two-Factor Authentication');
             }
+            if (controller.otpFlowType.value == OtpFlowType.emailLogin) {
+              return const Text('Email OTP Login');
+            }
             if (controller.otpFlowType.value == OtpFlowType.registration) {
               return Text(controller.phoneNumber.value.isNotEmpty
                   ? 'Phone Verification'
@@ -87,6 +90,12 @@ class OtpView extends GetView<AuthController> {
                       style: AppTextStyles.headlineLarge(),
                     );
                   }
+                  if (controller.otpFlowType.value == OtpFlowType.emailLogin) {
+                    return Text(
+                      'Verify Your Email',
+                      style: AppTextStyles.headlineLarge(),
+                    );
+                  }
                   if (controller.otpFlowType.value == OtpFlowType.registration) {
                     return Text(
                       controller.phoneNumber.value.isNotEmpty
@@ -138,6 +147,16 @@ class OtpView extends GetView<AuthController> {
                           ],
                         ),
                       ],
+                    );
+                  }
+
+                  if (controller.otpFlowType.value == OtpFlowType.emailLogin) {
+                    final email = controller.registrationEmail.value.isNotEmpty
+                        ? controller.registrationEmail.value
+                        : controller.loginEmailController.text.trim();
+                    return Text(
+                      'A 6-digit login OTP code was sent to $email',
+                      style: AppTextStyles.bodyMedium(),
                     );
                   }
 
@@ -338,7 +357,8 @@ class OtpView extends GetView<AuthController> {
                   String buttonText = AppStrings.verifyOtp;
                   if (lockout > 0) {
                     buttonText = 'Locked (${_formatSeconds(lockout)})';
-                  } else if (controller.otpFlowType.value == OtpFlowType.twoFactorLogin) {
+                  } else if (controller.otpFlowType.value == OtpFlowType.twoFactorLogin ||
+                      controller.otpFlowType.value == OtpFlowType.emailLogin) {
                     buttonText = 'Verify & Sign In';
                   } else if (controller.otpFlowType.value == OtpFlowType.registration) {
                     buttonText = 'Verify & Complete';

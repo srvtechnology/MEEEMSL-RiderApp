@@ -4,6 +4,7 @@ import '../entities/rider_entity.dart';
 import '../entities/registration_result_entity.dart';
 import '../entities/login_response_entity.dart';
 import '../entities/phone_otp_result_entity.dart';
+import '../entities/email_otp_result_entity.dart';
 import '../entities/two_factor_resend_result_entity.dart';
 
 import '../entities/reset_password_result_entity.dart';
@@ -39,6 +40,15 @@ abstract class AuthRepository {
   Future<Either<Failure, SendPhoneOtpResultEntity>> sendPhoneOtp(String phone);
   Future<Either<Failure, LoginResponseEntity>> verifyPhoneOtp({
     required String phone,
+    required String otp,
+    required String deviceId,
+    required String platform,
+    required String deviceToken,
+    required String userAgent,
+  });
+  Future<Either<Failure, SendEmailOtpResultEntity>> sendEmailOtp(String email);
+  Future<Either<Failure, LoginResponseEntity>> verifyEmailOtp({
+    required String email,
     required String otp,
     required String deviceId,
     required String platform,

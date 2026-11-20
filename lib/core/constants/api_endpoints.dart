@@ -30,6 +30,8 @@ class ApiEndpoints {
   static const String resend2fa = '/auth/resend-2fa';
   static const String phoneOtpSend = '/auth/phone-otp/send-otp';
   static const String phoneOtpVerify = '/auth/phone-otp/verify-otp';
+  static const String emailOtpSend = '/auth/email-otp/send-otp';
+  static const String emailOtpVerify = '/auth/email-otp/verify-otp';
   static const String refreshToken = '/auth/refresh';
   static const String logout = '/auth/logout'; // Note: Logout in Part 1 is DELETE /device-token
 

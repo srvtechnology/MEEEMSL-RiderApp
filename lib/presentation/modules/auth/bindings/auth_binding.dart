@@ -10,6 +10,8 @@ import '../../../../domain/usecases/auth/login_with_password_usecase.dart';
 import '../../../../domain/usecases/auth/login_with_email_password_usecase.dart';
 import '../../../../domain/usecases/auth/send_phone_otp_usecase.dart';
 import '../../../../domain/usecases/auth/verify_phone_otp_usecase.dart';
+import '../../../../domain/usecases/auth/send_email_otp_usecase.dart';
+import '../../../../domain/usecases/auth/verify_email_otp_usecase.dart';
 import '../../../../domain/usecases/auth/verify_otp_usecase.dart';
 import '../../../../domain/usecases/auth/register_rider_usecase.dart';
 import '../../../../domain/usecases/auth/self_register_usecase.dart';
@@ -61,6 +63,8 @@ class AuthBinding extends Bindings {
     Get.lazyPut(() => LoginWithEmailPasswordUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => SendPhoneOtpUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => VerifyPhoneOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => SendEmailOtpUseCase(Get.find<AuthRepository>()), fenix: true);
+    Get.lazyPut(() => VerifyEmailOtpUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => VerifyOtpUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => RegisterRiderUseCase(Get.find<AuthRepository>()), fenix: true);
     Get.lazyPut(() => SubmitOnboardingUseCase(Get.find<AuthRepository>()), fenix: true);
@@ -96,6 +100,8 @@ class AuthBinding extends Bindings {
           getOperatingZonesUseCase: Get.find<GetOperatingZonesUseCase>(),
           verify2faOtpUseCase: Get.find<Verify2faOtpUseCase>(),
           resend2faOtpUseCase: Get.find<Resend2faOtpUseCase>(),
+          sendEmailOtpUseCase: Get.find<SendEmailOtpUseCase>(),
+          verifyEmailOtpUseCase: Get.find<VerifyEmailOtpUseCase>(),
         ),
         permanent: true,
       );

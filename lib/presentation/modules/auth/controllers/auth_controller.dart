@@ -18,6 +18,8 @@ import '../../../../domain/usecases/auth/login_with_password_usecase.dart';
 import '../../../../domain/usecases/auth/login_with_email_password_usecase.dart';
 import '../../../../domain/usecases/auth/send_phone_otp_usecase.dart';
 import '../../../../domain/usecases/auth/verify_phone_otp_usecase.dart';
+import '../../../../domain/usecases/auth/send_email_otp_usecase.dart';
+import '../../../../domain/usecases/auth/verify_email_otp_usecase.dart';
 import '../../../../domain/usecases/auth/verify_otp_usecase.dart';
 import '../../../../domain/usecases/auth/register_rider_usecase.dart';
 import '../../../../domain/usecases/auth/self_register_usecase.dart';
@@ -39,7 +41,14 @@ import '../../../routes/app_routes.dart';
 enum OtpFlowType {
   registration,
   phoneLogin,
+  emailLogin,
   twoFactorLogin,
+}
+
+enum LoginTabType {
+  password,
+  phoneOtp,
+  emailOtp,
 }
 
 class AuthController extends GetxController {
@@ -59,6 +68,8 @@ class AuthController extends GetxController {
   final GetOperatingZonesUseCase? getOperatingZonesUseCase;
   final Verify2faOtpUseCase? verify2faOtpUseCase;
   final Resend2faOtpUseCase? resend2faOtpUseCase;
+  final SendEmailOtpUseCase? sendEmailOtpUseCase;
+  final VerifyEmailOtpUseCase? verifyEmailOtpUseCase;
 
   AuthController({
     required this.loginUseCase,
@@ -77,10 +88,13 @@ class AuthController extends GetxController {
     this.getOperatingZonesUseCase,
     this.verify2faOtpUseCase,
     this.resend2faOtpUseCase,
+    this.sendEmailOtpUseCase,
+    this.verifyEmailOtpUseCase,
   });
 
   // State Observables
   final isLoading = false.obs;
+  final loginTab = LoginTabType.password.obs;
   final isEmailLoginMode = true.obs;
   final isPasswordVisible = false.obs;
   final selectedCountryCode = AppConstants.defaultCountryCode.obs;
@@ -93,6 +107,7 @@ class AuthController extends GetxController {
   // Security & Rate-Limiting Cooldowns (HTTP 429)
   final loginCooldownSeconds = 0.obs;
   final phoneOtpCooldownSeconds = 0.obs;
+  final emailOtpCooldownSeconds = 0.obs;
   final registerCooldownSeconds = 0.obs;
   final forgotPasswordCooldownSeconds = 0.obs;
   final otpLockoutSeconds = 0.obs;
@@ -101,6 +116,7 @@ class AuthController extends GetxController {
   final dailyOtpLimitMessage = ''.obs;
   Timer? _loginCooldownTimer;
   Timer? _phoneOtpCooldownTimer;
+  Timer? _emailOtpCooldownTimer;
   Timer? _registerCooldownTimer;
   Timer? _forgotPasswordCooldownTimer;
   Timer? _otpLockoutTimer;
@@ -271,6 +287,8 @@ class AuthController extends GetxController {
     _loginCooldownTimer = null;
     _phoneOtpCooldownTimer?.cancel();
     _phoneOtpCooldownTimer = null;
+    _emailOtpCooldownTimer?.cancel();
+    _emailOtpCooldownTimer = null;
     _registerCooldownTimer?.cancel();
     _registerCooldownTimer = null;
     _forgotPasswordCooldownTimer?.cancel();
@@ -311,6 +329,22 @@ class AuthController extends GetxController {
     _phoneOtpCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (phoneOtpCooldownSeconds.value > 0) {
         phoneOtpCooldownSeconds.value--;
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  void startEmailOtpCooldown({required int seconds}) {
+    _emailOtpCooldownTimer?.cancel();
+    if (seconds <= 0) {
+      emailOtpCooldownSeconds.value = 0;
+      return;
+    }
+    emailOtpCooldownSeconds.value = seconds;
+    _emailOtpCooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (emailOtpCooldownSeconds.value > 0) {
+        emailOtpCooldownSeconds.value--;
       } else {
         timer.cancel();
       }
@@ -410,6 +444,10 @@ class AuthController extends GetxController {
           break;
         case 'phoneOtp':
           startPhoneOtpCooldown(seconds: waitSeconds);
+          startResendTimer(seconds: waitSeconds);
+          break;
+        case 'emailOtp':
+          startEmailOtpCooldown(seconds: waitSeconds);
           startResendTimer(seconds: waitSeconds);
           break;
         case 'register':
@@ -674,6 +712,41 @@ class AuthController extends GetxController {
           );
         },
       );
+    } else if (otpFlowType.value == OtpFlowType.emailLogin) {
+      final email = registrationEmail.value.isNotEmpty
+          ? registrationEmail.value
+          : loginEmailController.text.trim();
+
+      final useCase = sendEmailOtpUseCase ?? (Get.isRegistered<SendEmailOtpUseCase>() ? Get.find<SendEmailOtpUseCase>() : null);
+      if (useCase == null) {
+        isLoading.value = false;
+        return;
+      }
+
+      final result = await useCase(email);
+      isLoading.value = false;
+
+      result.fold(
+        (failure) {
+          if (failure is SuspendedFailure) {
+            SuspendedAccountDialog.show(message: failure.message);
+          } else if (failure is RateLimitFailure) {
+            _handleRateLimitFailure(failure, flowContext: 'otpResend');
+          } else {
+            Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+          }
+        },
+        (res) {
+          dailyOtpLimitReached.value = false;
+          startResendTimer(seconds: res.resendCooldown);
+          Get.snackbar(
+            'New OTP Sent',
+            'Login OTP resent to $email',
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFE8F8EE),
+          );
+        },
+      );
     } else {
       final cleanPhone = Formatters.sanitizePhoneNumber(phoneNumber.value);
       final result = await sendPhoneOtpUseCase(cleanPhone.isNotEmpty ? cleanPhone : phoneNumber.value);
@@ -932,6 +1005,67 @@ class AuthController extends GetxController {
     );
   }
 
+  // 3.2 (C) Send Email OTP (Passwordless Login)
+  Future<void> sendEmailOtp() async {
+    if (emailOtpCooldownSeconds.value > 0) {
+      _showSnackbar(
+        'Please Wait',
+        'Please wait ${emailOtpCooldownSeconds.value}s before requesting another OTP.',
+        snackPosition: SnackPosition.BOTTOM,
+      );
+      return;
+    }
+
+    final email = loginEmailController.text.trim();
+    final error = Validators.validateEmail(email);
+    if (error != null) {
+      Get.snackbar('Invalid Input', error, snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    final useCase = sendEmailOtpUseCase ?? (Get.isRegistered<SendEmailOtpUseCase>() ? Get.find<SendEmailOtpUseCase>() : null);
+    if (useCase == null) {
+      Get.snackbar('Error', 'Email OTP service not available', snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    isLoading.value = true;
+    registrationEmail.value = email;
+    otpFlowType.value = OtpFlowType.emailLogin;
+    otpTextController.clear();
+
+    final result = await useCase(email);
+    isLoading.value = false;
+
+    result.fold(
+      (failure) {
+        if (failure is SuspendedFailure) {
+          SuspendedAccountDialog.show(message: failure.message);
+        } else if (failure is UnverifiedAccountFailure) {
+          otpFlowType.value = OtpFlowType.registration;
+          Get.snackbar(
+            'Account Verification Required',
+            failure.message,
+            snackPosition: SnackPosition.TOP,
+            backgroundColor: const Color(0xFFFFF3E0),
+            duration: const Duration(seconds: 4),
+          );
+          Get.toNamed(AppRoutes.otp, arguments: {'email': email, 'flow': 'verification'});
+        } else if (failure is RateLimitFailure) {
+          _handleRateLimitFailure(failure, flowContext: 'emailOtp');
+        } else {
+          Get.snackbar('Error', failure.message, snackPosition: SnackPosition.BOTTOM);
+        }
+      },
+      (res) {
+        dailyOtpLimitReached.value = false;
+        clearOtpLockout();
+        startResendTimer(seconds: res.resendCooldown);
+        Get.toNamed(AppRoutes.otp);
+      },
+    );
+  }
+
   Future<void> verify2faOtp(String otp) {
     otpTextController.text = otp;
     return verifyOtp();
@@ -1074,6 +1208,50 @@ class AuthController extends GetxController {
             duration: const Duration(seconds: 4),
           );
           Get.offAllNamed(AppRoutes.login);
+        },
+      );
+    } else if (otpFlowType.value == OtpFlowType.emailLogin) {
+      final email = registrationEmail.value.isNotEmpty
+          ? registrationEmail.value
+          : loginEmailController.text.trim();
+
+      final useCase = verifyEmailOtpUseCase ?? (Get.isRegistered<VerifyEmailOtpUseCase>() ? Get.find<VerifyEmailOtpUseCase>() : null);
+      if (useCase == null) {
+        isLoading.value = false;
+        _showSnackbar('Error', 'Email verification service not available', snackPosition: SnackPosition.BOTTOM);
+        return;
+      }
+
+      final deviceId = await deviceInfoService.getDeviceId();
+      final platform = deviceInfoService.getPlatform();
+      final userAgent = await deviceInfoService.getUserAgent();
+      final storage = GetStorage();
+      final deviceToken = storage.read<String>(AppConstants.devicePushTokenKey) ?? 'fcm_mock_device_token';
+
+      final result = await useCase(
+        email: email,
+        otp: otp,
+        deviceId: deviceId,
+        platform: platform,
+        deviceToken: deviceToken,
+        userAgent: userAgent,
+      );
+      isLoading.value = false;
+
+      result.fold(
+        (failure) {
+          if (failure is SuspendedFailure) {
+            SuspendedAccountDialog.show(message: failure.message);
+          } else if (failure is RateLimitFailure) {
+            _handleRateLimitFailure(failure, flowContext: 'otpVerify');
+          } else {
+            Get.snackbar('Verification Failed', failure.message, snackPosition: SnackPosition.BOTTOM);
+          }
+        },
+        (res) {
+          clearOtpLockout();
+          dailyOtpLimitReached.value = false;
+          _handleLoginSuccess(res.user, res.rider);
         },
       );
     } else {

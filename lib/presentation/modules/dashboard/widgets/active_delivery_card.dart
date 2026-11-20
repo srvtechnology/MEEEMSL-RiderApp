@@ -6,6 +6,7 @@ import '../../../../core/theme/text_styles.dart';
 import '../../../../core/widgets/custom_button.dart';
 import '../../../../core/widgets/delivery_earning_badge.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../../core/utils/map_launcher_util.dart';
 import '../../../../domain/entities/order_entity.dart';
 import '../../../routes/app_routes.dart';
 import '../controllers/dashboard_controller.dart';
@@ -94,16 +95,20 @@ class ActiveDeliveryCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          StatusBadge(
-                            text: order.status.displayName.toUpperCase(),
-                            type: BadgeType.info,
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.primary),
-                        ],
+                      Flexible(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: StatusBadge(
+                                text: order.status.displayName.toUpperCase(),
+                                type: BadgeType.info,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.primary),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -195,6 +200,8 @@ class ActiveDeliveryCard extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   order.pickupName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
@@ -227,7 +234,7 @@ class ActiveDeliveryCard extends StatelessWidget {
                                   if (Get.isRegistered<OrdersController>()) {
                                     Get.find<OrdersController>().selectedOrder.value = order;
                                   }
-                                  Get.toNamed(AppRoutes.navigation);
+                                  Get.toNamed(AppRoutes.navigation, arguments: {'target': 'pickup'});
                                 },
                               ),
                             ],
@@ -302,6 +309,8 @@ class ActiveDeliveryCard extends StatelessWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   order.customerName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
                                     fontSize: 13.5,
                                     fontWeight: FontWeight.w700,
@@ -334,7 +343,7 @@ class ActiveDeliveryCard extends StatelessWidget {
                                   if (Get.isRegistered<OrdersController>()) {
                                     Get.find<OrdersController>().selectedOrder.value = order;
                                   }
-                                  Get.toNamed(AppRoutes.navigation);
+                                  Get.toNamed(AppRoutes.navigation, arguments: {'target': 'dropoff'});
                                 },
                               ),
                             ],

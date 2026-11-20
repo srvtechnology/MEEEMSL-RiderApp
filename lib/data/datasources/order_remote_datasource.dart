@@ -284,8 +284,8 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
         final data = response.data['data'];
         final deliveryOtp = data?['deliveryOtp']?.toString() ?? '582910';
 
-        // 1. If backend returns full order data in response
-        if (data is Map<String, dynamic> && data['order'] != null) {
+        // 1. If backend returns full enriched assignment / order data in response
+        if (data is Map<String, dynamic> && (data['order'] != null || data['pickupLocation'] != null || data['sellerLatitude'] != null)) {
           final acceptedOrder = OrderModel.fromJson(data);
           _activeOrders.removeWhere((o) => o.id == acceptedOrder.id || (acceptedOrder.assignmentId != null && o.assignmentId == acceptedOrder.assignmentId));
           _activeOrders.insert(0, acceptedOrder);
@@ -502,6 +502,34 @@ class OrderRemoteDataSourceImpl implements OrderRemoteDataSource {
                 .where((e) => e != null && e.toString().trim().isNotEmpty)
                 .map((e) => e.toString())
                 .toList();
+          }
+
+          // If backend returns the full enriched assignment data with coordinates & locations:
+          if (data['pickupLocation'] != null || data['dropoffLocation'] != null || data['order'] != null) {
+            try {
+              final enriched = OrderModel.fromJson(data);
+              final index = _activeOrders.indexWhere((o) =>
+                  o.id == orderId ||
+                  (o.assignmentId != null && o.assignmentId!.isNotEmpty && o.assignmentId == orderId) ||
+                  o.id == enriched.id ||
+                  (enriched.assignmentId != null && o.assignmentId == enriched.assignmentId));
+              if (enriched.status == OrderStatus.delivered || enriched.status == OrderStatus.cancelled) {
+                if (index != -1) _activeOrders.removeAt(index);
+                _orderHistory.insert(0, enriched);
+                _saveOrderHistoryToLocal(_orderHistory);
+                _clearActiveOrderFromLocal();
+              } else {
+                if (index != -1) {
+                  _activeOrders[index] = enriched;
+                } else {
+                  _activeOrders.insert(0, enriched);
+                }
+                _saveActiveOrderToLocal(enriched);
+              }
+              return enriched;
+            } catch (err) {
+              debugPrint('[OrderRemoteDataSource] Error parsing enriched status update response: $err');
+            }
           }
         }
       }

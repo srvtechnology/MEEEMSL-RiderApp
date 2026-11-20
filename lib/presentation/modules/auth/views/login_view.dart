@@ -112,7 +112,7 @@ class LoginView extends GetView<AuthController> {
                 );
               }),
 
-              // Login Mode Toggle Chips (Email & Password vs Phone & OTP)
+              // Login Mode Toggle Chips (Password vs Phone OTP vs Email OTP)
               Obx(() => Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(
@@ -124,24 +124,31 @@ class LoginView extends GetView<AuthController> {
                       children: [
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => controller.isEmailLoginMode.value = true,
+                            onTap: () {
+                              controller.loginTab.value = LoginTabType.password;
+                              controller.isEmailLoginMode.value = true;
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: controller.isEmailLoginMode.value
+                                color: controller.loginTab.value == LoginTabType.password
                                     ? AppColors.primary
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Center(
-                                child: Text(
-                                  AppStrings.loginWithEmail,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: controller.isEmailLoginMode.value
-                                        ? Colors.white
-                                        : AppColors.textPrimaryLight,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'Password',
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: controller.loginTab.value == LoginTabType.password
+                                          ? Colors.white
+                                          : AppColors.textPrimaryLight,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -150,24 +157,64 @@ class LoginView extends GetView<AuthController> {
                         ),
                         Expanded(
                           child: GestureDetector(
-                            onTap: () => controller.isEmailLoginMode.value = false,
+                            onTap: () {
+                              controller.loginTab.value = LoginTabType.phoneOtp;
+                              controller.isEmailLoginMode.value = false;
+                            },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 10),
                               decoration: BoxDecoration(
-                                color: !controller.isEmailLoginMode.value
+                                color: controller.loginTab.value == LoginTabType.phoneOtp
                                     ? AppColors.primary
                                     : Colors.transparent,
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Center(
-                                child: Text(
-                                  AppStrings.loginWithPhone,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: !controller.isEmailLoginMode.value
-                                        ? Colors.white
-                                        : AppColors.textPrimaryLight,
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'Phone OTP',
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: controller.loginTab.value == LoginTabType.phoneOtp
+                                          ? Colors.white
+                                          : AppColors.textPrimaryLight,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () {
+                              controller.loginTab.value = LoginTabType.emailOtp;
+                              controller.isEmailLoginMode.value = false;
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: controller.loginTab.value == LoginTabType.emailOtp
+                                    ? AppColors.primary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Center(
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(
+                                    'Email OTP',
+                                    maxLines: 1,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: controller.loginTab.value == LoginTabType.emailOtp
+                                          ? Colors.white
+                                          : AppColors.textPrimaryLight,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -181,10 +228,13 @@ class LoginView extends GetView<AuthController> {
 
               // Form fields based on selected login mode
               Obx(() {
-                if (controller.isEmailLoginMode.value) {
-                  return _buildEmailPasswordForm(context);
-                } else {
-                  return _buildPhoneOtpForm(context);
+                switch (controller.loginTab.value) {
+                  case LoginTabType.password:
+                    return _buildEmailPasswordForm(context);
+                  case LoginTabType.phoneOtp:
+                    return _buildPhoneOtpForm(context);
+                  case LoginTabType.emailOtp:
+                    return _buildEmailOtpForm(context);
                 }
               }),
 
@@ -364,6 +414,30 @@ class LoginView extends GetView<AuthController> {
             text: cooldown > 0 ? 'Resend OTP in ${cooldown}s' : AppStrings.sendOtp,
             isLoading: controller.isLoading.value,
             onPressed: cooldown > 0 ? null : () => controller.sendOtp(),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildEmailOtpForm(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        CustomTextField(
+          controller: controller.loginEmailController,
+          label: AppStrings.email,
+          hintText: 'e.g. rider@example.com',
+          keyboardType: TextInputType.emailAddress,
+          prefixIcon: Icons.email_outlined,
+        ),
+        const SizedBox(height: 28),
+        Obx(() {
+          final cooldown = controller.emailOtpCooldownSeconds.value;
+          return CustomButton(
+            text: cooldown > 0 ? 'Resend OTP in ${cooldown}s' : 'Send Email OTP',
+            isLoading: controller.isLoading.value,
+            onPressed: cooldown > 0 ? null : () => controller.sendEmailOtp(),
           );
         }),
       ],
