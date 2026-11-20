@@ -73,4 +73,51 @@ void main() {
     final route = guard.redirect('/main');
     expect(route, isNull);
   });
+
+  test('AuthGuard allows navigation (returns null) for approved rider even if onboardingCompleted is false or first login', () async {
+    await storage.write(AppConstants.tokenKey, 'mock_valid_token');
+    final riderData = {
+      'id': 'rider_1',
+      'name': 'Test Rider',
+      'isApproved': true,
+      'status': 'APPROVED',
+      'onboardingCompleted': false,
+      'isFirstLogin': true,
+    };
+    await storage.write(AppConstants.riderProfileKey, jsonEncode(riderData));
+
+    final route = guard.redirect('/main');
+    expect(route, isNull);
+  });
+
+  test('AuthGuard redirects to AppRoutes.onboarding when rider is not approved and has not completed onboarding', () async {
+    await storage.write(AppConstants.tokenKey, 'mock_valid_token');
+    final riderData = {
+      'id': 'rider_2',
+      'name': 'New Rider',
+      'isApproved': false,
+      'status': 'NEW',
+      'onboardingCompleted': false,
+    };
+    await storage.write(AppConstants.riderProfileKey, jsonEncode(riderData));
+
+    final route = guard.redirect('/main');
+    expect(route, isNotNull);
+    expect(route?.name, AppRoutes.onboarding);
+  });
+
+  test('AuthGuard redirects to AppRoutes.login when rider is suspended', () async {
+    await storage.write(AppConstants.tokenKey, 'mock_valid_token');
+    final riderData = {
+      'id': 'rider_3',
+      'name': 'Suspended Rider',
+      'isSuspended': true,
+      'status': 'SUSPENDED',
+    };
+    await storage.write(AppConstants.riderProfileKey, jsonEncode(riderData));
+
+    final route = guard.redirect('/main');
+    expect(route, isNotNull);
+    expect(route?.name, AppRoutes.login);
+  });
 }

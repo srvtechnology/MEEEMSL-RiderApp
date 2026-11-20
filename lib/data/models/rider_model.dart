@@ -1,3 +1,4 @@
+import 'dart:convert';
 import '../../domain/entities/rider_entity.dart';
 import 'vehicle_model.dart';
 import 'payout_info_model.dart';
@@ -42,23 +43,45 @@ class RiderModel extends RiderEntity {
 
     final statusStr = rider['status'] as String? ??
         rider['approvalStatus'] as String? ??
+        rider['approval_status'] as String? ??
         json['status'] as String? ??
         json['approvalStatus'] as String? ??
+        json['approval_status'] as String? ??
+        user?['status'] as String? ??
+        user?['approvalStatus'] as String? ??
         'APPROVED';
     final isSuspendedVal = (rider['isSuspended'] as bool?) ??
+        (rider['is_suspended'] as bool?) ??
         (json['isSuspended'] as bool?) ??
-        (statusStr == 'SUSPENDED');
+        (json['is_suspended'] as bool?) ??
+        (user?['isSuspended'] as bool?) ??
+        (statusStr.toUpperCase() == 'SUSPENDED');
     final isApprovedVal = (rider['isApproved'] as bool?) ??
+        (rider['is_approved'] as bool?) ??
         (json['isApproved'] as bool?) ??
-        (statusStr == 'APPROVED' && !isSuspendedVal);
+        (json['is_approved'] as bool?) ??
+        (user?['isApproved'] as bool?) ??
+        ((statusStr.toUpperCase() == 'APPROVED' || statusStr.toUpperCase() == 'ACTIVE') && !isSuspendedVal);
 
     // Safely parse onboardingCompleted (supports bool, String, num, and defaults to false)
-    final rawOnboarding = rider['onboardingCompleted'] ?? json['onboardingCompleted'];
+    final rawOnboarding = rider['onboardingCompleted'] ??
+        rider['onboarding_completed'] ??
+        rider['isOnboarded'] ??
+        rider['is_onboarded'] ??
+        rider['isOnboardingCompleted'] ??
+        json['onboardingCompleted'] ??
+        json['onboarding_completed'] ??
+        json['isOnboarded'] ??
+        user?['onboardingCompleted'] ??
+        user?['onboarding_completed'] ??
+        user?['isOnboarded'];
     final bool onboardingCompletedVal;
     if (rawOnboarding is bool) {
       onboardingCompletedVal = rawOnboarding;
     } else if (rawOnboarding is String) {
-      onboardingCompletedVal = rawOnboarding.toLowerCase() == 'true';
+      onboardingCompletedVal = rawOnboarding.toLowerCase() == 'true' ||
+          rawOnboarding.toLowerCase() == 'completed' ||
+          rawOnboarding == '1';
     } else if (rawOnboarding is num) {
       onboardingCompletedVal = rawOnboarding == 1;
     } else {
@@ -66,16 +89,42 @@ class RiderModel extends RiderEntity {
     }
 
     // Safely parse isFirstLogin
-    final rawFirstLogin = rider['isFirstLogin'] ?? json['isFirstLogin'];
+    final rawFirstLogin = rider['isFirstLogin'] ??
+        rider['is_first_login'] ??
+        json['isFirstLogin'] ??
+        json['is_first_login'] ??
+        user?['isFirstLogin'] ??
+        user?['is_first_login'];
     final bool isFirstLoginVal;
     if (rawFirstLogin is bool) {
       isFirstLoginVal = rawFirstLogin;
     } else if (rawFirstLogin is String) {
-      isFirstLoginVal = rawFirstLogin.toLowerCase() == 'true';
+      isFirstLoginVal = rawFirstLogin.toLowerCase() == 'true' || rawFirstLogin == '1';
     } else if (rawFirstLogin is num) {
       isFirstLoginVal = rawFirstLogin == 1;
     } else {
       isFirstLoginVal = false;
+    }
+
+    List<String> parseStringList(dynamic raw) {
+      if (raw == null) return const [];
+      if (raw is List) {
+        return raw.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      }
+      if (raw is String) {
+        final trimmed = raw.trim();
+        if (trimmed.isEmpty) return const [];
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          try {
+            final decoded = jsonDecode(trimmed);
+            if (decoded is List) {
+              return decoded.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+            }
+          } catch (_) {}
+        }
+        return trimmed.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+      return const [];
     }
 
     final nameVal = (rider['name'] as String? ?? '').isNotEmpty
@@ -172,20 +221,41 @@ class RiderModel extends RiderEntity {
           const ['2_WHEELER'],
       vehicleType: rider['vehicleType'] as String? ?? json['vehicleType'] as String? ?? '2_WHEELER',
       vehicleName: rider['vehicleName'] as String? ?? json['vehicleName'] as String?,
-      vehicleNumber: rider['vehicleNumber'] as String? ?? json['vehicleNumber'] as String?,
-      drivingLicenseNo: rider['drivingLicenseNo'] as String? ?? json['drivingLicenseNo'] as String?,
+      vehicleNumber: rider['vehicleNumber'] as String? ??
+          rider['vehicle_number'] as String? ??
+          json['vehicleNumber'] as String? ??
+          json['vehicle_number'] as String? ??
+          (rider['vehicle'] is Map
+              ? (rider['vehicle']['licensePlate'] as String? ?? rider['vehicle']['vehicleNumber'] as String?)
+              : null),
+      drivingLicenseNo: rider['drivingLicenseNo'] as String? ??
+          rider['driving_license_no'] as String? ??
+          rider['drivingLicense'] as String? ??
+          json['drivingLicenseNo'] as String? ??
+          json['driving_license_no'] as String? ??
+          json['drivingLicense'] as String?,
       profileImage: rider['profileImage'] as String? ?? json['profileImage'] as String? ?? avatarVal,
       drivingLicenseDoc: rider['drivingLicenseDoc'] as String? ?? json['drivingLicenseDoc'] as String?,
       nationalIdDoc: rider['nationalIdDoc'] as String? ?? json['nationalIdDoc'] as String?,
       vehicleInsuranceDoc: rider['vehicleInsuranceDoc'] as String? ?? json['vehicleInsuranceDoc'] as String?,
-      selectedZones: ((rider['selectedZones'] ?? json['selectedZones']) as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
-      selectedLocations: ((rider['selectedLocations'] ?? json['selectedLocations']) as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      selectedZones: parseStringList(
+        rider['selectedZones'] ??
+            rider['selected_zones'] ??
+            rider['operatingZones'] ??
+            rider['operating_zones'] ??
+            rider['zones'] ??
+            json['selectedZones'] ??
+            json['selected_zones'] ??
+            json['operatingZones'] ??
+            json['zones'],
+      ),
+      selectedLocations: parseStringList(
+        rider['selectedLocations'] ??
+            rider['selected_locations'] ??
+            rider['locations'] ??
+            json['selectedLocations'] ??
+            json['selected_locations'],
+      ),
       vehicle: rider['vehicle'] != null
           ? VehicleModel.fromJson(rider['vehicle'] as Map<String, dynamic>)
           : json['vehicle'] != null

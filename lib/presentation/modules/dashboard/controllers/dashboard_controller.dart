@@ -831,6 +831,40 @@ class DashboardController extends GetxController {
     final customerPhone = (data['customerPhone'] ?? '').toString();
     final distanceKm = double.tryParse(data['distanceKm']?.toString() ?? '2.1') ?? 2.1;
 
+    final riderPos = Get.isRegistered<LocationService>()
+        ? Get.find<LocationService>().currentPosition.value
+        : null;
+
+    final parsedPickLat = double.tryParse(data['pickupLat']?.toString() ?? '');
+    final parsedPickLng = double.tryParse(data['pickupLng']?.toString() ?? '');
+    final parsedDropLat = double.tryParse(data['dropoffLat']?.toString() ?? '');
+    final parsedDropLng = double.tryParse(data['dropoffLng']?.toString() ?? '');
+
+    double resolveCoord(String addr, bool isLat, {bool isDropoff = false}) {
+      final l = addr.toLowerCase();
+      if (l.contains('patiram')) return isLat ? 25.3340 : 88.7600;
+      if (l.contains('balurghat')) return isLat ? 25.2200 : 88.7667;
+      if (l.contains('gangarampur')) return isLat ? 25.4000 : 88.5200;
+      if (l.contains('buniadpur')) return isLat ? 25.3833 : 88.3833;
+      if (l.contains('malda') || l.contains('english bazar')) return isLat ? 25.0000 : 88.1400;
+      if (l.contains('raiganj')) return isLat ? 25.6167 : 88.1167;
+      if (l.contains('siliguri')) return isLat ? 26.7271 : 88.3953;
+      if (l.contains('jalpaiguri')) return isLat ? 26.5400 : 88.7200;
+      if (l.contains('khagrabari')) return isLat ? 26.3442 : 89.4529;
+      if (l.contains('cooch') || l.contains('cob')) return isLat ? 26.3239 : 89.4510;
+      if (riderPos != null && riderPos.latitude != 0.0 && !(riderPos.latitude >= 8.4 && riderPos.latitude <= 8.55)) {
+        return isLat
+            ? (isDropoff ? riderPos.latitude + 0.008 : riderPos.latitude)
+            : (isDropoff ? riderPos.longitude + 0.008 : riderPos.longitude);
+      }
+      return isLat ? (isDropoff ? 26.3442 : 26.3239) : (isDropoff ? 89.4529 : 89.4510);
+    }
+
+    final pLat = parsedPickLat ?? resolveCoord(shopAddress, true, isDropoff: false);
+    final pLng = parsedPickLng ?? resolveCoord(shopAddress, false, isDropoff: false);
+    final dLat = parsedDropLat ?? resolveCoord(customerAddress, true, isDropoff: true);
+    final dLng = parsedDropLng ?? resolveCoord(customerAddress, false, isDropoff: true);
+
     final offer = OrderEntity(
       id: orderId,
       assignmentId: assignmentId,
@@ -843,12 +877,10 @@ class DashboardController extends GetxController {
       pickupAddress: shopAddress,
       pickupPhone: (data['pickupPhone'] ?? '').toString(),
       dropoffAddress: customerAddress,
-      pickupLat: double.tryParse(data['pickupLat']?.toString() ?? '') ?? 26.3239,
-      pickupLng: double.tryParse(data['pickupLng']?.toString() ?? '') ?? 89.4510,
-      dropoffLat: double.tryParse(data['dropoffLat']?.toString() ?? '') ??
-          (customerAddress.toLowerCase().contains('khagrabari') ? 26.3442 : 26.3239),
-      dropoffLng: double.tryParse(data['dropoffLng']?.toString() ?? '') ??
-          (customerAddress.toLowerCase().contains('khagrabari') ? 89.4529 : 89.4510),
+      pickupLat: pLat,
+      pickupLng: pLng,
+      dropoffLat: dLat,
+      dropoffLng: dLng,
       items: const [],
       subtotal: double.tryParse(data['subtotal']?.toString() ?? '') ?? 0.0,
       riderEarnings: earning,

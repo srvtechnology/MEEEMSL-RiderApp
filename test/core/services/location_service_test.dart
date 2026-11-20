@@ -75,10 +75,9 @@ void main() {
       Get.reset();
     });
 
-    test('Initializes with defaultFallbackPosition and default state', () {
-      expect(locationService.currentPosition.value, isNotNull);
-      expect(locationService.currentPosition.value?.latitude, LocationService.defaultFallbackPosition.latitude);
-      expect(locationService.currentPosition.value?.longitude, LocationService.defaultFallbackPosition.longitude);
+    test('Initializes with null position and awaits real device GPS lock', () {
+      expect(locationService.currentPosition.value, isNull);
+      expect(locationService.hasRealGpsFix.value, isFalse);
       expect(locationService.isTrackingActive.value, isFalse);
       expect(locationService.hasPermission.value, isFalse);
     });

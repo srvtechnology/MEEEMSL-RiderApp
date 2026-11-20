@@ -41,12 +41,6 @@ class NavigationController extends GetxController {
   bool get isHeadingToPickup =>
       activeOrder?.status == OrderStatus.accepted || activeOrder?.status == OrderStatus.atPickup;
 
-  // Cooch Behar (COB) coordinates
-  static const double cobCenterLat = 26.3239;
-  static const double cobCenterLng = 89.4510;
-  static const double khagrabariLat = 26.3442;
-  static const double khagrabariLng = 89.4529;
-
   String get targetTitle =>
       isHeadingToPickup ? (activeOrder?.pickupName ?? 'Vendor Store') : (activeOrder?.customerName ?? 'Customer Dropoff');
 
@@ -64,47 +58,66 @@ class NavigationController extends GetxController {
   }
 
   double _resolveTargetCoordinate(double? raw, {required bool isLat}) {
-    // 1. If a valid non-default coordinate was provided (not 0, and not the Sierra Leone fallback ~8.4x / -13.2x)
+    // 1. If backend coordinate was provided, strictly respect and use it (regardless of distance)
     if (raw != null && raw != 0.0) {
-      final isSierraLeone = isLat
-          ? (raw >= 8.40 && raw <= 8.55)
-          : (raw <= -13.15 && raw >= -13.35);
-      if (!isSierraLeone) {
-        return raw;
-      }
+      return raw;
     }
 
-    // 2. Match known landmarks/areas in Cooch Behar (COB) & North Bengal
+    // 2. Dynamic landmark and address matching across Sierra Leone & West Bengal
     final addr = targetAddress.toLowerCase();
-    if (addr.contains('khagrabari') || addr.contains('khagra bari')) {
-      return isLat ? khagrabariLat : khagrabariLng;
-    }
-    if (addr.contains('cooch') || addr.contains('cob') || addr.contains('koch bihar')) {
-      return isLat ? cobCenterLat : cobCenterLng;
-    }
-    if (addr.contains('alipurduar')) {
-      return isLat ? 26.4919 : 89.5271;
-    }
-    if (addr.contains('tufanganj')) {
-      return isLat ? 26.3167 : 89.6667;
-    }
-    if (addr.contains('dinhata')) {
-      return isLat ? 26.1333 : 89.4667;
-    }
-    if (addr.contains('mathabhanga')) {
-      return isLat ? 26.3333 : 89.2167;
-    }
-    if (addr.contains('mekhliganj')) {
-      return isLat ? 26.3456 : 88.9167;
-    }
-    if (addr.contains('haldibari')) {
-      return isLat ? 26.3333 : 88.7667;
+
+    // Sierra Leone landmarks (MEEEM Platform Core)
+    if (addr.contains('siaka stevens')) return isLat ? 8.4842 : -13.2341;
+    if (addr.contains('wilkinson')) return isLat ? 8.4756 : -13.2652;
+    if (addr.contains('lumley')) return isLat ? 8.4632 : -13.2778;
+    if (addr.contains('aberdeen')) return isLat ? 8.4900 : -13.2900;
+    if (addr.contains('congo cross')) return isLat ? 8.4780 : -13.2500;
+    if (addr.contains('kissy')) return isLat ? 8.4700 : -13.1900;
+    if (addr.contains('tower hill')) return isLat ? 8.4800 : -13.2300;
+    if (addr.contains('brookfields')) return isLat ? 8.4720 : -13.2450;
+    if (addr.contains('fourah bay')) return isLat ? 8.4850 : -13.2180;
+    if (addr.contains('regent')) return isLat ? 8.4350 : -13.2200;
+    if (addr.contains('waterloo')) return isLat ? 8.3389 : -13.0708;
+    if (addr.contains('goderich')) return isLat ? 8.4300 : -13.2800;
+    if (addr.contains('lakka')) return isLat ? 8.4000 : -13.2800;
+    if (addr.contains('hamilton')) return isLat ? 8.3700 : -13.2700;
+    if (addr.contains('no 2 river') || addr.contains('river no 2')) return isLat ? 8.3300 : -13.2600;
+    if (addr.contains('baw baw')) return isLat ? 8.3500 : -13.2700;
+    if (addr.contains('freetown')) return isLat ? 8.4842 : -13.2341;
+    if (addr.contains('bo')) return isLat ? 7.9644 : -11.7383;
+    if (addr.contains('kenema')) return isLat ? 7.8767 : -11.1875;
+    if (addr.contains('makeni')) return isLat ? 8.8833 : -12.0500;
+
+    // West Bengal districts
+    if (addr.contains('patiram')) return isLat ? 25.3340 : 88.7600;
+    if (addr.contains('balurghat')) return isLat ? 25.2200 : 88.7667;
+    if (addr.contains('gangarampur')) return isLat ? 25.4000 : 88.5200;
+    if (addr.contains('buniadpur')) return isLat ? 25.3833 : 88.3833;
+    if (addr.contains('malda') || addr.contains('english bazar')) return isLat ? 25.0000 : 88.1400;
+    if (addr.contains('raiganj')) return isLat ? 25.6167 : 88.1167;
+    if (addr.contains('siliguri')) return isLat ? 26.7271 : 88.3953;
+    if (addr.contains('jalpaiguri')) return isLat ? 26.5400 : 88.7200;
+    if (addr.contains('khagrabari') || addr.contains('khagra bari')) return isLat ? 26.3442 : 89.4529;
+    if (addr.contains('cooch') || addr.contains('cob') || addr.contains('koch bihar')) return isLat ? 26.3239 : 89.4510;
+    if (addr.contains('alipurduar')) return isLat ? 26.4919 : 89.5271;
+    if (addr.contains('tufanganj')) return isLat ? 26.3167 : 89.6667;
+    if (addr.contains('dinhata')) return isLat ? 26.1333 : 89.4667;
+    if (addr.contains('mathabhanga')) return isLat ? 26.3333 : 89.2167;
+    if (addr.contains('mekhliganj')) return isLat ? 26.3456 : 88.9167;
+    if (addr.contains('haldibari')) return isLat ? 26.3333 : 88.7667;
+    if (addr.contains('kolkata') || addr.contains('calcutta')) return isLat ? 22.5726 : 88.3639;
+
+    // 3. Fallback based on regional context
+    final isIndia = addr.contains('cooch') || addr.contains('patiram') || addr.contains('bengal') || addr.contains('india');
+    if (isIndia) {
+      return isLat
+          ? (isHeadingToPickup ? 26.3239 : 26.3442)
+          : (isHeadingToPickup ? 89.4510 : 89.4529);
     }
 
-    // 3. Default to Cooch Behar (COB)
     return isLat
-        ? (isHeadingToPickup ? cobCenterLat : khagrabariLat)
-        : (isHeadingToPickup ? cobCenterLng : khagrabariLng);
+        ? (isHeadingToPickup ? 8.4842 : 8.4632)
+        : (isHeadingToPickup ? -13.2341 : -13.2778);
   }
 
   String get targetPhone =>
@@ -115,14 +128,10 @@ class NavigationController extends GetxController {
   LatLng get riderLatLng {
     final pos = _locationService?.currentPosition.value;
     if (pos != null && pos.latitude != 0.0 && pos.longitude != 0.0) {
-      final isSierraLeone = (pos.latitude >= 8.40 && pos.latitude <= 8.55) &&
-          (pos.longitude <= -13.15 && pos.longitude >= -13.35);
-      if (!isSierraLeone) {
-        return LatLng(pos.latitude, pos.longitude);
-      }
+      return LatLng(pos.latitude, pos.longitude);
     }
-    // Realistic fallback offset around destination in Cooch Behar (COB) if no GPS lock yet
-    return LatLng(targetLat - 0.008, targetLng - 0.006);
+    // Dynamic fallback: Offset slightly from destination while device GPS acquires satellite lock
+    return LatLng(targetLat - 0.005, targetLng - 0.005);
   }
 
   CameraPosition get initialCameraPosition => CameraPosition(
@@ -134,6 +143,7 @@ class NavigationController extends GetxController {
   bool _isDisposed = false;
   Worker? _locationWorker;
   Worker? _orderWorker;
+  Worker? _dashboardWorker;
 
   @override
   void onInit() {
@@ -151,10 +161,22 @@ class NavigationController extends GetxController {
       });
     }
 
-    // Reactively update route if active order milestone changes
+    // Reactively update route if active order milestone changes in OrdersController
     final ordersCtrl = _ordersController;
     if (ordersCtrl != null) {
       _orderWorker = ever(ordersCtrl.selectedOrder, (_) {
+        if (_isDisposed) return;
+        updateMapRoute();
+        if (isFollowingRider.value && mapController != null) {
+          centerOnRider();
+        }
+      });
+    }
+
+    // Reactively update route if active order milestone changes in DashboardController
+    final dashCtrl = _dashboardController;
+    if (dashCtrl != null) {
+      _dashboardWorker = ever(dashCtrl.activeOrder, (_) {
         if (_isDisposed) return;
         updateMapRoute();
         if (isFollowingRider.value && mapController != null) {
@@ -169,6 +191,7 @@ class NavigationController extends GetxController {
     _isDisposed = true;
     _locationWorker?.dispose();
     _orderWorker?.dispose();
+    _dashboardWorker?.dispose();
     mapController?.dispose();
     mapController = null;
     super.onClose();
@@ -295,6 +318,7 @@ class NavigationController extends GetxController {
     );
     final distKm = distMeters / 1000.0;
     remainingDistance.value = distKm;
+    debugPrint('[NavigationRouting] Target: $targetTitle ($targetAddress) | HeadingToPickup: $isHeadingToPickup | Rider: (${rider.latitude.toStringAsFixed(4)}, ${rider.longitude.toStringAsFixed(4)}) -> Dest: (${dest.latitude.toStringAsFixed(4)}, ${dest.longitude.toStringAsFixed(4)}) | Dist: ${distKm.toStringAsFixed(2)} km');
 
     // Speed and ETA calculation
     final currentSpeed = (_locationService?.currentPosition.value?.speed ?? 0.0) * 3.6;

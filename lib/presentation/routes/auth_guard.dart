@@ -25,12 +25,16 @@ class AuthGuard extends GetMiddleware {
         if (rider.isSuspended || rider.status.toUpperCase() == 'SUSPENDED') {
           return const RouteSettings(name: AppRoutes.login);
         }
-        if (!rider.onboardingCompleted || rider.isFirstLogin) {
-          return const RouteSettings(name: AppRoutes.onboarding);
+        final bool isApproved = rider.isApproved ||
+            rider.status.toUpperCase() == 'APPROVED' ||
+            rider.status.toUpperCase() == 'ACTIVE';
+        if (isApproved) {
+          return null;
         }
-        if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
+        if (rider.onboardingCompleted || rider.status.toUpperCase() == 'PENDING') {
           return const RouteSettings(name: AppRoutes.pendingApproval);
         }
+        return const RouteSettings(name: AppRoutes.onboarding);
       } catch (_) {}
     }
 

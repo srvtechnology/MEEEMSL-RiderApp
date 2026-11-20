@@ -722,45 +722,43 @@ class AuthController extends GetxController {
       return;
     }
 
-    if (rider.isSuspended || rider.status == 'SUSPENDED') {
+    if (rider.isSuspended || rider.status.toUpperCase() == 'SUSPENDED') {
       SuspendedAccountDialog.show();
       return;
     }
 
-    // Redirect to onboarding if onboarding is not completed, is first login, or essential details missing
-    final bool requiresOnboarding = !rider.onboardingCompleted ||
-        rider.isFirstLogin ||
-        rider.vehicleNumber == null ||
-        rider.vehicleNumber!.isEmpty ||
-        rider.drivingLicenseNo == null ||
-        rider.drivingLicenseNo!.isEmpty ||
-        rider.selectedZones.isEmpty;
+    // 1. If rider is already approved or active, navigate directly to Dashboard
+    final bool isApprovedRider = rider.isApproved ||
+        rider.status.toUpperCase() == 'APPROVED' ||
+        rider.status.toUpperCase() == 'ACTIVE';
 
-    if (requiresOnboarding) {
-      initOnboardingData(user: user, rider: rider);
-      onboardingStep.value = 0;
-      Get.snackbar(
-        'Welcome, ${user.name.isNotEmpty ? user.name : "Rider"}!',
-        'Please complete your initial rider onboarding details.',
-        snackPosition: SnackPosition.TOP,
-        duration: const Duration(seconds: 4),
+    if (isApprovedRider) {
+      _showSnackbar(
+        'Welcome Back!',
+        'Signed in as ${user.name.isNotEmpty ? user.name : rider.name}',
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: const Color(0xFFE8F8EE),
       );
-      Get.offAllNamed(AppRoutes.onboarding);
+      _safeNavigate(AppRoutes.main, offAll: true);
       return;
     }
 
-    if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
+    // 2. If onboarding was completed or status is pending review, show Pending Approval
+    if (rider.onboardingCompleted || rider.status.toUpperCase() == 'PENDING') {
       _safeNavigate(AppRoutes.pendingApproval, offAll: true);
       return;
     }
 
-    _showSnackbar(
-      'Welcome Back!',
-      'Signed in as ${user.name.isNotEmpty ? user.name : rider.name}',
-      snackPosition: SnackPosition.BOTTOM,
-      backgroundColor: const Color(0xFFE8F8EE),
+    // 3. Otherwise, rider has not completed onboarding -> route to onboarding wizard
+    initOnboardingData(user: user, rider: rider);
+    onboardingStep.value = 0;
+    Get.snackbar(
+      'Welcome, ${user.name.isNotEmpty ? user.name : "Rider"}!',
+      'Please complete your initial rider onboarding details.',
+      snackPosition: SnackPosition.TOP,
+      duration: const Duration(seconds: 4),
     );
-    _safeNavigate(AppRoutes.main, offAll: true);
+    Get.offAllNamed(AppRoutes.onboarding);
   }
 
   // 3.1 Rider Login with Email/Phone & Password (with Auto Device Token Registration)

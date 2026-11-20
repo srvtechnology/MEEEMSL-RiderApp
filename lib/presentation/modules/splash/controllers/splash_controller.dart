@@ -21,14 +21,23 @@ class SplashController extends GetxController {
         try {
           final riderMap = jsonDecode(rawRider) as Map<String, dynamic>;
           final rider = RiderModel.fromJson(riderMap);
-          if (!rider.onboardingCompleted || rider.isFirstLogin) {
-            Get.offAllNamed(AppRoutes.onboarding);
+          if (rider.isSuspended || rider.status.toUpperCase() == 'SUSPENDED') {
+            Get.offAllNamed(AppRoutes.login);
             return;
           }
-          if (!rider.isApproved || rider.status.toUpperCase() == 'PENDING') {
+          final bool isApproved = rider.isApproved ||
+              rider.status.toUpperCase() == 'APPROVED' ||
+              rider.status.toUpperCase() == 'ACTIVE';
+          if (isApproved) {
+            Get.offAllNamed(AppRoutes.main);
+            return;
+          }
+          if (rider.onboardingCompleted || rider.status.toUpperCase() == 'PENDING') {
             Get.offAllNamed(AppRoutes.pendingApproval);
             return;
           }
+          Get.offAllNamed(AppRoutes.onboarding);
+          return;
         } catch (_) {}
       }
       Get.offAllNamed(AppRoutes.main);

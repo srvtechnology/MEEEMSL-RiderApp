@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import '../../domain/entities/order_entity.dart';
 import 'order_item_model.dart';
 
@@ -83,6 +85,12 @@ class OrderModel extends OrderEntity {
           return Map<String, dynamic>.from(val);
         } catch (_) {}
       }
+      if (val is String && val.trim().startsWith('{')) {
+        try {
+          final decoded = jsonDecode(val);
+          if (decoded is Map) return Map<String, dynamic>.from(decoded);
+        } catch (_) {}
+      }
       return null;
     }
 
@@ -156,10 +164,35 @@ class OrderModel extends OrderEntity {
       return double.tryParse(val.toString());
     }
 
+    (double, double)? extractGeoJson(dynamic obj) {
+      if (obj == null) return null;
+      if (obj is List && obj.length >= 2) {
+        final p0 = parseCoordinate(obj[0]);
+        final p1 = parseCoordinate(obj[1]);
+        if (p0 != null && p1 != null) {
+          if ((p0.abs() <= 90 && p1.abs() > 90) || (p0 >= 6 && p0 <= 38 && p1 >= 68 && p1 <= 98)) {
+            return (p0, p1);
+          }
+          return (p1, p0);
+        }
+      }
+      if (obj is Map) {
+        final innerCoords = obj['coordinates'] ??
+            (obj['location'] is Map ? (obj['location'] as Map)['coordinates'] : null) ??
+            (obj['geo'] is Map ? (obj['geo'] as Map)['coordinates'] : null);
+        if (innerCoords != null) return extractGeoJson(innerCoords);
+      }
+      return null;
+    }
+
     final shippingAddressMap = safeMap(orderMap?['shippingAddress'] ?? json['shippingAddress']);
     final deliveryAddressMap = safeMap(orderMap?['deliveryAddress'] ?? json['deliveryAddress']);
     final dropoffLocationMap = safeMap(orderMap?['dropoffLocation'] ?? json['dropoffLocation']);
     final coords = orderMap?['coordinates'] ?? json['coordinates'];
+
+    // 1. Resolve Customer Dropoff Coordinates
+    final customerAddressMap = safeMap(customer?['address']);
+    final customerLocationMap = safeMap(customer?['location']);
 
     double? rawDropLat = parseCoordinate(json['dropoffLat']) ??
         parseCoordinate(orderMap?['dropoffLat']) ??
@@ -179,7 +212,10 @@ class OrderModel extends OrderEntity {
         parseCoordinate(dropoffLocationMap?['lat']) ??
         parseCoordinate(customer?['latitude']) ??
         parseCoordinate(customer?['lat']) ??
-        (coords is List && coords.length >= 2 ? parseCoordinate(coords[1]) : null);
+        parseCoordinate(customerAddressMap?['latitude']) ??
+        parseCoordinate(customerAddressMap?['lat']) ??
+        parseCoordinate(customerLocationMap?['latitude']) ??
+        parseCoordinate(customerLocationMap?['lat']);
 
     double? rawDropLng = parseCoordinate(json['dropoffLng']) ??
         parseCoordinate(orderMap?['dropoffLng']) ??
@@ -199,88 +235,199 @@ class OrderModel extends OrderEntity {
         parseCoordinate(dropoffLocationMap?['lng']) ??
         parseCoordinate(customer?['longitude']) ??
         parseCoordinate(customer?['lng']) ??
-        (coords is List && coords.length >= 2 ? parseCoordinate(coords[0]) : null);
+        parseCoordinate(customerAddressMap?['longitude']) ??
+        parseCoordinate(customerAddressMap?['lng']) ??
+        parseCoordinate(customerLocationMap?['longitude']) ??
+        parseCoordinate(customerLocationMap?['lng']);
 
-    // Geocode known locations in Cooch Behar (COB) or North Bengal if missing or Sierra Leone default
-    final dropAddrLower = dropoffAddress.toLowerCase();
-    if (dropAddrLower.contains('khagrabari') || dropAddrLower.contains('khagra bari')) {
-      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
-        rawDropLat = 26.3442;
-        rawDropLng = 89.4529;
-      }
-    } else if (dropAddrLower.contains('cooch') || dropAddrLower.contains('cob') || dropAddrLower.contains('koch bihar')) {
-      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
-        rawDropLat = 26.3239;
-        rawDropLng = 89.4510;
-      }
-    } else if (dropAddrLower.contains('alipurduar')) {
-      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
-        rawDropLat = 26.4919;
-        rawDropLng = 89.5271;
-      }
-    } else if (dropAddrLower.contains('tufanganj')) {
-      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
-        rawDropLat = 26.3167;
-        rawDropLng = 89.6667;
-      }
-    } else if (dropAddrLower.contains('dinhata')) {
-      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
-        rawDropLat = 26.1333;
-        rawDropLng = 89.4667;
-      }
-    } else if (dropAddrLower.contains('mathabhanga')) {
-      if (rawDropLat == null || (rawDropLat >= 8.4 && rawDropLat <= 8.55)) {
-        rawDropLat = 26.3333;
-        rawDropLng = 89.2167;
+    if (rawDropLat == null || rawDropLng == null) {
+      final geo = extractGeoJson(coords) ??
+          extractGeoJson(dropoffLocationMap) ??
+          extractGeoJson(deliveryAddressMap) ??
+          extractGeoJson(shippingAddressMap) ??
+          extractGeoJson(customerLocationMap) ??
+          extractGeoJson(customerAddressMap);
+      if (geo != null) {
+        rawDropLat ??= geo.$1;
+        rawDropLng ??= geo.$2;
       }
     }
 
-    if (rawDropLat != null && (rawDropLat >= 8.4 && rawDropLat <= 8.55) && (rawDropLng != null && rawDropLng <= -13.15 && rawDropLng >= -13.35)) {
-      rawDropLat = 26.3442;
-      rawDropLng = 89.4529;
+    // Dynamic coordinate lookup from address text and landmarks across Sierra Leone & West Bengal
+    (double, double)? resolveAddressCoordinates(String address) {
+      final lower = address.toLowerCase();
+
+      // 1. Sierra Leone locations & street landmarks (MEEEM Platform Core)
+      if (lower.contains('siaka stevens')) return const (8.4842, -13.2341);
+      if (lower.contains('wilkinson')) return const (8.4756, -13.2652);
+      if (lower.contains('lumley')) return const (8.4632, -13.2778);
+      if (lower.contains('aberdeen')) return const (8.4900, -13.2900);
+      if (lower.contains('congo cross')) return const (8.4780, -13.2500);
+      if (lower.contains('kissy')) return const (8.4700, -13.1900);
+      if (lower.contains('tower hill')) return const (8.4800, -13.2300);
+      if (lower.contains('brookfields')) return const (8.4720, -13.2450);
+      if (lower.contains('fourah bay')) return const (8.4850, -13.2180);
+      if (lower.contains('regent')) return const (8.4350, -13.2200);
+      if (lower.contains('waterloo')) return const (8.3389, -13.0708);
+      if (lower.contains('goderich')) return const (8.4300, -13.2800);
+      if (lower.contains('lakka')) return const (8.4000, -13.2800);
+      if (lower.contains('hamilton')) return const (8.3700, -13.2700);
+      if (lower.contains('no 2 river') || lower.contains('river no 2')) return const (8.3300, -13.2600);
+      if (lower.contains('baw baw')) return const (8.3500, -13.2700);
+      if (lower.contains('freetown')) return const (8.4842, -13.2341);
+      if (lower.contains('bo')) return const (7.9644, -11.7383);
+      if (lower.contains('kenema')) return const (7.8767, -11.1875);
+      if (lower.contains('makeni')) return const (8.8833, -12.0500);
+      if (lower.contains('koidu')) return const (8.6439, -10.9708);
+
+      // 2. West Bengal districts & landmarks
+      if (lower.contains('patiram')) return const (25.3340, 88.7600);
+      if (lower.contains('balurghat')) return const (25.2200, 88.7667);
+      if (lower.contains('gangarampur')) return const (25.4000, 88.5200);
+      if (lower.contains('buniadpur')) return const (25.3833, 88.3833);
+      if (lower.contains('malda') || lower.contains('english bazar')) return const (25.0000, 88.1400);
+      if (lower.contains('raiganj')) return const (25.6167, 88.1167);
+      if (lower.contains('siliguri')) return const (26.7271, 88.3953);
+      if (lower.contains('jalpaiguri')) return const (26.5400, 88.7200);
+      if (lower.contains('khagrabari') || lower.contains('khagra bari')) return const (26.3442, 89.4529);
+      if (lower.contains('cooch') || lower.contains('cob') || lower.contains('koch bihar')) return const (26.3239, 89.4510);
+      if (lower.contains('alipurduar')) return const (26.4919, 89.5271);
+      if (lower.contains('tufanganj')) return const (26.3167, 89.6667);
+      if (lower.contains('dinhata')) return const (26.1333, 89.4667);
+      if (lower.contains('mathabhanga')) return const (26.3333, 89.2167);
+      if (lower.contains('mekhliganj')) return const (26.3456, 88.9167);
+      if (lower.contains('haldibari')) return const (26.3333, 88.7667);
+      if (lower.contains('kolkata') || lower.contains('calcutta')) return const (22.5726, 88.3639);
+
+      // Check if address string contains literal coordinate pair like "25.3340, 88.7600" or "8.4842, -13.2341"
+      final match = RegExp(r'(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})').firstMatch(address);
+      if (match != null) {
+        final p1 = double.tryParse(match.group(1)!);
+        final p2 = double.tryParse(match.group(2)!);
+        if (p1 != null && p2 != null) {
+          if ((p1 >= 68 && p1 <= 98) && (p2 >= 6 && p2 <= 38)) {
+            return (p2, p1);
+          } else {
+            return (p1, p2);
+          }
+        }
+      }
+      return null;
     }
 
-    final dropoffLat = rawDropLat ?? 26.3442;
-    final dropoffLng = rawDropLng ?? 89.4529;
+    // ONLY if backend did not provide dropoff coordinates, try geocoding address text
+    if (rawDropLat == null || rawDropLng == null || (rawDropLat == 0.0 && rawDropLng == 0.0)) {
+      final resolved = resolveAddressCoordinates(dropoffAddress);
+      if (resolved != null) {
+        rawDropLat = resolved.$1;
+        rawDropLng = resolved.$2;
+      }
+    }
+
+    // 2. Resolve Seller / Store Pickup Coordinates
+    final pickupLocationMap = safeMap(orderMap?['pickupLocation'] ?? json['pickupLocation']);
+    final storeLocationMap = safeMap(store?['location'] ?? businessInfo?['location'] ?? sellerMap?['location']);
 
     double? rawPickLat = parseCoordinate(businessInfo?['latitude']) ??
+        parseCoordinate(businessInfo?['lat']) ??
         parseCoordinate(store?['lat']) ??
         parseCoordinate(store?['latitude']) ??
-        parseCoordinate(json['sellerLatitude']) ??
+        parseCoordinate(pickupLocationMap?['latitude']) ??
+        parseCoordinate(pickupLocationMap?['lat']) ??
+        parseCoordinate(storeLocationMap?['latitude']) ??
+        parseCoordinate(storeLocationMap?['lat']) ??
         parseCoordinate(json['pickupLat']) ??
+        parseCoordinate(json['pickupLatitude']) ??
         parseCoordinate(orderMap?['pickupLat']) ??
+        parseCoordinate(orderMap?['pickupLatitude']) ??
+        parseCoordinate(json['sellerLatitude']) ??
+        parseCoordinate(json['sellerLat']) ??
+        parseCoordinate(orderMap?['sellerLatitude']) ??
+        parseCoordinate(orderMap?['sellerLat']) ??
         parseCoordinate(sellerMap?['latitude']) ??
         parseCoordinate(sellerMap?['lat']);
 
     double? rawPickLng = parseCoordinate(businessInfo?['longitude']) ??
+        parseCoordinate(businessInfo?['lng']) ??
         parseCoordinate(store?['lng']) ??
         parseCoordinate(store?['longitude']) ??
-        parseCoordinate(json['sellerLongitude']) ??
+        parseCoordinate(pickupLocationMap?['longitude']) ??
+        parseCoordinate(pickupLocationMap?['lng']) ??
+        parseCoordinate(storeLocationMap?['longitude']) ??
+        parseCoordinate(storeLocationMap?['lng']) ??
         parseCoordinate(json['pickupLng']) ??
+        parseCoordinate(json['pickupLongitude']) ??
         parseCoordinate(orderMap?['pickupLng']) ??
+        parseCoordinate(orderMap?['pickupLongitude']) ??
+        parseCoordinate(json['sellerLongitude']) ??
+        parseCoordinate(json['sellerLng']) ??
+        parseCoordinate(orderMap?['sellerLongitude']) ??
+        parseCoordinate(orderMap?['sellerLng']) ??
         parseCoordinate(sellerMap?['longitude']) ??
         parseCoordinate(sellerMap?['lng']);
 
-    final pickAddrLower = pickupAddress.toLowerCase();
-    if (pickAddrLower.contains('khagrabari') || pickAddrLower.contains('khagra bari')) {
-      if (rawPickLat == null || (rawPickLat >= 8.4 && rawPickLat <= 8.55)) {
-        rawPickLat = 26.3442;
-        rawPickLng = 89.4529;
+    if (rawPickLat == null || rawPickLng == null) {
+      final geoPick = extractGeoJson(pickupLocationMap) ??
+          extractGeoJson(storeLocationMap) ??
+          extractGeoJson(businessInfo) ??
+          extractGeoJson(store) ??
+          extractGeoJson(sellerMap);
+      if (geoPick != null) {
+        rawPickLat ??= geoPick.$1;
+        rawPickLng ??= geoPick.$2;
       }
-    } else if (pickAddrLower.contains('cooch') || pickAddrLower.contains('cob') || pickAddrLower.contains('koch bihar')) {
-      if (rawPickLat == null || (rawPickLat >= 8.4 && rawPickLat <= 8.55)) {
+    }
+
+    // ONLY if backend did not provide pickup coordinates, try geocoding address text
+    if (rawPickLat == null || rawPickLng == null || (rawPickLat == 0.0 && rawPickLng == 0.0)) {
+      final resolvedPick = resolveAddressCoordinates(pickupAddress);
+      if (resolvedPick != null) {
+        rawPickLat = resolvedPick.$1;
+        rawPickLng = resolvedPick.$2;
+      }
+    }
+
+    // Dynamic fallback ONLY if backend coordinates and address geocoding are completely missing
+    if (rawPickLat == null || rawPickLng == null || (rawPickLat == 0.0 && rawPickLng == 0.0)) {
+      final isIndia = pickupAddress.toLowerCase().contains('cooch') ||
+          pickupAddress.toLowerCase().contains('patiram') ||
+          pickupAddress.toLowerCase().contains('bengal') ||
+          pickupAddress.toLowerCase().contains('india');
+      if (isIndia) {
         rawPickLat = 26.3239;
         rawPickLng = 89.4510;
+      } else {
+        rawPickLat = 8.4842;
+        rawPickLng = -13.2341;
       }
     }
 
-    if (rawPickLat != null && (rawPickLat >= 8.4 && rawPickLat <= 8.55) && (rawPickLng != null && rawPickLng <= -13.15 && rawPickLng >= -13.35)) {
-      rawPickLat = 26.3239;
-      rawPickLng = 89.4510;
+    if (rawDropLat == null || rawDropLng == null || (rawDropLat == 0.0 && rawDropLng == 0.0)) {
+      final isIndia = dropoffAddress.toLowerCase().contains('cooch') ||
+          dropoffAddress.toLowerCase().contains('patiram') ||
+          dropoffAddress.toLowerCase().contains('bengal') ||
+          dropoffAddress.toLowerCase().contains('india');
+      if (isIndia) {
+        rawDropLat = 26.3442;
+        rawDropLng = 89.4529;
+      } else {
+        rawDropLat = 8.4632;
+        rawDropLng = -13.2778;
+      }
     }
 
-    final pickupLat = rawPickLat ?? 26.3239;
-    final pickupLng = rawPickLng ?? 89.4510;
+    final orderNumber = orderMap?['orderNumber']?.toString() ??
+        json['orderNumber']?.toString() ??
+        orderMap?['orderNo']?.toString() ??
+        json['orderNo']?.toString() ??
+        (json['id'] != null ? json['id'].toString() : '');
+
+    final pickupLat = rawPickLat;
+    final pickupLng = rawPickLng;
+    final dropoffLat = rawDropLat;
+    final dropoffLng = rawDropLng;
+
+    debugPrint('[OrderModel.fromJson] #$orderNumber | Pickup: ($pickupLat, $pickupLng) from "$pickupAddress" | Dropoff: ($dropoffLat, $dropoffLng) from "$dropoffAddress"');
 
     final rawItems = orderMap?['items'] ?? json['items'];
     final items = <OrderItemModel>[];
@@ -297,12 +444,6 @@ class OrderModel extends OrderEntity {
         }
       }
     }
-
-    final orderNumber = orderMap?['orderNumber']?.toString() ??
-        json['orderNumber']?.toString() ??
-        orderMap?['orderNo']?.toString() ??
-        json['orderNo']?.toString() ??
-        (json['id'] != null ? json['id'].toString() : '');
 
     String? resolvedOtp = json['deliveryOtp']?.toString() ??
         orderMap?['deliveryOtp']?.toString();

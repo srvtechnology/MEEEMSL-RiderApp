@@ -56,7 +56,8 @@ class LocationService extends GetxService {
   static const int restFallbackHeartbeatSeconds = 20; // 15-30s heartbeat window per Checklist Point 2
 
   // Reactive state
-  final Rx<Position?> currentPosition = Rx<Position?>(defaultFallbackPosition);
+  final Rx<Position?> currentPosition = Rx<Position?>(null);
+  final RxBool hasRealGpsFix = false.obs;
   final RxBool isTrackingActive = false.obs;
   final RxBool hasPermission = false.obs;
   final Rxn<DateTime> lastSyncTimestamp = Rxn<DateTime>();
@@ -69,24 +70,34 @@ class LocationService extends GetxService {
   DateTime? _lastRestFallbackTimestamp;
   bool _wasSocketConnected = false;
 
-  // Fallback initial location (Cooch Behar / COB Delivery District)
-  static final Position defaultFallbackPosition = Position(
-    latitude: 26.3239,
-    longitude: 89.4510,
-    timestamp: DateTime.now(),
-    accuracy: 5.0,
-    altitude: 40.0,
-    altitudeAccuracy: 1.0,
-    heading: 90.0,
-    headingAccuracy: 1.0,
-    speed: 0.0,
-    speedAccuracy: 1.0,
-  );
+  bool _isValidGpsCoordinate(double lat, double lng) {
+    if (lat == 0.0 && lng == 0.0) return false;
+    return lat >= -90.0 && lat <= 90.0 && lng >= -180.0 && lng <= 180.0;
+  }
 
   @override
   void onInit() {
     super.onInit();
-    currentPosition.value = defaultFallbackPosition;
+    _fetchInitialDeviceLocation();
+  }
+
+  Future<void> _fetchInitialDeviceLocation() async {
+    try {
+      final isEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!isEnabled) return;
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.always || permission == LocationPermission.whileInUse) {
+        hasPermission.value = true;
+        final lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null && _isValidGpsCoordinate(lastKnown.latitude, lastKnown.longitude)) {
+          currentPosition.value = lastKnown;
+          hasRealGpsFix.value = true;
+          debugPrint('[LocationService] Acquired initial real device GPS from last known location: (${lastKnown.latitude}, ${lastKnown.longitude})');
+        }
+      }
+    } catch (e) {
+      debugPrint('[LocationService] Error fetching initial device location: $e');
+    }
   }
 
   @override
@@ -211,18 +222,35 @@ class LocationService extends GetxService {
     }
 
     try {
-      // Immediately obtain high accuracy location lock
+      // 1. Immediately check last known position for 0ms physical device coordinates
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null && _isValidGpsCoordinate(lastKnown.latitude, lastKnown.longitude)) {
+        currentPosition.value = lastKnown;
+        hasRealGpsFix.value = true;
+        debugPrint('[LocationService] Live tracking initialized with last known GPS: (${lastKnown.latitude}, ${lastKnown.longitude})');
+      }
+
+      // 2. High-accuracy current position lock
       Geolocator.getCurrentPosition(
         locationSettings: locationSettings,
       ).then((Position initialPos) {
-        currentPosition.value = initialPos;
+        if (_isValidGpsCoordinate(initialPos.latitude, initialPos.longitude)) {
+          currentPosition.value = initialPos;
+          hasRealGpsFix.value = true;
+          debugPrint('[LocationService] Acquired high-accuracy GPS lock: (${initialPos.latitude}, ${initialPos.longitude})');
+          sendLocationUpdate();
+        }
       }).catchError((_) {});
 
+      // 3. Continuous device GPS position stream
       _positionSubscription =
           Geolocator.getPositionStream(locationSettings: locationSettings)
               .listen(
         (Position position) {
-          currentPosition.value = position;
+          if (_isValidGpsCoordinate(position.latitude, position.longitude)) {
+            currentPosition.value = position;
+            hasRealGpsFix.value = true;
+          }
         },
         onError: (error) {
           debugPrint('[LocationService] Position stream error: $error');
@@ -239,8 +267,10 @@ class LocationService extends GetxService {
       (_) => sendLocationUpdate(),
     );
 
-    // Initial immediate ping
-    sendLocationUpdate();
+    // Initial ping ONLY if a real GPS fix has been acquired
+    if (hasRealGpsFix.value && currentPosition.value != null) {
+      sendLocationUpdate();
+    }
   }
 
   /// Stops tracking, closes telemetry streaming, and disconnects socket.
@@ -314,7 +344,11 @@ class LocationService extends GetxService {
   Future<void> sendLocationUpdate({bool forceRest = false}) async {
     if (!isTrackingActive.value) return;
 
-    final pos = currentPosition.value ?? defaultFallbackPosition;
+    final pos = currentPosition.value;
+    if (pos == null || !hasRealGpsFix.value || !_isValidGpsCoordinate(pos.latitude, pos.longitude)) {
+      debugPrint('[LocationService] Telemetry suspended: Waiting for real device GPS lock.');
+      return;
+    }
     final token = _authLocalDataSource?.getToken();
     final rider = _authLocalDataSource?.getSavedRider();
     final riderId = rider?.id ??

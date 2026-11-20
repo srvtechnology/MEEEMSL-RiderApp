@@ -138,5 +138,35 @@ void main() {
       expect(serialized['paymentOption'], 'Orange Money');
       expect(serialized['mobileNumber'], '+23276123456');
     });
+
+    test('correctly parses JSON-encoded or comma-separated selectedZones and operatingZones fallback', () {
+      final jsonEncoded = RiderModel.fromJson({
+        "id": "r1",
+        "selectedZones": '["ZONE 1", "ZONE 2"]',
+        "selectedLocations": '["NO 2 RIVER", "BAW BAW"]',
+      });
+      expect(jsonEncoded.selectedZones, ['ZONE 1', 'ZONE 2']);
+      expect(jsonEncoded.selectedLocations, ['NO 2 RIVER', 'BAW BAW']);
+
+      final fallbackZones = RiderModel.fromJson({
+        "id": "r2",
+        "operatingZones": ['ZONE 1', 'ZONE 3'],
+      });
+      expect(fallbackZones.selectedZones, ['ZONE 1', 'ZONE 3']);
+
+      final snakeCase = RiderModel.fromJson({
+        "id": "r3",
+        "is_approved": true,
+        "onboarding_completed": true,
+        "is_first_login": false,
+        "vehicle_number": "SL-9988",
+        "driving_license_no": "DL-1234",
+      });
+      expect(snakeCase.isApproved, true);
+      expect(snakeCase.onboardingCompleted, true);
+      expect(snakeCase.isFirstLogin, false);
+      expect(snakeCase.vehicleNumber, "SL-9988");
+      expect(snakeCase.drivingLicenseNo, "DL-1234");
+    });
   });
 }

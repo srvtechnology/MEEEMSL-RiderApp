@@ -30,23 +30,71 @@ class LoginResponseModel extends LoginResponseEntity {
     final resendCooldown = dataMap['resendCooldown'] as int? ?? json['resendCooldown'] as int? ?? 60;
 
     final userJson = dataMap['user'] as Map<String, dynamic>? ?? json['user'] as Map<String, dynamic>? ?? {};
-    final riderProfile = userJson['riderProfile'] as Map<String, dynamic>? ?? {};
-    final riderSource = dataMap['rider'] as Map<String, dynamic>? ?? json['rider'] as Map<String, dynamic>? ?? (riderProfile.isNotEmpty ? riderProfile : {});
+    final riderProfile = userJson['riderProfile'] as Map<String, dynamic>? ??
+        userJson['rider'] as Map<String, dynamic>? ??
+        dataMap['riderProfile'] as Map<String, dynamic>? ??
+        json['riderProfile'] as Map<String, dynamic>? ??
+        dataMap['profile'] as Map<String, dynamic>? ??
+        {};
+    final riderSource = dataMap['rider'] as Map<String, dynamic>? ??
+        json['rider'] as Map<String, dynamic>? ??
+        (riderProfile.isNotEmpty ? riderProfile : userJson);
     final riderJson = Map<String, dynamic>.from(riderSource);
     final tokensJson = dataMap['tokens'] as Map<String, dynamic>? ?? json['tokens'] as Map<String, dynamic>? ?? {};
 
-    // Propagate onboarding status from root if present
-    if (json.containsKey('onboardingCompleted') && !riderJson.containsKey('onboardingCompleted')) {
-      riderJson['onboardingCompleted'] = json['onboardingCompleted'];
+    // Propagate onboarding status from root/user if present
+    for (final key in [
+      'onboardingCompleted',
+      'onboarding_completed',
+      'isOnboarded',
+      'is_onboarded',
+      'isOnboardingCompleted',
+    ]) {
+      if (json.containsKey(key) && !riderJson.containsKey('onboardingCompleted')) {
+        riderJson['onboardingCompleted'] = json[key];
+      }
+      if (dataMap.containsKey(key) && !riderJson.containsKey('onboardingCompleted')) {
+        riderJson['onboardingCompleted'] = dataMap[key];
+      }
+      if (userJson.containsKey(key) && !riderJson.containsKey('onboardingCompleted')) {
+        riderJson['onboardingCompleted'] = userJson[key];
+      }
     }
-    if (dataMap.containsKey('onboardingCompleted') && !riderJson.containsKey('onboardingCompleted')) {
-      riderJson['onboardingCompleted'] = dataMap['onboardingCompleted'];
+
+    for (final key in ['isApproved', 'is_approved']) {
+      if (json.containsKey(key) && !riderJson.containsKey('isApproved')) {
+        riderJson['isApproved'] = json[key];
+      }
+      if (dataMap.containsKey(key) && !riderJson.containsKey('isApproved')) {
+        riderJson['isApproved'] = dataMap[key];
+      }
+      if (userJson.containsKey(key) && !riderJson.containsKey('isApproved')) {
+        riderJson['isApproved'] = userJson[key];
+      }
     }
-    if (json.containsKey('isFirstLogin') && !riderJson.containsKey('isFirstLogin')) {
-      riderJson['isFirstLogin'] = json['isFirstLogin'];
+
+    for (final key in ['status', 'approvalStatus', 'approval_status']) {
+      if (json.containsKey(key) && !riderJson.containsKey('status')) {
+        riderJson['status'] = json[key];
+      }
+      if (dataMap.containsKey(key) && !riderJson.containsKey('status')) {
+        riderJson['status'] = dataMap[key];
+      }
+      if (userJson.containsKey(key) && !riderJson.containsKey('status')) {
+        riderJson['status'] = userJson[key];
+      }
     }
-    if (dataMap.containsKey('isFirstLogin') && !riderJson.containsKey('isFirstLogin')) {
-      riderJson['isFirstLogin'] = dataMap['isFirstLogin'];
+
+    for (final key in ['isFirstLogin', 'is_first_login']) {
+      if (json.containsKey(key) && !riderJson.containsKey('isFirstLogin')) {
+        riderJson['isFirstLogin'] = json[key];
+      }
+      if (dataMap.containsKey(key) && !riderJson.containsKey('isFirstLogin')) {
+        riderJson['isFirstLogin'] = dataMap[key];
+      }
+      if (userJson.containsKey(key) && !riderJson.containsKey('isFirstLogin')) {
+        riderJson['isFirstLogin'] = userJson[key];
+      }
     }
 
     final user = userJson.isNotEmpty
@@ -55,18 +103,20 @@ class LoginResponseModel extends LoginResponseEntity {
 
     final rider = riderJson.isNotEmpty
         ? RiderModel.fromJson(riderJson, userJson)
-        : const RiderModel(
-            id: '',
-            name: '',
-            phone: '',
-            email: '',
-            avatar: '',
-            rating: 0,
-            totalTrips: 0,
-            isOnline: false,
-            walletBalance: 0,
-            approvalStatus: '',
-          );
+        : (userJson.isNotEmpty
+            ? RiderModel.fromJson(userJson)
+            : const RiderModel(
+                id: '',
+                name: '',
+                phone: '',
+                email: '',
+                avatar: '',
+                rating: 0,
+                totalTrips: 0,
+                isOnline: false,
+                walletBalance: 0,
+                approvalStatus: '',
+              ));
 
     String firstNonEmpty(List<dynamic> candidates) {
       for (final value in candidates) {
